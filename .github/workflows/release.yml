@@ -1,0 +1,25 @@
+name: Release
+on:
+  push:
+    branches: [main]
+permissions:
+  contents: read
+jobs:
+  release:
+    uses: leaflockio/core-actions/.github/workflows/tpl-release.yml@v1
+    with:
+      core-actions-ref: v1
+      extra-plugins: "@semantic-release/exec"
+    secrets:
+      APP_ID: ${{ secrets.LOCKET_CI_APP_ID }}
+      APP_PRIVATE_KEY: ${{ secrets.LOCKET_CI_PRIVATE_KEY }}
+  back-merge:
+    needs: release
+    if: needs.release.outputs.new_release_published == 'true'
+    uses: leaflockio/core-actions/.github/workflows/tpl-back-merge.yml@v1
+    with:
+      core-actions-ref: v1
+      strategy: force-sync
+    secrets:
+      APP_ID: ${{ secrets.LOCKET_CI_APP_ID }}
+      APP_PRIVATE_KEY: ${{ secrets.LOCKET_CI_PRIVATE_KEY }}
