@@ -93,6 +93,7 @@
     "gofmt",
     "gofumpt",
     "coverprofile",
+    "covermode",
     "gomod",
     "gosum",
     "goroutine",
