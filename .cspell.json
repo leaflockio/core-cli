@@ -6,6 +6,7 @@
     ".git",
     ".lefthook",
     "vendor",
+    "go.mod",
     "go.sum",
     "*.lock",
     "*.png",
