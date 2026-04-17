@@ -109,6 +109,9 @@
     "mkdir",
     "chmod",
 
-    "pathutil"
+    "pathutil",
+
+    "debugf",
+    "mapstructure"
   ]
 }
