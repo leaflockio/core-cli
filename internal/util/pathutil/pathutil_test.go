@@ -126,9 +126,9 @@ func TestRelPath_fallbackDepthExceedsComponents(t *testing.T) {
 	FallbackDepth = 5
 	t.Cleanup(func() { FallbackDepth = oldDepth })
 
-	// Path has only 1 component — fewer than FallbackDepth, returns as-is.
-	got := RelPath(filepath.Join(t.TempDir(), "file.go"))
-	if !strings.HasSuffix(got, "file.go") {
-		t.Errorf("got %q, want suffix file.go", got)
+	// "pkg/file.go" has 2 components — fewer than FallbackDepth=5, returns as-is.
+	got := RelPath("pkg/file.go")
+	if got != "pkg/file.go" {
+		t.Errorf("got %q, want %q", got, "pkg/file.go")
 	}
 }
