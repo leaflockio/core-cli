@@ -29,18 +29,18 @@ build: build-prod ## Build the leaf binary (prod by default)
 build-dev: ## Build with dev profile (debug symbols, no optimization)
 	@echo "Building $(BINARY) [dev]..."
 	@mkdir -p $(BIN_DIR)
-	@$(GO) build -gcflags="$(GCFLAGS_DEV)" -ldflags="$(LDFLAGS_DEV)" -o $(BIN_DIR)/$(BINARY) .
+	@$(GO) build -gcflags="$(GCFLAGS_DEV)" -ldflags="$(LDFLAGS_DEV)" -o $(BIN_DIR)/$(BINARY) ./cmd/...
 	@echo "Binary: $(BIN_DIR)/$(BINARY)"
 
 build-prod: ## Build with prod profile (stripped, optimized)
 	@echo "Building $(BINARY) [prod]..."
 	@mkdir -p $(BIN_DIR)
-	@$(GO) build -ldflags="$(LDFLAGS_PROD)" -o $(BIN_DIR)/$(BINARY) .
+	@$(GO) build -ldflags="$(LDFLAGS_PROD)" -o $(BIN_DIR)/$(BINARY) ./cmd/...
 	@echo "Binary: $(BIN_DIR)/$(BINARY)"
 
-install: ## Install leaf to GOPATH/bin
+install: ## Install leaf to GOPATH/bin (prod profile)
 	@echo "Installing $(BINARY)..."
-	@$(GO) install .
+	@$(GO) install -ldflags="$(LDFLAGS_PROD)" ./cmd/...
 	@echo "$(BINARY) installed"
 
 tidy: ## Tidy go modules
@@ -74,6 +74,23 @@ test-coverage: ## Generate test coverage report
 	@echo "Generating coverage report..."
 	@mkdir -p $(COVERAGE_DIR)
 	@$(GO) test -race -coverprofile=$(COVERAGE_DIR)/coverage.out -covermode=atomic $(PKG)
+	@$(GO) tool cover -html=$(COVERAGE_DIR)/coverage.out -o $(COVERAGE_DIR)/index.html
+	@echo "Coverage report: $(COVERAGE_DIR)/index.html"
+
+test-coverage-verbose: ## Generate coverage report with per-test results, totals, and color
+	@echo "Generating coverage report..."
+	@mkdir -p $(COVERAGE_DIR)
+	@$(GO) test -v -race -coverprofile=$(COVERAGE_DIR)/coverage.out -covermode=atomic $(PKG) \
+		2>&1 | tee $(COVERAGE_DIR)/test.log | \
+		awk '/^--- PASS:/ && $$3 !~ /\// { printf "\033[32m--- PASS\033[0m: %s %s\n", $$3, $$4 } \
+		     /^--- FAIL:/ && $$3 !~ /\// { printf "\033[31m--- FAIL\033[0m: %s %s\n", $$3, $$4 } \
+		     /^(ok|FAIL)[[:space:]]/ { print ""; print }'
+	@echo ""
+	@awk 'BEGIN { p=0; f=0 } \
+	      /^--- PASS:/ && $$3 !~ /\// { p++ } \
+	      /^--- FAIL:/ && $$3 !~ /\// { f++ } \
+	      END { printf "\033[32mPassed: %d\033[0m  \033[31mFailed: %d\033[0m  Total: %d\n", p, f, p+f }' \
+		$(COVERAGE_DIR)/test.log
 	@$(GO) tool cover -html=$(COVERAGE_DIR)/coverage.out -o $(COVERAGE_DIR)/index.html
 	@echo "Coverage report: $(COVERAGE_DIR)/index.html"
 
