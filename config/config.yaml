@@ -1,3 +1,8 @@
 log:
   level: info
   format: text
+
+errors:
+  show_code: true
+  show_resolution: true
+  show_underlying: false
