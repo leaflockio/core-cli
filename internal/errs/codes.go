@@ -22,6 +22,24 @@ const (
 	ENV001 Code = "ENV001"
 )
 
+// CFG domain covers errors caused by malformed or unreadable configuration
+// files. Use a CFG code when the problem is in the config file content, not
+// in leaf itself.
+const (
+	// CFG001 is used when the base config file exists but cannot be read or
+	// contains invalid YAML.
+	CFG001 Code = "CFG001"
+
+	// CFG002 is used when an environment overlay config file exists but cannot
+	// be read or contains invalid YAML.
+	CFG002 Code = "CFG002"
+
+	// CFG003 is used when the config file is valid but its structure does not
+	// match the expected schema — either due to a user mistake or a schema
+	// change after a product update.
+	CFG003 Code = "CFG003"
+)
+
 // INT domain covers unexpected internal failures that indicate a bug in leaf.
 // These codes are reserved — only errs.Internal() assigns them. Callers must
 // never construct an INT error directly.
