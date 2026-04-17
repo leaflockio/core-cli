@@ -55,6 +55,30 @@ func TestResetDebug_pkg(t *testing.T) {
 	}
 }
 
+func TestResetDebug_invalid(t *testing.T) {
+	oldLevel := debugLevel
+	oldPrefix := debugPkgPrefix
+	t.Cleanup(func() {
+		debugLevel = oldLevel
+		debugPkgPrefix = oldPrefix
+	})
+
+	const invalidLevel = "not-a-number"
+	out := captureStderr(t, func() {
+		resetDebug(invalidLevel)
+	})
+
+	if debugLevel != debugLevelOff {
+		t.Errorf("debugLevel = %d, want %d (invalid input should disable debug)", debugLevel, debugLevelOff)
+	}
+	if !strings.Contains(out, envVarConfigDebug) {
+		t.Errorf("expected env var name in warning output, got %q", out)
+	}
+	if !strings.Contains(out, invalidLevel) {
+		t.Errorf("expected invalid value in warning output, got %q", out)
+	}
+}
+
 func TestDebugf_off(t *testing.T) {
 	oldLevel := debugLevel
 	debugLevel = debugLevelOff

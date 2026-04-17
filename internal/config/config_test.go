@@ -155,6 +155,13 @@ log:
 	}
 }
 
+func TestFormatExtHint_single(t *testing.T) {
+	got := formatExtHint([]string{"json"})
+	if got != "json" {
+		t.Errorf("formatExtHint([json]) = %q, want %q", got, "json")
+	}
+}
+
 func TestLoad_debugEnabled(t *testing.T) {
 	isolateConfig(t, EnvTest)
 	t.Setenv(envVarConfigDebug, "1")

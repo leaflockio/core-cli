@@ -30,7 +30,8 @@ const (
 
 // Config holds all application configuration.
 type Config struct {
-	Log LogConfig `mapstructure:"log"`
+	Log    LogConfig    `mapstructure:"log"`
+	Errors ErrorsConfig `mapstructure:"errors"`
 }
 
 // Load reads configuration for env.
@@ -153,4 +154,8 @@ func setDefaults(v *viper.Viper, env Env) {
 	case EnvProd:
 		v.SetDefault(keyLogLevel, defaultLogLevelProd)
 	}
+
+	v.SetDefault(keyErrorsShowCode, true)
+	v.SetDefault(keyErrorsShowResolution, true)
+	v.SetDefault(keyErrorsShowUnderlying, false)
 }
