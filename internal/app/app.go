@@ -13,6 +13,7 @@ import (
 	"github.com/leaflock/core-cli/internal/config"
 	"github.com/leaflock/core-cli/internal/platform"
 	"github.com/leaflock/core-cli/internal/ui"
+	"github.com/leaflock/core-cli/internal/version"
 )
 
 // App is the central DI container. It is constructed once in main and passed
@@ -24,7 +25,7 @@ type App struct {
 	Log      *slog.Logger
 	Printer  *ui.Printer
 	Platform *platform.Platform
-	Version  string
+	Version  *version.Info
 }
 
 // Builder constructs an App using a fluent chain of With* calls.
@@ -33,7 +34,7 @@ type Builder struct {
 	log     *slog.Logger
 	printer *ui.Printer
 	plat    *platform.Platform
-	version string
+	version *version.Info
 }
 
 // NewBuilder returns an empty Builder.
@@ -65,9 +66,9 @@ func (b *Builder) WithPlatform(plat *platform.Platform) *Builder {
 	return b
 }
 
-// WithVersion sets the binary version string.
-func (b *Builder) WithVersion(version string) *Builder {
-	b.version = version
+// WithVersion sets the binary version info.
+func (b *Builder) WithVersion(v *version.Info) *Builder {
+	b.version = v
 	return b
 }
 

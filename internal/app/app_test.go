@@ -15,6 +15,7 @@ import (
 	"github.com/leaflock/core-cli/internal/platform"
 	"github.com/leaflock/core-cli/internal/terminal"
 	"github.com/leaflock/core-cli/internal/ui"
+	"github.com/leaflock/core-cli/internal/version"
 )
 
 func TestNewBuilder_returnsNonNil(t *testing.T) {
@@ -58,10 +59,11 @@ func TestBuilder_WithPlatform(t *testing.T) {
 }
 
 func TestBuilder_WithVersion(t *testing.T) {
-	a := NewBuilder().WithVersion("1.2.3").Build()
+	info := &version.Info{Version: "1.2.3"}
+	a := NewBuilder().WithVersion(info).Build()
 
-	if a.Version != "1.2.3" {
-		t.Errorf("expected Version %q, got %q", "1.2.3", a.Version)
+	if a.Version.Version != "1.2.3" {
+		t.Errorf("expected Version %q, got %q", "1.2.3", a.Version.Version)
 	}
 }
 
@@ -69,12 +71,13 @@ func TestBuilder_Build_fullChain(t *testing.T) {
 	printer := ui.NewPrinter(terminal.New(&bytes.Buffer{}, &bytes.Buffer{}, nil))
 	plat := platform.Detect()
 	log := slog.Default()
+	info := &version.Info{Version: "2.0.0", Commit: "abc", Date: "2026-04-18"}
 
 	a := NewBuilder().
 		WithLogger(log).
 		WithPrinter(printer).
 		WithPlatform(plat).
-		WithVersion("2.0.0").
+		WithVersion(info).
 		Build()
 
 	if a.Log != log {
@@ -86,7 +89,7 @@ func TestBuilder_Build_fullChain(t *testing.T) {
 	if a.Platform != plat {
 		t.Error("Platform not set in full chain")
 	}
-	if a.Version != "2.0.0" {
-		t.Errorf("expected Version %q, got %q", "2.0.0", a.Version)
+	if a.Version != info {
+		t.Error("Version not set in full chain")
 	}
 }
