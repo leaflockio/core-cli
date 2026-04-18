@@ -11,6 +11,7 @@ import (
 	"strings"
 
 	"github.com/leaflock/core-cli/internal/errs"
+	"github.com/leaflock/core-cli/internal/logger"
 	"github.com/spf13/viper"
 )
 
@@ -30,8 +31,8 @@ const (
 
 // Config holds all application configuration.
 type Config struct {
-	Log    LogConfig    `mapstructure:"log"`
-	Errors ErrorsConfig `mapstructure:"errors"`
+	Log    logger.Config `mapstructure:"log"`
+	Errors ErrorsConfig  `mapstructure:"errors"`
 }
 
 // Load reads configuration for env.
@@ -147,13 +148,26 @@ func formatExtHint(exts []string) string {
 }
 
 func setDefaults(v *viper.Viper, env Env) {
-	v.SetDefault(keyLogFormat, defaultLogFormat)
 	switch env {
 	case EnvDev, EnvTest:
 		v.SetDefault(keyLogLevel, defaultLogLevelDev)
+		v.SetDefault(keyLogConsoleEnabled, true)
+		v.SetDefault(keyLogConsoleFormat, logger.FormatText)
+		v.SetDefault(keyLogFileEnabled, false)
+		v.SetDefault(keyLogFileFormat, logger.FormatText)
 	case EnvProd:
 		v.SetDefault(keyLogLevel, defaultLogLevelProd)
+		v.SetDefault(keyLogConsoleEnabled, false)
+		v.SetDefault(keyLogConsoleFormat, logger.FormatText)
+		v.SetDefault(keyLogFileEnabled, true)
+		v.SetDefault(keyLogFileFormat, logger.FormatJSON)
 	}
+
+	v.SetDefault(keyLogFileFilename, defaultLogFilename)
+	v.SetDefault(keyLogFileMaxSizeMB, defaultLogMaxSizeMB)
+	v.SetDefault(keyLogFileMaxBackups, defaultLogMaxBackups)
+	v.SetDefault(keyLogFileMaxAgeDays, defaultLogMaxAgeDays)
+	v.SetDefault(keyLogFileCompress, true)
 
 	v.SetDefault(keyErrorsShowCode, true)
 	v.SetDefault(keyErrorsShowResolution, true)

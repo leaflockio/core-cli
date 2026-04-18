@@ -6,25 +6,26 @@
 
 package config
 
-// LogConfig holds logger settings.
-type LogConfig struct {
-	Level  string `mapstructure:"level"`
-	Format string `mapstructure:"format"`
-}
+import "github.com/leaflock/core-cli/internal/logger"
 
 const (
-	// KeyLogLevel is the viper key for log level.
 	keyLogLevel = "log.level"
 
-	// KeyLogFormat is the viper key for log format.
-	keyLogFormat = "log.format"
+	keyLogConsoleEnabled = "log.console.enabled"
+	keyLogConsoleFormat  = "log.console.format"
 
-	// DefaultLogFormat is the log format when no config file sets it.
-	defaultLogFormat = "text"
+	keyLogFileEnabled    = "log.file.enabled"
+	keyLogFileFormat     = "log.file.format"
+	keyLogFileFilename   = "log.file.filename"
+	keyLogFileMaxSizeMB  = "log.file.max_size_mb"
+	keyLogFileMaxBackups = "log.file.max_backups"
+	keyLogFileMaxAgeDays = "log.file.max_age_days"
+	keyLogFileCompress   = "log.file.compress"
 
-	// DefaultLogLevelDev is the log level for dev and test profiles.
-	defaultLogLevelDev = "debug"
-
-	// DefaultLogLevelProd is the log level for the prod profile.
-	defaultLogLevelProd = "info"
+	defaultLogLevelDev   = logger.LevelDebug
+	defaultLogLevelProd  = logger.LevelInfo
+	defaultLogFilename   = appName + ".log"
+	defaultLogMaxSizeMB  = 100
+	defaultLogMaxBackups = 3
+	defaultLogMaxAgeDays = 28
 )

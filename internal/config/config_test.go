@@ -8,6 +8,8 @@ package config
 
 import (
 	"testing"
+
+	"github.com/leaflock/core-cli/internal/logger"
 )
 
 func TestLoad_defaults(t *testing.T) {
@@ -21,8 +23,11 @@ func TestLoad_defaults(t *testing.T) {
 	if cfg.Log.Level != defaultLogLevelDev {
 		t.Errorf("Log.Level = %q, want %q", cfg.Log.Level, defaultLogLevelDev)
 	}
-	if cfg.Log.Format != defaultLogFormat {
-		t.Errorf("Log.Format = %q, want %q", cfg.Log.Format, defaultLogFormat)
+	if cfg.Log.Console.Format != logger.FormatText {
+		t.Errorf("Log.Console.Format = %q, want %q", cfg.Log.Console.Format, logger.FormatText)
+	}
+	if cfg.Log.File.Format != logger.FormatText {
+		t.Errorf("Log.File.Format = %q, want %q", cfg.Log.File.Format, logger.FormatText)
 	}
 }
 
@@ -44,7 +49,10 @@ func TestLoad_baseConfig(t *testing.T) {
 	writeYAML(t, dir, "config.yaml", `
 log:
   level: warn
-  format: json
+  console:
+    format: json
+  file:
+    format: json
 `)
 
 	cfg, err := Load(EnvTest)
@@ -52,11 +60,11 @@ log:
 		t.Fatalf("Load() error = %v", err)
 	}
 
-	if cfg.Log.Level != "warn" {
-		t.Errorf("Log.Level = %q, want %q", cfg.Log.Level, "warn")
+	if cfg.Log.Level != logger.LevelWarn {
+		t.Errorf("Log.Level = %q, want %q", cfg.Log.Level, logger.LevelWarn)
 	}
-	if cfg.Log.Format != "json" {
-		t.Errorf("Log.Format = %q, want %q", cfg.Log.Format, "json")
+	if cfg.Log.Console.Format != logger.FormatJSON {
+		t.Errorf("Log.Console.Format = %q, want %q", cfg.Log.Console.Format, logger.FormatJSON)
 	}
 }
 
@@ -65,7 +73,8 @@ func TestLoad_envOverlay(t *testing.T) {
 	writeYAML(t, dir, "config.yaml", `
 log:
   level: warn
-  format: text
+  console:
+    format: text
 `)
 	writeYAML(t, dir, "config.test.yaml", `
 log:
@@ -77,12 +86,13 @@ log:
 		t.Fatalf("Load() error = %v", err)
 	}
 
-	// overlay overrides base level but inherits base format
-	if cfg.Log.Level != "debug" {
-		t.Errorf("Log.Level = %q, want %q (overlay should win)", cfg.Log.Level, "debug")
+	// overlay overrides base level but inherits base console format
+	if cfg.Log.Level != logger.LevelDebug {
+		t.Errorf("Log.Level = %q, want %q (overlay should win)", cfg.Log.Level, logger.LevelDebug)
 	}
-	if cfg.Log.Format != "text" {
-		t.Errorf("Log.Format = %q, want %q (base should carry through)", cfg.Log.Format, "text")
+	if cfg.Log.Console.Format != logger.FormatText {
+		t.Errorf("Log.Console.Format = %q, want %q (base should carry through)",
+			cfg.Log.Console.Format, logger.FormatText)
 	}
 }
 
@@ -91,7 +101,8 @@ func TestLoad_envVarOverride(t *testing.T) {
 	writeYAML(t, dir, "config.yaml", `
 log:
   level: warn
-  format: text
+  console:
+    format: text
 `)
 	t.Setenv("LEAF_LOG_LEVEL", "error")
 
@@ -100,8 +111,8 @@ log:
 		t.Fatalf("Load() error = %v", err)
 	}
 
-	if cfg.Log.Level != "error" {
-		t.Errorf("Log.Level = %q, want %q (env var should win)", cfg.Log.Level, "error")
+	if cfg.Log.Level != logger.LevelError {
+		t.Errorf("Log.Level = %q, want %q (env var should win)", cfg.Log.Level, logger.LevelError)
 	}
 }
 
@@ -150,8 +161,8 @@ log:
 	if err != nil {
 		t.Fatalf("Load() error = %v", err)
 	}
-	if cfg.Log.Level != "warn" {
-		t.Errorf("Log.Level = %q, want %q (config.yml should be loaded)", cfg.Log.Level, "warn")
+	if cfg.Log.Level != logger.LevelWarn {
+		t.Errorf("Log.Level = %q, want %q (config.yml should be loaded)", cfg.Log.Level, logger.LevelWarn)
 	}
 }
 
