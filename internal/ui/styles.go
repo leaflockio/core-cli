@@ -14,6 +14,7 @@ var (
 	colorPrimary     = lipgloss.AdaptiveColor{Light: "#00695C", Dark: "#26A69A"}
 	colorSecondary   = lipgloss.AdaptiveColor{Light: "#4527A0", Dark: "#7E57C2"}
 	colorDescription = lipgloss.AdaptiveColor{Light: "#455A64", Dark: "#90A4AE"}
+	colorFlag        = lipgloss.AdaptiveColor{Light: "#00838F", Dark: "#26C6DA"}
 )
 
 // Semantic colors — operation results only. Each color carries a specific
@@ -31,6 +32,7 @@ var (
 	StylePrimary     = lipgloss.NewStyle().Foreground(colorPrimary)
 	StyleSecondary   = lipgloss.NewStyle().Foreground(colorSecondary)
 	StyleDescription = lipgloss.NewStyle().Foreground(colorDescription)
+	StyleFlag        = lipgloss.NewStyle().Foreground(colorFlag)
 )
 
 // Semantic styles for operation results.

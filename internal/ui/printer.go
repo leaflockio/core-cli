@@ -65,6 +65,9 @@ func (p *Printer) Description(text string) string { return p.render(&StyleDescri
 // Muted returns text styled as muted/secondary metadata for inline use.
 func (p *Printer) Muted(text string) string { return p.render(&StyleMuted, text) }
 
+// Flag returns text styled as a flag name (--flag, -f).
+func (p *Printer) Flag(text string) string { return p.render(&StyleFlag, text) }
+
 // Success prints a success message to Out.
 func (p *Printer) Success(msg string) {
 	fmt.Fprintln(p.term.Out, p.render(&StyleSuccess, "✓ "+msg))

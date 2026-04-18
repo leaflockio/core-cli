@@ -176,3 +176,12 @@ func TestPrinter_Muted(t *testing.T) {
 		t.Errorf("expected Muted to contain %q, got %q", "secondary info", result)
 	}
 }
+
+func TestPrinter_Flag(t *testing.T) {
+	printer, _, _ := newTestPrinter(t)
+
+	result := printer.Flag("--verbose")
+	if !strings.Contains(result, "--verbose") {
+		t.Errorf("expected Flag to contain %q, got %q", "--verbose", result)
+	}
+}
