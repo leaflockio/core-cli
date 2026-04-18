@@ -6,6 +6,7 @@ BINARY       := leaf
 BIN_DIR      := bin
 COVERAGE_DIR := coverage
 PKG          := ./...
+COVERAGE_PKG := $(shell go list ./... | grep -v '/cmd')
 LINTER       := golangci-lint
 
 # Build flags
@@ -29,18 +30,18 @@ build: build-prod ## Build the leaf binary (prod by default)
 build-dev: ## Build with dev profile (debug symbols, no optimization)
 	@echo "Building $(BINARY) [dev]..."
 	@mkdir -p $(BIN_DIR)
-	@$(GO) build -gcflags="$(GCFLAGS_DEV)" -ldflags="$(LDFLAGS_DEV)" -o $(BIN_DIR)/$(BINARY) ./cmd/...
+	@$(GO) build -gcflags="$(GCFLAGS_DEV)" -ldflags="$(LDFLAGS_DEV)" -o $(BIN_DIR)/$(BINARY) ./cmd
 	@echo "Binary: $(BIN_DIR)/$(BINARY)"
 
 build-prod: ## Build with prod profile (stripped, optimized)
 	@echo "Building $(BINARY) [prod]..."
 	@mkdir -p $(BIN_DIR)
-	@$(GO) build -ldflags="$(LDFLAGS_PROD)" -o $(BIN_DIR)/$(BINARY) ./cmd/...
+	@$(GO) build -ldflags="$(LDFLAGS_PROD)" -o $(BIN_DIR)/$(BINARY) ./cmd
 	@echo "Binary: $(BIN_DIR)/$(BINARY)"
 
 install: ## Install leaf to GOPATH/bin (prod profile)
 	@echo "Installing $(BINARY)..."
-	@$(GO) install -ldflags="$(LDFLAGS_PROD)" ./cmd/...
+	@$(GO) install -ldflags="$(LDFLAGS_PROD)" ./cmd
 	@echo "$(BINARY) installed"
 
 tidy: ## Tidy go modules
@@ -64,7 +65,8 @@ fmt: ## Format code
 
 test: ## Run tests
 	@echo "Running tests..."
-	@$(GO) test -race $(PKG)
+	@mkdir -p $(COVERAGE_DIR)
+	@$(GO) test -race -coverprofile=$(COVERAGE_DIR)/coverage.out -covermode=atomic $(COVERAGE_PKG)
 
 test-verbose: ## Run tests with verbose output
 	@echo "Running tests with verbose output..."
@@ -73,14 +75,14 @@ test-verbose: ## Run tests with verbose output
 test-coverage: ## Generate test coverage report
 	@echo "Generating coverage report..."
 	@mkdir -p $(COVERAGE_DIR)
-	@$(GO) test -race -coverprofile=$(COVERAGE_DIR)/coverage.out -covermode=atomic $(PKG)
+	@$(GO) test -race -coverprofile=$(COVERAGE_DIR)/coverage.out -covermode=atomic $(COVERAGE_PKG)
 	@$(GO) tool cover -html=$(COVERAGE_DIR)/coverage.out -o $(COVERAGE_DIR)/index.html
 	@echo "Coverage report: $(COVERAGE_DIR)/index.html"
 
 test-coverage-verbose: ## Generate coverage report with per-test results, totals, and color
 	@echo "Generating coverage report..."
 	@mkdir -p $(COVERAGE_DIR)
-	@$(GO) test -v -race -coverprofile=$(COVERAGE_DIR)/coverage.out -covermode=atomic $(PKG) \
+	@$(GO) test -v -race -coverprofile=$(COVERAGE_DIR)/coverage.out -covermode=atomic $(COVERAGE_PKG) \
 		2>&1 | tee $(COVERAGE_DIR)/test.log | \
 		awk '/^--- PASS:/ && $$3 !~ /\// { printf "\033[32m--- PASS\033[0m: %s %s\n", $$3, $$4 } \
 		     /^--- FAIL:/ && $$3 !~ /\// { printf "\033[31m--- FAIL\033[0m: %s %s\n", $$3, $$4 } \
