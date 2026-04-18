@@ -9,14 +9,14 @@ package config
 const (
 	// AppName is the CLI binary name. This is the single source of truth —
 	// update this if the binary is ever renamed.
-	appName = "leaf"
+	AppName = "leaf"
 
 	// AppFolder is the hidden directory name used in home and XDG paths.
-	// Derived from appName with a leading dot.
-	appFolder = "." + appName
+	// Derived from AppName with a leading dot.
+	appFolder = "." + AppName
 
 	// EnvPrefix is the prefix for all LEAF_* environment variables.
-	// Must be the uppercase form of appName — update together.
+	// Must be the uppercase form of AppName — update together.
 	envPrefix = "LEAF"
 
 	// EnvVarEnv selects the active profile (dev, test, prod).

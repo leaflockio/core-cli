@@ -12,8 +12,8 @@ import (
 )
 
 func TestEnvPrefixMatchesAppName(t *testing.T) {
-	if !strings.EqualFold(envPrefix, appName) {
-		t.Errorf("envPrefix %q does not match strings.ToUpper(appName) %q — update both together in app.go",
-			envPrefix, strings.ToUpper(appName))
+	if !strings.EqualFold(envPrefix, AppName) {
+		t.Errorf("envPrefix %q does not match strings.ToUpper(AppName) %q — update both together in app.go",
+			envPrefix, strings.ToUpper(AppName))
 	}
 }

@@ -24,7 +24,7 @@ const (
 
 	defaultLogLevelDev   = logger.LevelDebug
 	defaultLogLevelProd  = logger.LevelInfo
-	defaultLogFilename   = appName + ".log"
+	defaultLogFilename   = AppName + ".log"
 	defaultLogMaxSizeMB  = 100
 	defaultLogMaxBackups = 3
 	defaultLogMaxAgeDays = 28
