@@ -161,6 +161,7 @@ func setDefaults(v *viper.Viper, env Env) {
 		v.SetDefault(keyLogConsoleFormat, logger.FormatText)
 		v.SetDefault(keyLogFileEnabled, true)
 		v.SetDefault(keyLogFileFormat, logger.FormatJSON)
+		v.SetDefault(keyLogFilePath, defaultLogPath())
 	}
 
 	v.SetDefault(keyLogFileFilename, defaultLogFilename)
