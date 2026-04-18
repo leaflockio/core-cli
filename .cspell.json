@@ -16,7 +16,8 @@
     "*.ico",
     "*.svg",
     "CHANGELOG.md",
-    "LICENSE"
+    "LICENSE",
+    "coverage/**"
   ],
   "enableGlobDot": false,
   "words": [
