@@ -18,6 +18,7 @@ jobs:
     uses: leaflockio/core-actions/.github/workflows/tpl-go-ci.yml@v1
     with:
       core-actions-ref: v1
+      build-command: make build-prod
     secrets:
       APP_ID: ${{ secrets.LOCKET_CI_APP_ID }}
       APP_PRIVATE_KEY: ${{ secrets.LOCKET_CI_PRIVATE_KEY }}
