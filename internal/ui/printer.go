@@ -35,6 +35,15 @@ func (p *Printer) Err() io.Writer { return p.term.Err }
 // IsTTY reports whether the terminal is interactive.
 func (p *Printer) IsTTY() bool { return p.term.IsTTY }
 
+// Primary returns text styled as a primary chrome element (app name, main command).
+func (p *Printer) Primary(text string) string { return StylePrimary.Render(text) }
+
+// Secondary returns text styled as a secondary chrome element (subcommand names).
+func (p *Printer) Secondary(text string) string { return StyleSecondary.Render(text) }
+
+// Description returns text styled as descriptive content (command short descriptions).
+func (p *Printer) Description(text string) string { return StyleDescription.Render(text) }
+
 // Success prints a success message to Out.
 func (p *Printer) Success(msg string) {
 	fmt.Fprintln(p.term.Out, StyleSuccess.Render("✓ "+msg))

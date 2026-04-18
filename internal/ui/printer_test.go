@@ -57,6 +57,30 @@ func TestPrinter_IsTTY(t *testing.T) {
 	}
 }
 
+func TestPrinter_Primary(t *testing.T) {
+	printer, _, _ := newTestPrinter(t)
+
+	if !strings.Contains(printer.Primary("leaf"), "leaf") {
+		t.Error("Primary() did not contain the input text")
+	}
+}
+
+func TestPrinter_Secondary(t *testing.T) {
+	printer, _, _ := newTestPrinter(t)
+
+	if !strings.Contains(printer.Secondary("version"), "version") {
+		t.Error("Secondary() did not contain the input text")
+	}
+}
+
+func TestPrinter_Description(t *testing.T) {
+	printer, _, _ := newTestPrinter(t)
+
+	if !strings.Contains(printer.Description("Developer tooling"), "Developer tooling") {
+		t.Error("Description() did not contain the input text")
+	}
+}
+
 func TestPrinter_Success(t *testing.T) {
 	printer, out, errBuf := newTestPrinter(t)
 	printer.Success("installed")
