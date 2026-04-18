@@ -112,6 +112,9 @@
     "pathutil",
 
     "debugf",
-    "mapstructure"
+    "mapstructure",
+    "natefinch",
+    "nolint",
+    "lumberjack"
   ]
 }
