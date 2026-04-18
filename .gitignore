@@ -14,6 +14,9 @@
 # Build output
 bin/
 
+# Dev-generated output (logs, etc.)
+output/
+
 # Code coverage profiles and other test artifacts
 coverage/
 *.out
