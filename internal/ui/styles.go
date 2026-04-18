@@ -11,10 +11,10 @@ import "github.com/charmbracelet/lipgloss"
 // Chrome colors — structural UI elements such as command names, headers, and
 // descriptive text. These carry no pass/fail meaning.
 var (
-	colorPrimary     = lipgloss.AdaptiveColor{Light: "#00695C", Dark: "#26A69A"}
+	colorPrimary     = lipgloss.AdaptiveColor{Light: "#00838F", Dark: "#26C6DA"}
 	colorSecondary   = lipgloss.AdaptiveColor{Light: "#4527A0", Dark: "#7E57C2"}
 	colorDescription = lipgloss.AdaptiveColor{Light: "#455A64", Dark: "#90A4AE"}
-	colorFlag        = lipgloss.AdaptiveColor{Light: "#00838F", Dark: "#26C6DA"}
+	colorFlag        = lipgloss.AdaptiveColor{Light: "#00695C", Dark: "#26A69A"}
 )
 
 // Semantic colors — operation results only. Each color carries a specific
