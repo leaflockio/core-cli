@@ -57,6 +57,45 @@ func TestPrinter_IsTTY(t *testing.T) {
 	}
 }
 
+func TestNewPrinter_noColorFromEnv(t *testing.T) {
+	t.Setenv("NO_COLOR", "1")
+
+	printer, _, _ := newTestPrinter(t)
+
+	if !printer.noColor {
+		t.Error("expected noColor=true when NO_COLOR env var is set")
+	}
+}
+
+func TestPrinter_SetNoColor(t *testing.T) {
+	printer, _, _ := newTestPrinter(t)
+	printer.SetNoColor(true)
+
+	if !printer.noColor {
+		t.Error("expected noColor=true after SetNoColor(true)")
+	}
+}
+
+func TestPrinter_render_plainWhenNoColor(t *testing.T) {
+	printer, _, _ := newTestPrinter(t)
+	printer.SetNoColor(true)
+
+	result := printer.render(&StyleSuccess, "hello")
+	if result != "hello" {
+		t.Errorf("expected plain %q when noColor=true, got %q", "hello", result)
+	}
+}
+
+func TestPrinter_render_styledWhenColor(t *testing.T) {
+	printer, _, _ := newTestPrinter(t)
+	printer.SetNoColor(false)
+
+	result := printer.render(&StyleSuccess, "hello")
+	if !strings.Contains(result, "hello") {
+		t.Errorf("expected result to contain %q, got %q", "hello", result)
+	}
+}
+
 func TestPrinter_Primary(t *testing.T) {
 	printer, _, _ := newTestPrinter(t)
 
