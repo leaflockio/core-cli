@@ -1,4 +1,4 @@
-.PHONY: help build build-dev build-prod install tidy lint lint-fix fmt test test-verbose test-coverage test-clean clean
+.PHONY: help build build-dev build-prod install tidy lint lint-fix fmt test test-verbose test-coverage test-coverage-verbose test-clean clean
 
 # Variables
 GO           := go
@@ -6,14 +6,16 @@ BINARY       := leaf
 BIN_DIR      := bin
 COVERAGE_DIR := coverage
 PKG          := ./...
-COVERAGE_PKG := $(shell go list ./... | grep -v '/cmd')
 LINTER       := golangci-lint
 
 # Build flags
 VERSION        := $(strip $(file <.version))
+COMMIT         := $(shell git rev-parse --short HEAD 2>/dev/null || echo none)
+DATE           := $(shell date -u +%Y-%m-%d)
+PKG_VERSION    := github.com/leaflock/core-cli/internal/version
 GCFLAGS_DEV    := all=-N -l
-LDFLAGS_COMMON := -X main.version=$(VERSION)
-LDFLAGS_DEV    := $(LDFLAGS_COMMON) -X main.env=dev
+LDFLAGS_COMMON := -X $(PKG_VERSION).Version=$(VERSION) -X $(PKG_VERSION).Commit=$(COMMIT) -X $(PKG_VERSION).Date=$(DATE)
+LDFLAGS_DEV    := $(LDFLAGS_COMMON) -X $(PKG_VERSION).Version=$(VERSION)-dev -X main.env=dev
 LDFLAGS_PROD   := $(LDFLAGS_COMMON) -X main.env=prod -s -w
 
 help: ## Show this help message
@@ -59,14 +61,13 @@ lint-fix: ## Run linter with auto-fix
 
 fmt: ## Format code
 	@echo "Formatting code..."
-	@$(GO) fmt $(PKG)
 	@gofumpt -l -w .
 	@echo "Code formatted"
 
 test: ## Run tests
 	@echo "Running tests..."
 	@mkdir -p $(COVERAGE_DIR)
-	@$(GO) test -race -coverprofile=$(COVERAGE_DIR)/coverage.out -covermode=atomic $(COVERAGE_PKG)
+	@$(GO) test -race -coverprofile=$(COVERAGE_DIR)/coverage.out -covermode=atomic $(PKG)
 
 test-verbose: ## Run tests with verbose output
 	@echo "Running tests with verbose output..."
@@ -75,14 +76,15 @@ test-verbose: ## Run tests with verbose output
 test-coverage: ## Generate test coverage report
 	@echo "Generating coverage report..."
 	@mkdir -p $(COVERAGE_DIR)
-	@$(GO) test -race -coverprofile=$(COVERAGE_DIR)/coverage.out -covermode=atomic $(COVERAGE_PKG)
+	@$(GO) test -race -coverprofile=$(COVERAGE_DIR)/coverage.out -covermode=atomic $(PKG)
+	@$(GO) tool cover -func=$(COVERAGE_DIR)/coverage.out | tail -1
 	@$(GO) tool cover -html=$(COVERAGE_DIR)/coverage.out -o $(COVERAGE_DIR)/index.html
 	@echo "Coverage report: $(COVERAGE_DIR)/index.html"
 
 test-coverage-verbose: ## Generate coverage report with per-test results, totals, and color
 	@echo "Generating coverage report..."
 	@mkdir -p $(COVERAGE_DIR)
-	@$(GO) test -v -race -coverprofile=$(COVERAGE_DIR)/coverage.out -covermode=atomic $(COVERAGE_PKG) \
+	@$(GO) test -v -race -coverprofile=$(COVERAGE_DIR)/coverage.out -covermode=atomic $(PKG) \
 		2>&1 | tee $(COVERAGE_DIR)/test.log | \
 		awk '/^--- PASS:/ && $$3 !~ /\// { printf "\033[32m--- PASS\033[0m: %s %s\n", $$3, $$4 } \
 		     /^--- FAIL:/ && $$3 !~ /\// { printf "\033[31m--- FAIL\033[0m: %s %s\n", $$3, $$4 } \
