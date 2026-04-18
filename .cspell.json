@@ -116,6 +116,17 @@
     "mapstructure",
     "natefinch",
     "nolint",
-    "lumberjack"
+    "lumberjack",
+
+    "charmbracelet",
+    "lipgloss",
+    "pflag",
+
+    "helpcmd",
+    "licensecmd",
+    "versioncmd",
+    "strutil",
+
+    "capitalising"
   ]
 }
