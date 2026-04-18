@@ -12,6 +12,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/leaflock/core-cli/internal/app"
 	"github.com/leaflock/core-cli/internal/terminal"
 	"github.com/leaflock/core-cli/internal/ui"
 	ver "github.com/leaflock/core-cli/internal/version"
@@ -21,6 +22,12 @@ func newTestPrinter(t *testing.T) (*ui.Printer, *bytes.Buffer) {
 	t.Helper()
 	out := &bytes.Buffer{}
 	return ui.NewPrinter(terminal.New(out, &bytes.Buffer{}, nil)), out
+}
+
+func newTestApp(t *testing.T, info *ver.Info) (*app.App, *bytes.Buffer) {
+	t.Helper()
+	printer, out := newTestPrinter(t)
+	return app.NewBuilder().WithPrinter(printer).WithVersion(info).Build(), out
 }
 
 func TestPrint_containsAppName(t *testing.T) {
@@ -64,9 +71,9 @@ func TestPrint_noColor_noANSI(t *testing.T) {
 	}
 }
 
-func TestNewCmd_metadata(t *testing.T) {
-	printer, _ := newTestPrinter(t)
-	cmd := NewCmd(&ver.Info{}, printer)
+func TestNew_metadata(t *testing.T) {
+	a, _ := newTestApp(t, &ver.Info{})
+	cmd := New(a)
 
 	if cmd.Use != "version" {
 		t.Errorf("expected Use %q, got %q", "version", cmd.Use)
@@ -79,9 +86,9 @@ func TestNewCmd_metadata(t *testing.T) {
 	}
 }
 
-func TestNewCmd_run_writesToOut(t *testing.T) {
-	printer, out := newTestPrinter(t)
-	cmd := NewCmd(&ver.Info{Version: "2.0.0", Commit: "xyz", Date: "2026-04-18"}, printer)
+func TestNew_run_writesToOut(t *testing.T) {
+	a, out := newTestApp(t, &ver.Info{Version: "2.0.0", Commit: "xyz", Date: "2026-04-18"})
+	cmd := New(a)
 	cmd.Run(cmd, nil)
 
 	if !strings.Contains(out.String(), "v2.0.0") {

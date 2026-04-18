@@ -11,6 +11,7 @@ import (
 	"fmt"
 
 	"github.com/charmbracelet/lipgloss"
+	"github.com/leaflock/core-cli/internal/app"
 	"github.com/leaflock/core-cli/internal/config"
 	"github.com/leaflock/core-cli/internal/ui"
 	ver "github.com/leaflock/core-cli/internal/version"
@@ -27,14 +28,14 @@ func Print(info *ver.Info, printer *ui.Printer) {
 	fmt.Fprintln(printer.Out(), lipgloss.JoinHorizontal(lipgloss.Left, name, "  ", version, "  ", commit, "  ", date))
 }
 
-// NewCmd returns the "leaf version" subcommand.
-func NewCmd(info *ver.Info, printer *ui.Printer) *cobra.Command {
+// New returns the "leaf version" subcommand.
+func New(a *app.App) *cobra.Command {
 	return &cobra.Command{
 		Use:   "version",
 		Short: "Print the current version",
 		Args:  cobra.NoArgs,
 		Run: func(cmd *cobra.Command, args []string) {
-			Print(info, printer)
+			Print(a.Version, a.Printer)
 		},
 	}
 }
