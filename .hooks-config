@@ -9,3 +9,4 @@ LINK_CHECK_TIMEOUT=5
 CHECK_MODE=staged
 COVERAGE_DIR=coverage
 COVERAGE_CONFIG_GO={"floor":80,"delta":0.05,"tag":"go"}
+CHECK_PATHS_SKIP_FILES=["config/*.yaml","config/*.yml"]

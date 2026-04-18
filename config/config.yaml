@@ -1,6 +1,17 @@
 log:
   level: info
-  format: text
+  console:
+    enabled: true
+    format: text
+  file:
+    enabled: false
+    format: json
+    path: ""
+    filename: leaf.log
+    max_size_mb: 100
+    max_backups: 3
+    max_age_days: 28
+    compress: true
 
 errors:
   show_code: true
