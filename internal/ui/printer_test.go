@@ -169,13 +169,10 @@ func TestPrinter_Error(t *testing.T) {
 }
 
 func TestPrinter_Muted(t *testing.T) {
-	printer, out, errBuf := newTestPrinter(t)
-	printer.Muted("secondary info")
+	printer, _, _ := newTestPrinter(t)
 
-	if !strings.Contains(out.String(), "secondary info") {
-		t.Errorf("expected Out to contain %q, got %q", "secondary info", out.String())
-	}
-	if errBuf.Len() != 0 {
-		t.Error("expected Err to be empty for Muted")
+	result := printer.Muted("secondary info")
+	if !strings.Contains(result, "secondary info") {
+		t.Errorf("expected Muted to contain %q, got %q", "secondary info", result)
 	}
 }

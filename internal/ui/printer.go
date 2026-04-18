@@ -62,6 +62,9 @@ func (p *Printer) Secondary(text string) string { return p.render(&StyleSecondar
 // Description returns text styled as descriptive content (command short descriptions).
 func (p *Printer) Description(text string) string { return p.render(&StyleDescription, text) }
 
+// Muted returns text styled as muted/secondary metadata for inline use.
+func (p *Printer) Muted(text string) string { return p.render(&StyleMuted, text) }
+
 // Success prints a success message to Out.
 func (p *Printer) Success(msg string) {
 	fmt.Fprintln(p.term.Out, p.render(&StyleSuccess, "✓ "+msg))
@@ -80,9 +83,4 @@ func (p *Printer) Warning(msg string) {
 // Error prints an error message to Err.
 func (p *Printer) Error(msg string) {
 	fmt.Fprintln(p.term.Err, p.render(&StyleError, "✗ "+msg))
-}
-
-// Muted prints a secondary message to Out.
-func (p *Printer) Muted(msg string) {
-	fmt.Fprintln(p.term.Out, p.render(&StyleMuted, msg))
 }
