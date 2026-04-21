@@ -256,6 +256,92 @@ func TestResolvePRFiles_nonMainBaseFetchFails(t *testing.T) {
 	}
 }
 
+func TestResolvePRFiles_fetchSucceedsButDiffFails(t *testing.T) {
+	origOut := cmdOutput
+	origRun := cmdRun
+	defer func() { cmdOutput = origOut; cmdRun = origRun }()
+
+	calls := 0
+	cmdOutput = func(_ ...string) ([]byte, error) {
+		calls++
+		return nil, errDiffFailed // both initial and retry diff fail
+	}
+	cmdRun = func(_ ...string) error {
+		return nil // fetch succeeds
+	}
+
+	_, err := ResolvePRFiles("origin/main", "ACM", true)
+	if err == nil {
+		t.Fatal("expected error, got nil")
+	}
+	var ce *errs.Error
+	if !errors.As(err, &ce) || ce.Code != errs.LIC006 {
+		t.Errorf("expected LIC006 error, got %v", err)
+	}
+}
+
+func TestResolvePRFiles_fallbackFetchSucceedsAndDiff(t *testing.T) {
+	origOut := cmdOutput
+	origRun := cmdRun
+	defer func() { cmdOutput = origOut; cmdRun = origRun }()
+
+	runCalls := 0
+	cmdRun = func(_ ...string) error {
+		runCalls++
+		if runCalls == 1 {
+			return errFetchFailed // main fetch fails
+		}
+		return nil // fallback fetch succeeds
+	}
+	diffCalls := 0
+	cmdOutput = func(_ ...string) ([]byte, error) {
+		diffCalls++
+		switch diffCalls {
+		case 1:
+			return nil, errDiffFailed // initial diff fails
+		case 2:
+			return nil, errDiffFailed // first fallback diff fails
+		default:
+			return []byte("recovered.go\n"), nil // second fallback diff succeeds
+		}
+	}
+
+	files, err := ResolvePRFiles(defaultRemote+"/"+defaultBranch, "ACM", true)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if len(files) != 1 || files[0] != "recovered.go" {
+		t.Errorf("expected recovered.go, got %v", files)
+	}
+}
+
+func TestResolvePRFiles_fallbackFetchSucceedsButDiffFails(t *testing.T) {
+	origOut := cmdOutput
+	origRun := cmdRun
+	defer func() { cmdOutput = origOut; cmdRun = origRun }()
+
+	runCalls := 0
+	cmdRun = func(_ ...string) error {
+		runCalls++
+		if runCalls == 1 {
+			return errFetchFailed // main fetch fails
+		}
+		return nil // fallback fetch succeeds but diff still fails
+	}
+	cmdOutput = func(_ ...string) ([]byte, error) {
+		return nil, errDiffFailed // all diffs fail
+	}
+
+	_, err := ResolvePRFiles(defaultRemote+"/"+defaultBranch, "ACM", true)
+	if err == nil {
+		t.Fatal("expected error, got nil")
+	}
+	var ce *errs.Error
+	if !errors.As(err, &ce) || ce.Code != errs.LIC006 {
+		t.Errorf("expected LIC006 error, got %v", err)
+	}
+}
+
 // --- Flags.AddTo ---
 
 func TestFlagsAddTo_registersAllFlags(t *testing.T) {
@@ -282,5 +368,23 @@ func TestFlagsAddTo_diffFilterDefault(t *testing.T) {
 	}
 	if fl.DefValue != "ACM" {
 		t.Errorf("expected default ACM, got %s", fl.DefValue)
+	}
+}
+
+// --- cmdOutput / cmdRun real implementations ---
+
+func TestCmdOutput_realImpl(t *testing.T) {
+	out, err := cmdOutput("--version")
+	if err != nil {
+		t.Skipf("git not available: %v", err)
+	}
+	if len(out) == 0 {
+		t.Error("expected non-empty output from git --version")
+	}
+}
+
+func TestCmdRun_realImpl(t *testing.T) {
+	if err := cmdRun("--version"); err != nil {
+		t.Skipf("git not available: %v", err)
 	}
 }
