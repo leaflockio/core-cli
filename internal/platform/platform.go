@@ -39,7 +39,7 @@ const (
 // String returns the string representation of the Arch.
 func (a Arch) String() string { return string(a) }
 
-// PackageManager represents the system package manager available on the host.
+// PackageManager represents the name of a system package manager.
 type PackageManager string
 
 const (
@@ -54,10 +54,44 @@ const (
 // String returns the string representation of the PackageManager.
 func (pm PackageManager) String() string { return string(pm) }
 
+// PackageManagerInfo holds details about a detected package manager.
+type PackageManagerInfo struct {
+	Name    PackageManager
+	Present bool
+}
+
+// ContainerType identifies the type of container environment.
+type ContainerType string
+
+const (
+	// ContainerNone indicates not running in a container.
+	ContainerNone ContainerType = "none"
+	// ContainerDocker indicates running in a Docker container.
+	ContainerDocker ContainerType = "docker"
+	// ContainerK8s indicates running in a Kubernetes pod.
+	ContainerK8s ContainerType = "kubernetes"
+)
+
+// String returns the string representation of the ContainerType.
+func (ct ContainerType) String() string { return string(ct) }
+
+// ContainerInfo holds details about the detected container environment.
+type ContainerInfo struct {
+	Type    ContainerType
+	Present bool
+}
+
+// CIInfo holds details about the detected CI environment.
+type CIInfo struct {
+	Provider Provider
+	Present  bool
+}
+
 // Platform holds detected information about the host system.
 type Platform struct {
-	OS             OS
-	Arch           Arch
-	PackageManager PackageManager
-	IsCI           bool
+	OS              OS
+	Arch            Arch
+	PackageManagers []PackageManagerInfo
+	Container       ContainerInfo
+	CI              CIInfo
 }

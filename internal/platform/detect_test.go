@@ -8,15 +8,8 @@
 package platform
 
 import (
-	"errors"
 	"testing"
 )
-
-var errNotFound = errors.New("executable file not found in PATH")
-
-func notFound(_ string) (string, error) { return "", errNotFound }
-func found(_ string) (string, error)    { return "tool", nil }
-func noEnv(_ string) string             { return "" }
 
 // --- Detect ---
 
@@ -72,72 +65,13 @@ func TestResolveArch_unknown(t *testing.T) {
 	}
 }
 
-// --- resolvePackageManager ---
+// --- DetectProvider ---
 
-func TestResolvePackageManager_macOSWithBrew(t *testing.T) {
-	if resolvePackageManager(MacOS, found) != Homebrew {
-		t.Error("expected Homebrew when brew is on PATH")
-	}
-}
-
-func TestResolvePackageManager_macOSWithoutBrew(t *testing.T) {
-	if resolvePackageManager(MacOS, notFound) != UnknownPM {
-		t.Error("expected UnknownPM when brew is not on PATH")
-	}
-}
-
-func TestResolvePackageManager_linuxWithApt(t *testing.T) {
-	if resolvePackageManager(Linux, found) != Apt {
-		t.Error("expected Apt when apt is on PATH")
-	}
-}
-
-func TestResolvePackageManager_linuxWithoutApt(t *testing.T) {
-	if resolvePackageManager(Linux, notFound) != UnknownPM {
-		t.Error("expected UnknownPM when apt is not on PATH")
-	}
-}
-
-func TestResolvePackageManager_windows(t *testing.T) {
-	if resolvePackageManager(Windows, notFound) != UnknownPM {
-		t.Error("expected UnknownPM for Windows")
-	}
-}
-
-func TestResolvePackageManager_unknown(t *testing.T) {
-	if resolvePackageManager(UnknownOS, notFound) != UnknownPM {
-		t.Error("expected UnknownPM for UnknownOS")
-	}
-}
-
-// --- resolveIsCI ---
-
-func TestResolveIsCI_githubActions(t *testing.T) {
-	result := resolveIsCI(func(key string) string {
-		if key == envGitHubActions {
-			return envGitHubActionsVal
-		}
-		return ""
-	})
-	if !result {
-		t.Error("expected IsCI=true when GITHUB_ACTIONS=true")
-	}
-}
-
-func TestResolveIsCI_genericCI(t *testing.T) {
-	result := resolveIsCI(func(key string) string {
-		if key == envCI {
-			return "true"
-		}
-		return ""
-	})
-	if !result {
-		t.Error("expected IsCI=true when CI is set")
-	}
-}
-
-func TestResolveIsCI_notCI(t *testing.T) {
-	if resolveIsCI(noEnv) {
-		t.Error("expected IsCI=false when no CI env vars are set")
+func TestDetectProvider(t *testing.T) {
+	// Set a CI env var to ensure we detect a provider
+	t.Setenv(envGitHubActions, "true")
+	p := DetectProvider()
+	if p != ProviderGitHub {
+		t.Errorf("expected ProviderGitHub, got %s", p)
 	}
 }

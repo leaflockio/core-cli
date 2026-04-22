@@ -7,7 +7,9 @@
 
 package platform
 
-import "testing"
+import (
+	"testing"
+)
 
 func TestOS_String(t *testing.T) {
 	cases := []struct {
@@ -55,8 +57,25 @@ func TestPackageManager_String(t *testing.T) {
 	}
 
 	for _, tc := range cases {
-		if tc.pm.String() != tc.expected {
-			t.Errorf("PackageManager(%q).String() = %q, want %q", tc.pm, tc.pm.String(), tc.expected)
+		if got := tc.pm.String(); got != tc.expected {
+			t.Errorf("PackageManager(%q).String() = %q, want %q", tc.pm, got, tc.expected)
+		}
+	}
+}
+
+func TestContainerType_String(t *testing.T) {
+	cases := []struct {
+		ct       ContainerType
+		expected string
+	}{
+		{ContainerNone, "none"},
+		{ContainerDocker, "docker"},
+		{ContainerK8s, "kubernetes"},
+	}
+
+	for _, tc := range cases {
+		if tc.ct.String() != tc.expected {
+			t.Errorf("ContainerType(%q).String() = %q, want %q", tc.ct, tc.ct.String(), tc.expected)
 		}
 	}
 }
