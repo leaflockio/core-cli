@@ -1,0 +1,5 @@
+Copyright {YEAR} {ORG}
+
+This file is part of an open-source project.
+Use of this source code is governed by the {SPDX_ID} license that can be
+found in the LICENSE file at the root of the repository.
