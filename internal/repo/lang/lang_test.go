@@ -7,200 +7,140 @@
 
 package lang
 
-import "testing"
+import (
+	"path/filepath"
+	"testing"
+)
 
-// --- Language.String ---
+// --- Classify ---
 
-func TestString_knownLanguage(t *testing.T) {
-	if got := Go.String(); got != "go" {
-		t.Errorf("expected %q, got %q", "go", got)
+func TestClassify_goFile(t *testing.T) {
+	if got := Classify(filepath.Join("src", "main.go")); got != "Go" {
+		t.Errorf("expected Go, got %q", got)
 	}
 }
 
-func TestString_unknownLanguage(t *testing.T) {
-	if got := Unknown.String(); got != "unknown" {
-		t.Errorf("expected %q, got %q", "unknown", got)
+func TestClassify_typescriptFile(t *testing.T) {
+	if got := Classify(filepath.Join("src", "app.ts")); got != "TypeScript" {
+		t.Errorf("expected TypeScript, got %q", got)
 	}
 }
 
-func TestString_outOfRangeLanguage(t *testing.T) {
-	if got := Language(9999).String(); got != "unknown" {
-		t.Errorf("expected %q for out-of-range language, got %q", "unknown", got)
+func TestClassify_pythonFile(t *testing.T) {
+	if got := Classify(filepath.Join("src", "main.py")); got != "Python" {
+		t.Errorf("expected Python, got %q", got)
 	}
 }
 
-// --- FromExtension ---
-
-func TestFromExtension_empty(t *testing.T) {
-	if got := FromExtension(""); got != Unknown {
-		t.Errorf("expected Unknown for empty extension, got %v", got)
+func TestClassify_rustFile(t *testing.T) {
+	// .rs is shared by RenderScript and Rust; without file content enry cannot
+	// make a definitive call. We only verify a Programming-type language is returned.
+	if got := Classify(filepath.Join("src", "main.rs")); got == "" {
+		t.Error("expected a non-empty language for .rs file")
 	}
 }
 
-func TestFromExtension_withLeadingDot(t *testing.T) {
-	if got := FromExtension(".go"); got != Go {
-		t.Errorf("expected Go for .go, got %v", got)
+func TestClassify_filenameBasedMakefile(t *testing.T) {
+	if got := Classify("Makefile"); got == "" {
+		t.Error("expected non-empty language for Makefile")
 	}
 }
 
-func TestFromExtension_withoutLeadingDot(t *testing.T) {
-	if got := FromExtension("go"); got != Go {
-		t.Errorf("expected Go for go, got %v", got)
+func TestClassify_unknownExtension(t *testing.T) {
+	if got := Classify(filepath.Join("repo", "data.bin")); got != "" {
+		t.Errorf("expected empty for unknown extension, got %q", got)
 	}
 }
 
-func TestFromExtension_caseInsensitive(t *testing.T) {
-	if got := FromExtension(".GO"); got != Go {
-		t.Errorf("expected Go for .GO, got %v", got)
+func TestClassify_vendoredPathSkipped(t *testing.T) {
+	if got := Classify(filepath.Join("vendor", "lib", "main.go")); got != "" {
+		t.Errorf("expected empty for vendored path, got %q", got)
 	}
 }
 
-func TestFromExtension_unknownExtension(t *testing.T) {
-	if got := FromExtension(".xyz"); got != Unknown {
-		t.Errorf("expected Unknown for .xyz, got %v", got)
+// --- Count ---
+
+func TestCount_empty(t *testing.T) {
+	counts := Count(nil)
+	if len(counts) != 0 {
+		t.Errorf("expected empty counts, got %v", counts)
 	}
 }
 
-func TestFromExtension_typescript(t *testing.T) {
-	if got := FromExtension(".ts"); got != TypeScript {
-		t.Errorf("expected TypeScript for .ts, got %v", got)
+func TestCount_knownExtensions(t *testing.T) {
+	files := []string{
+		filepath.Join("src", "main.go"),
+		filepath.Join("src", "util.go"),
+		filepath.Join("src", "app.ts"),
+	}
+	counts := Count(files)
+	if counts["Go"] != 2 {
+		t.Errorf("expected Go count=2, got %d", counts["Go"])
+	}
+	if counts["TypeScript"] != 1 {
+		t.Errorf("expected TypeScript count=1, got %d", counts["TypeScript"])
 	}
 }
 
-func TestFromExtension_tsx(t *testing.T) {
-	if got := FromExtension(".tsx"); got != TypeScript {
-		t.Errorf("expected TypeScript for .tsx, got %v", got)
+func TestCount_unknownExtensionIgnored(t *testing.T) {
+	counts := Count([]string{filepath.Join("repo", "data.bin")})
+	if len(counts) != 0 {
+		t.Errorf("expected no counts for unknown extension, got %v", counts)
 	}
 }
 
-func TestFromExtension_javascript(t *testing.T) {
-	if got := FromExtension(".js"); got != JavaScript {
-		t.Errorf("expected JavaScript for .js, got %v", got)
+// --- Build ---
+
+func TestBuild_empty(t *testing.T) {
+	det := Build(map[string]int{})
+	if det.Primary != "" {
+		t.Errorf("expected empty Primary for empty counts, got %q", det.Primary)
+	}
+	if len(det.All) != 0 {
+		t.Errorf("expected empty All, got %v", det.All)
 	}
 }
 
-func TestFromExtension_python(t *testing.T) {
-	if got := FromExtension(".py"); got != Python {
-		t.Errorf("expected Python for .py, got %v", got)
+func TestBuild_singleLanguage(t *testing.T) {
+	det := Build(map[string]int{"Go": 3})
+	if det.Primary != "Go" {
+		t.Errorf("expected Primary=Go, got %q", det.Primary)
+	}
+	if len(det.All) != 1 || det.All[0] != "Go" {
+		t.Errorf("expected All=[Go], got %v", det.All)
 	}
 }
 
-func TestFromExtension_shell(t *testing.T) {
-	if got := FromExtension(".sh"); got != Shell {
-		t.Errorf("expected Shell for .sh, got %v", got)
+func TestBuild_orderedByCount(t *testing.T) {
+	// Go: 3, TypeScript: 1, Python: 1 — tie broken alphabetically.
+	counts := map[string]int{
+		"Go":         3,
+		"TypeScript": 1,
+		"Python":     1,
+	}
+	det := Build(counts)
+	if det.Primary != "Go" {
+		t.Errorf("expected Primary=Go, got %q", det.Primary)
+	}
+	if len(det.All) != 3 {
+		t.Errorf("expected 3 languages, got %v", det.All)
+	}
+	if det.All[0] != "Go" {
+		t.Errorf("expected Go first, got %q", det.All[0])
+	}
+	// Tie between Python and TypeScript — Python comes first alphabetically.
+	if det.All[1] != "Python" {
+		t.Errorf("expected Python second (alphabetical tie-break), got %q", det.All[1])
 	}
 }
 
-func TestFromExtension_rust(t *testing.T) {
-	if got := FromExtension(".rs"); got != Rust {
-		t.Errorf("expected Rust for .rs, got %v", got)
+func TestBuild_fileCountsPreserved(t *testing.T) {
+	counts := map[string]int{"Go": 5, "Rust": 2}
+	det := Build(counts)
+	if det.FileCounts["Go"] != 5 {
+		t.Errorf("expected Go FileCounts=5, got %d", det.FileCounts["Go"])
 	}
-}
-
-func TestFromExtension_java(t *testing.T) {
-	if got := FromExtension(".java"); got != Java {
-		t.Errorf("expected Java for .java, got %v", got)
-	}
-}
-
-func TestFromExtension_kotlin(t *testing.T) {
-	if got := FromExtension(".kt"); got != Kotlin {
-		t.Errorf("expected Kotlin for .kt, got %v", got)
-	}
-}
-
-func TestFromExtension_swift(t *testing.T) {
-	if got := FromExtension(".swift"); got != Swift {
-		t.Errorf("expected Swift for .swift, got %v", got)
-	}
-}
-
-func TestFromExtension_ruby(t *testing.T) {
-	if got := FromExtension(".rb"); got != Ruby {
-		t.Errorf("expected Ruby for .rb, got %v", got)
-	}
-}
-
-func TestFromExtension_css(t *testing.T) {
-	if got := FromExtension(".css"); got != CSS {
-		t.Errorf("expected CSS for .css, got %v", got)
-	}
-}
-
-func TestFromExtension_html(t *testing.T) {
-	if got := FromExtension(".html"); got != HTML {
-		t.Errorf("expected HTML for .html, got %v", got)
-	}
-}
-
-func TestFromExtension_proto(t *testing.T) {
-	if got := FromExtension(".proto"); got != Proto {
-		t.Errorf("expected Proto for .proto, got %v", got)
-	}
-}
-
-func TestFromExtension_terraform(t *testing.T) {
-	if got := FromExtension(".tf"); got != Terraform {
-		t.Errorf("expected Terraform for .tf, got %v", got)
-	}
-}
-
-func TestFromExtension_cpp(t *testing.T) {
-	if got := FromExtension(".cpp"); got != CPP {
-		t.Errorf("expected CPP for .cpp, got %v", got)
-	}
-}
-
-func TestFromExtension_c(t *testing.T) {
-	if got := FromExtension(".c"); got != C {
-		t.Errorf("expected C for .c, got %v", got)
-	}
-}
-
-func TestFromExtension_csharp(t *testing.T) {
-	if got := FromExtension(".cs"); got != CSharp {
-		t.Errorf("expected CSharp for .cs, got %v", got)
-	}
-}
-
-func TestFromExtension_vue(t *testing.T) {
-	if got := FromExtension(".vue"); got != Vue {
-		t.Errorf("expected Vue for .vue, got %v", got)
-	}
-}
-
-func TestFromExtension_svelte(t *testing.T) {
-	if got := FromExtension(".svelte"); got != Svelte {
-		t.Errorf("expected Svelte for .svelte, got %v", got)
-	}
-}
-
-func TestFromExtension_scala(t *testing.T) {
-	if got := FromExtension(".scala"); got != Scala {
-		t.Errorf("expected Scala for .scala, got %v", got)
-	}
-}
-
-func TestFromExtension_elixir(t *testing.T) {
-	if got := FromExtension(".ex"); got != Elixir {
-		t.Errorf("expected Elixir for .ex, got %v", got)
-	}
-}
-
-func TestFromExtension_haskell(t *testing.T) {
-	if got := FromExtension(".hs"); got != Haskell {
-		t.Errorf("expected Haskell for .hs, got %v", got)
-	}
-}
-
-func TestFromExtension_lua(t *testing.T) {
-	if got := FromExtension(".lua"); got != Lua {
-		t.Errorf("expected Lua for .lua, got %v", got)
-	}
-}
-
-func TestFromExtension_dart(t *testing.T) {
-	if got := FromExtension(".dart"); got != Dart {
-		t.Errorf("expected Dart for .dart, got %v", got)
+	if det.FileCounts["Rust"] != 2 {
+		t.Errorf("expected Rust FileCounts=2, got %d", det.FileCounts["Rust"])
 	}
 }

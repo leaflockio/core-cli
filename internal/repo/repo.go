@@ -6,74 +6,49 @@
 // written permission from LeafLock.
 
 // Package repo detects information about the current repository at startup.
-// The result is injected into App and consumed by domain packages that need
-// to know whether they are in a git repo, which languages are present, etc.
+// It inspects the working directory for git metadata, remote URL, language
+// composition, and license file presence.
 package repo
 
 import (
 	"os"
 	"os/exec"
 	"path/filepath"
-	"sort"
 	"strings"
 
+	"github.com/google/licenseclassifier/v2/assets"
 	"github.com/leaflock/core-cli/internal/fstree"
 	"github.com/leaflock/core-cli/internal/repo/lang"
 )
 
 const defaultRemote = "origin"
 
-// License type identifiers returned by DetectedLicenseType.
-const (
-	licenseApache20    = "apache-2.0"
-	licenseMIT         = "mit"
-	licenseGPL3        = "gpl-3.0"
-	licenseGPL2        = "gpl-2.0"
-	licenseLGPL3       = "lgpl-3.0"
-	licenseLGPL21      = "lgpl-2.1"
-	licenseAGPL3       = "agpl-3.0"
-	licenseMPL2        = "mpl-2.0"
-	licenseBSD2Clause  = "bsd-2-clause"
-	licenseBSD3Clause  = "bsd-3-clause"
-	licenseISC         = "isc"
-	licenseProprietary = "proprietary"
-)
-
-// Keywords used for license text classification.
-const (
-	kwApacheLicense           = "APACHE LICENSE"
-	kwApacheVersion           = "2.0"
-	kwMITLicense              = "MIT LICENSE"
-	kwPermissionGranted       = "PERMISSION IS HEREBY GRANTED"
-	kwWithoutWarranty         = "WITHOUT WARRANTY"
-	kwGNUGeneralPublicLicense = "GNU GENERAL PUBLIC LICENSE"
-	kwGNULesserPublicLicense  = "GNU LESSER GENERAL PUBLIC LICENSE"
-	kwGNUAfferoPublicLicense  = "GNU AFFERO GENERAL PUBLIC LICENSE"
-	kwMozillaPublicLicense    = "MOZILLA PUBLIC LICENSE"
-	kwBSD2Clause              = "BSD 2-CLAUSE"
-	kwBSDTwoClause            = "BSD TWO-CLAUSE"
-	kwBSD3Clause              = "BSD 3-CLAUSE"
-	kwBSDThreeClause          = "BSD THREE-CLAUSE"
-	kwISCLicense              = "ISC LICENSE"
-	kwVersion2                = "VERSION 2"
-	kwVersion3                = "VERSION 3"
-)
-
-// Mockable runner for git root detection.
+// execGitRoot resolves the repository root via git.
 var execGitRoot = func() ([]byte, error) {
 	return exec.Command("git", "rev-parse", "--show-toplevel").Output()
 }
 
-// Mockable runner for git remote URL detection.
+// execGitRemoteURL resolves the remote URL for the default remote via git.
 var execGitRemoteURL = func() ([]byte, error) {
 	return exec.Command("git", "remote", "get-url", defaultRemote).Output()
 }
 
-// Mockable file walker for language detection.
+// walkFiles walks the repository file tree.
 var walkFiles = fstree.Walk
 
-// Mockable working directory resolver.
+// osGetwd resolves the current working directory.
 var osGetwd = os.Getwd
+
+// LicenseInfo holds the result of license file detection at the repo root.
+type LicenseInfo struct {
+	// Found reports whether a license file was found at the repo root.
+	Found bool
+	// File is the name of the detected license file (e.g. "LICENSE", "LICENSE.md").
+	File string
+	// SPDXID is the SPDX identifier detected from the license file content
+	// (e.g. "MIT", "Apache-2.0"). Empty when the license could not be classified.
+	SPDXID string
+}
 
 // Info holds repository information detected at startup.
 // All fields are best-effort; undetectable fields are left at their zero value.
@@ -94,16 +69,11 @@ type Info struct {
 	// RepoName is the repository name portion of RemoteURL (e.g. "core-cli").
 	// Empty when RemoteURL is empty.
 	RepoName string
-	// Languages contains the languages detected in the repository, ordered by
+	// Languages is the language composition of the repository, ordered by
 	// file count descending.
-	Languages lang.Detection
-	// HasLicenseFile reports whether a LICENSE, LICENSE.md, or LICENSE.txt file
-	// exists at the repository root.
-	HasLicenseFile bool
-	// DetectedLicenseType is a best-effort license type string derived from the
-	// content of the LICENSE file (e.g. "apache-2.0", "mit", "proprietary").
-	// Empty when HasLicenseFile is false.
-	DetectedLicenseType string
+	Languages lang.Composition
+	// License holds the result of license file detection at the repo root.
+	License LicenseInfo
 }
 
 // Detect builds an Info by inspecting the current working directory.
@@ -126,8 +96,12 @@ func Detect() *Info {
 		info.RootDir = wd
 	}
 
-	info.HasLicenseFile, info.DetectedLicenseType = detectLicense(info.RootDir)
-	info.Languages = detectLanguages(info.RootDir)
+	info.License = detectLicense(info.RootDir)
+	files, err := walkFiles(info.RootDir, true)
+	if err != nil {
+		files = nil
+	}
+	info.Languages = lang.Build(lang.Count(files))
 
 	return info
 }
@@ -141,26 +115,33 @@ func parseRemoteURL(rawURL string) (string, string, string) {
 	if rawURL == "" {
 		return "", "", ""
 	}
-
 	url := strings.TrimSuffix(rawURL, ".git")
-
-	// SSH format: git@github.com:org/repo
 	if strings.HasPrefix(url, "git@") {
-		url = strings.TrimPrefix(url, "git@")
-		parts := strings.SplitN(url, ":", 2)
-		if len(parts) != 2 {
-			return "", "", ""
-		}
-		host := parts[0]
-		var owner, repo string
-		pathParts := strings.SplitN(parts[1], "/", 2)
-		if len(pathParts) == 2 {
-			owner, repo = pathParts[0], pathParts[1]
-		}
-		return host, owner, repo
+		return parseSSHRemoteURL(url)
 	}
+	return parseHTTPSRemoteURL(url)
+}
 
-	// HTTPS format: https://github.com/org/repo
+// parseSSHRemoteURL extracts host, owner, and repo from an SSH remote URL
+// of the form git@github.com:org/repo.
+func parseSSHRemoteURL(url string) (string, string, string) {
+	url = strings.TrimPrefix(url, "git@")
+	parts := strings.SplitN(url, ":", 2)
+	if len(parts) != 2 {
+		return "", "", ""
+	}
+	host := parts[0]
+	var owner, repo string
+	pathParts := strings.SplitN(parts[1], "/", 2)
+	if len(pathParts) == 2 {
+		owner, repo = pathParts[0], pathParts[1]
+	}
+	return host, owner, repo
+}
+
+// parseHTTPSRemoteURL extracts host, owner, and repo from an HTTPS remote URL
+// of the form https://github.com/org/repo.
+func parseHTTPSRemoteURL(url string) (string, string, string) {
 	for _, prefix := range []string{"https://", "http://"} {
 		if strings.HasPrefix(url, prefix) {
 			url = strings.TrimPrefix(url, prefix)
@@ -179,119 +160,24 @@ var licenseFileNames = []string{
 	"LICENSE", "LICENSE.md", "LICENSE.txt",
 }
 
-// detectLicense checks whether a LICENSE file exists at root and performs a
-// best-effort classification of its type.
-func detectLicense(root string) (bool, string) {
+// detectLicense checks whether a LICENSE file exists at root and classifies
+// its content to extract the SPDX identifier.
+func detectLicense(root string) LicenseInfo {
 	for _, name := range licenseFileNames {
 		p := filepath.Join(root, name)
 		data, err := os.ReadFile(p)
 		if err != nil {
 			continue
 		}
-		return true, classifyLicenseText(string(data))
-	}
-	return false, ""
-}
-
-// classifyLicenseText performs a simple keyword-based license identification.
-func classifyLicenseText(text string) string {
-	upper := strings.ToUpper(text)
-	if r := classifyCommonLicenses(upper); r != "" {
-		return r
-	}
-	return classifyRareLicenses(upper)
-}
-
-// classifyCommonLicenses matches the most widely used open-source licenses.
-func classifyCommonLicenses(upper string) string {
-	switch {
-	case strings.Contains(upper, kwApacheLicense) && strings.Contains(upper, kwApacheVersion):
-		return licenseApache20
-	case strings.Contains(upper, kwMITLicense) ||
-		(strings.Contains(upper, kwPermissionGranted) &&
-			strings.Contains(upper, kwWithoutWarranty)):
-		return licenseMIT
-	case strings.Contains(upper, kwGNUGeneralPublicLicense) &&
-		strings.Contains(upper, kwVersion3):
-		return licenseGPL3
-	case strings.Contains(upper, kwGNUGeneralPublicLicense) &&
-		strings.Contains(upper, kwVersion2):
-		return licenseGPL2
-	case strings.Contains(upper, kwGNULesserPublicLicense) &&
-		strings.Contains(upper, kwVersion3):
-		return licenseLGPL3
-	case strings.Contains(upper, kwGNULesserPublicLicense) &&
-		strings.Contains(upper, kwVersion2):
-		return licenseLGPL21
-	}
-	return ""
-}
-
-// classifyRareLicenses matches less common open-source licenses, defaulting
-// to proprietary when no pattern matches.
-func classifyRareLicenses(upper string) string {
-	switch {
-	case strings.Contains(upper, kwGNUAfferoPublicLicense):
-		return licenseAGPL3
-	case strings.Contains(upper, kwMozillaPublicLicense):
-		return licenseMPL2
-	case strings.Contains(upper, kwBSD2Clause) || strings.Contains(upper, kwBSDTwoClause):
-		return licenseBSD2Clause
-	case strings.Contains(upper, kwBSD3Clause) || strings.Contains(upper, kwBSDThreeClause):
-		return licenseBSD3Clause
-	case strings.Contains(upper, kwISCLicense):
-		return licenseISC
-	default:
-		return licenseProprietary
-	}
-}
-
-// countLanguages maps each recognized language to its file count in files.
-func countLanguages(files []string) map[lang.Language]int {
-	counts := make(map[lang.Language]int)
-	for _, f := range files {
-		ext := filepath.Ext(f)
-		if l := lang.FromExtension(ext); l != lang.Unknown {
-			counts[l]++
+		info := LicenseInfo{Found: true, File: name}
+		c, err := assets.DefaultClassifier()
+		if err == nil {
+			results := c.Match(data)
+			if len(results.Matches) > 0 {
+				info.SPDXID = results.Matches[0].Name
+			}
 		}
+		return info
 	}
-	return counts
-}
-
-// buildDetection constructs a Detection from a language→count map, ordered by
-// file count descending.
-func buildDetection(counts map[lang.Language]int) lang.Detection {
-	type entry struct {
-		l     lang.Language
-		count int
-	}
-	entries := make([]entry, 0, len(counts))
-	for l, c := range counts {
-		entries = append(entries, entry{l, c})
-	}
-	sort.Slice(entries, func(i, j int) bool {
-		if entries[i].count != entries[j].count {
-			return entries[i].count > entries[j].count
-		}
-		return entries[i].l < entries[j].l
-	})
-
-	det := lang.Detection{FileCounts: counts}
-	for _, e := range entries {
-		det.All = append(det.All, e.l)
-	}
-	if len(det.All) > 0 {
-		det.Primary = det.All[0]
-	}
-	return det
-}
-
-// detectLanguages scans the repository for source files and returns a
-// Detection ordered by file count descending.
-func detectLanguages(root string) lang.Detection {
-	files, err := walkFiles(root, true)
-	if err != nil {
-		files = nil
-	}
-	return buildDetection(countLanguages(files))
+	return LicenseInfo{}
 }

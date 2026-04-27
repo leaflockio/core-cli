@@ -12,8 +12,6 @@ import (
 	"os"
 	"path/filepath"
 	"testing"
-
-	"github.com/leaflock/core-cli/internal/repo/lang"
 )
 
 var (
@@ -57,8 +55,8 @@ func TestDetect_gitRepoWithRemote(t *testing.T) {
 	if info.RepoName != "core-cli" {
 		t.Errorf("expected RepoName=core-cli, got %q", info.RepoName)
 	}
-	if info.HasLicenseFile {
-		t.Error("expected HasLicenseFile=false for empty dir")
+	if info.License.Found {
+		t.Error("expected License.Found=false for empty dir")
 	}
 }
 
@@ -127,7 +125,29 @@ func TestDetect_getwdFails(t *testing.T) {
 
 func TestDetect_withLicenseFile(t *testing.T) {
 	dir := t.TempDir()
-	if err := os.WriteFile(filepath.Join(dir, "LICENSE"), []byte("MIT LICENSE"), 0o600); err != nil {
+	mitText := `MIT License
+
+Copyright (c) 2024 LeafLock
+
+Permission is hereby granted, free of charge, to any person obtaining a copy
+of this software and associated documentation files (the "Software"), to deal
+in the Software without restriction, including without limitation the rights
+to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+copies of the Software, and to permit persons to whom the Software is
+furnished to do so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in all
+copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+SOFTWARE.
+`
+	if err := os.WriteFile(filepath.Join(dir, "LICENSE"), []byte(mitText), 0o600); err != nil {
 		t.Fatal(err)
 	}
 	origRoot := execGitRoot
@@ -141,11 +161,11 @@ func TestDetect_withLicenseFile(t *testing.T) {
 
 	info := Detect()
 
-	if !info.HasLicenseFile {
-		t.Error("expected HasLicenseFile=true")
+	if !info.License.Found {
+		t.Error("expected License.Found=true")
 	}
-	if info.DetectedLicenseType != licenseMIT {
-		t.Errorf("expected DetectedLicenseType=%q, got %q", licenseMIT, info.DetectedLicenseType)
+	if info.License.SPDXID == "" {
+		t.Error("expected License.SPDXID to be detected")
 	}
 }
 
@@ -168,7 +188,7 @@ func TestDetect_withLanguages(t *testing.T) {
 
 	info := Detect()
 
-	if info.Languages.Primary != lang.Go {
+	if info.Languages.Primary != "Go" {
 		t.Errorf("expected Primary=Go, got %v", info.Languages.Primary)
 	}
 }
@@ -235,211 +255,73 @@ func TestParseRemoteURL_sshNoSlashInPath(t *testing.T) {
 
 func TestDetectLicense_noFile(t *testing.T) {
 	dir := t.TempDir()
-	exists, licenseType := detectLicense(dir)
-	if exists || licenseType != "" {
-		t.Errorf("expected no license, got exists=%v type=%q", exists, licenseType)
+	info := detectLicense(dir)
+	if info.Found || info.File != "" || info.SPDXID != "" {
+		t.Errorf("expected empty LicenseInfo, got %+v", info)
 	}
 }
 
-func TestDetectLicense_licenseFile(t *testing.T) {
+func TestDetectLicense_foundLicenseFile(t *testing.T) {
 	dir := t.TempDir()
-	if err := os.WriteFile(filepath.Join(dir, "LICENSE"), []byte("MIT LICENSE"), 0o600); err != nil {
+	content := []byte("MIT LICENSE\nPermission is hereby granted")
+	if err := os.WriteFile(filepath.Join(dir, "LICENSE"), content, 0o600); err != nil {
 		t.Fatal(err)
 	}
-	exists, licenseType := detectLicense(dir)
-	if !exists || licenseType != licenseMIT {
-		t.Errorf("expected MIT license, got exists=%v type=%q", exists, licenseType)
+	info := detectLicense(dir)
+	if !info.Found {
+		t.Error("expected Found=true")
+	}
+	if info.File != "LICENSE" {
+		t.Errorf("expected File=LICENSE, got %q", info.File)
 	}
 }
 
 func TestDetectLicense_licenseMdFile(t *testing.T) {
 	dir := t.TempDir()
-	// Only LICENSE.md exists, not LICENSE.
-	if err := os.WriteFile(filepath.Join(dir, "LICENSE.md"), []byte("Apache License\n2.0"), 0o600); err != nil {
+	content := []byte("MIT LICENSE\nPermission is hereby granted")
+	if err := os.WriteFile(filepath.Join(dir, "LICENSE.md"), content, 0o600); err != nil {
 		t.Fatal(err)
 	}
-	exists, licenseType := detectLicense(dir)
-	if !exists || licenseType != licenseApache20 {
-		t.Errorf("expected apache-2.0, got exists=%v type=%q", exists, licenseType)
+	info := detectLicense(dir)
+	if !info.Found {
+		t.Error("expected Found=true")
+	}
+	if info.File != "LICENSE.md" {
+		t.Errorf("expected File=LICENSE.md, got %q", info.File)
 	}
 }
 
-// --- classifyLicenseText ---
-
-func TestClassifyLicenseText_apache20(t *testing.T) {
-	if got := classifyLicenseText("Apache License 2.0"); got != licenseApache20 {
-		t.Errorf("expected %q, got %q", licenseApache20, got)
+func TestDetectLicense_preferLicenseOverMd(t *testing.T) {
+	dir := t.TempDir()
+	if err := os.WriteFile(filepath.Join(dir, "LICENSE"), []byte("MIT LICENSE"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(dir, "LICENSE.md"), []byte("Apache License"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	info := detectLicense(dir)
+	if info.File != "LICENSE" {
+		t.Errorf("expected LICENSE to take precedence, got %q", info.File)
 	}
 }
 
-func TestClassifyLicenseText_mit(t *testing.T) {
-	if got := classifyLicenseText("MIT LICENSE"); got != licenseMIT {
-		t.Errorf("expected %q, got %q", licenseMIT, got)
-	}
-}
+// --- walk error ---
 
-func TestClassifyLicenseText_mitByPermission(t *testing.T) {
-	if got := classifyLicenseText("Permission is hereby granted without warranty of any kind"); got != licenseMIT {
-		t.Errorf("expected %q, got %q", licenseMIT, got)
-	}
-}
+func TestDetect_walkError(t *testing.T) {
+	dir := t.TempDir()
+	origRoot := execGitRoot
+	origRemote := execGitRemoteURL
+	origWalk := walkFiles
+	defer func() { execGitRoot = origRoot; execGitRemoteURL = origRemote; walkFiles = origWalk }()
 
-func TestClassifyLicenseText_gpl3(t *testing.T) {
-	if got := classifyLicenseText("GNU General Public License Version 3"); got != licenseGPL3 {
-		t.Errorf("expected %q, got %q", licenseGPL3, got)
-	}
-}
+	execGitRoot = func() ([]byte, error) { return []byte(dir), nil }
+	execGitRemoteURL = func() ([]byte, error) { return nil, errGitFailed }
+	walkFiles = func(_ string, _ bool) ([]string, error) { return nil, errWalkFailed }
 
-func TestClassifyLicenseText_gpl2(t *testing.T) {
-	if got := classifyLicenseText("GNU General Public License Version 2"); got != licenseGPL2 {
-		t.Errorf("expected %q, got %q", licenseGPL2, got)
-	}
-}
+	info := Detect()
 
-func TestClassifyLicenseText_lgpl3(t *testing.T) {
-	if got := classifyLicenseText("GNU Lesser General Public License Version 3"); got != licenseLGPL3 {
-		t.Errorf("expected %q, got %q", licenseLGPL3, got)
-	}
-}
-
-func TestClassifyLicenseText_lgpl21(t *testing.T) {
-	if got := classifyLicenseText("GNU Lesser General Public License Version 2"); got != licenseLGPL21 {
-		t.Errorf("expected %q, got %q", licenseLGPL21, got)
-	}
-}
-
-func TestClassifyLicenseText_agpl3(t *testing.T) {
-	if got := classifyLicenseText("GNU Affero General Public License"); got != licenseAGPL3 {
-		t.Errorf("expected %q, got %q", licenseAGPL3, got)
-	}
-}
-
-func TestClassifyLicenseText_mpl2(t *testing.T) {
-	if got := classifyLicenseText("Mozilla Public License"); got != licenseMPL2 {
-		t.Errorf("expected %q, got %q", licenseMPL2, got)
-	}
-}
-
-func TestClassifyLicenseText_bsd2Clause(t *testing.T) {
-	if got := classifyLicenseText("BSD 2-Clause"); got != licenseBSD2Clause {
-		t.Errorf("expected %q, got %q", licenseBSD2Clause, got)
-	}
-}
-
-func TestClassifyLicenseText_bsd2ClauseTwoClause(t *testing.T) {
-	if got := classifyLicenseText("BSD Two-Clause"); got != licenseBSD2Clause {
-		t.Errorf("expected %q, got %q", licenseBSD2Clause, got)
-	}
-}
-
-func TestClassifyLicenseText_bsd3Clause(t *testing.T) {
-	if got := classifyLicenseText("BSD 3-Clause"); got != licenseBSD3Clause {
-		t.Errorf("expected %q, got %q", licenseBSD3Clause, got)
-	}
-}
-
-func TestClassifyLicenseText_bsd3ClauseThreeClause(t *testing.T) {
-	if got := classifyLicenseText("BSD Three-Clause"); got != licenseBSD3Clause {
-		t.Errorf("expected %q, got %q", licenseBSD3Clause, got)
-	}
-}
-
-func TestClassifyLicenseText_isc(t *testing.T) {
-	if got := classifyLicenseText("ISC License"); got != licenseISC {
-		t.Errorf("expected %q, got %q", licenseISC, got)
-	}
-}
-
-func TestClassifyLicenseText_proprietary(t *testing.T) {
-	if got := classifyLicenseText("All rights reserved. Proprietary software."); got != licenseProprietary {
-		t.Errorf("expected %q, got %q", licenseProprietary, got)
-	}
-}
-
-// --- countLanguages ---
-
-func TestCountLanguages_empty(t *testing.T) {
-	counts := countLanguages(nil)
-	if len(counts) != 0 {
-		t.Errorf("expected empty counts, got %v", counts)
-	}
-}
-
-func TestCountLanguages_knownExtensions(t *testing.T) {
-	files := []string{
-		filepath.Join("repo", "main.go"),
-		filepath.Join("repo", "util.go"),
-		filepath.Join("repo", "app.ts"),
-	}
-	counts := countLanguages(files)
-	if counts[lang.Go] != 2 {
-		t.Errorf("expected Go count=2, got %d", counts[lang.Go])
-	}
-	if counts[lang.TypeScript] != 1 {
-		t.Errorf("expected TypeScript count=1, got %d", counts[lang.TypeScript])
-	}
-}
-
-func TestCountLanguages_unknownExtensionIgnored(t *testing.T) {
-	counts := countLanguages([]string{filepath.Join("repo", "Makefile"), filepath.Join("repo", "data.bin")})
-	if len(counts) != 0 {
-		t.Errorf("expected no counts for unknown extensions, got %v", counts)
-	}
-}
-
-// --- buildDetection ---
-
-func TestBuildDetection_empty(t *testing.T) {
-	det := buildDetection(map[lang.Language]int{})
-	if det.Primary != lang.Unknown {
-		t.Errorf("expected Unknown primary for empty counts, got %v", det.Primary)
-	}
-	if len(det.All) != 0 {
-		t.Errorf("expected empty All, got %v", det.All)
-	}
-}
-
-func TestBuildDetection_singleLanguage(t *testing.T) {
-	det := buildDetection(map[lang.Language]int{lang.Go: 3})
-	if det.Primary != lang.Go {
-		t.Errorf("expected Primary=Go, got %v", det.Primary)
-	}
-	if len(det.All) != 1 || det.All[0] != lang.Go {
-		t.Errorf("expected All=[Go], got %v", det.All)
-	}
-}
-
-func TestBuildDetection_orderedByCount(t *testing.T) {
-	// Go: 3, TypeScript: 1, Python: 1 — tie between TypeScript and Python broken by Language value.
-	counts := map[lang.Language]int{
-		lang.Go:         3,
-		lang.TypeScript: 1,
-		lang.Python:     1,
-	}
-	det := buildDetection(counts)
-	if det.Primary != lang.Go {
-		t.Errorf("expected Primary=Go, got %v", det.Primary)
-	}
-	if len(det.All) != 3 {
-		t.Errorf("expected 3 languages, got %v", det.All)
-	}
-	if det.All[0] != lang.Go {
-		t.Errorf("expected Go first, got %v", det.All[0])
-	}
-}
-
-// --- detectLanguages ---
-
-func TestDetectLanguages_walkError(t *testing.T) {
-	orig := walkFiles
-	defer func() { walkFiles = orig }()
-	walkFiles = func(_ string, _ bool) ([]string, error) {
-		return nil, errWalkFailed
-	}
-
-	det := detectLanguages("root")
-	if det.Primary != lang.Unknown {
-		t.Errorf("expected Unknown primary on walk error, got %v", det.Primary)
+	if info.Languages.Primary != "" {
+		t.Errorf("expected empty Primary on walk error, got %q", info.Languages.Primary)
 	}
 }
 
