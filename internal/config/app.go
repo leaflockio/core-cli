@@ -15,6 +15,15 @@ const (
 	// Derived from AppName with a leading dot.
 	appFolder = "." + AppName
 
+	// Entity is the entity name.
+	Entity = "leaflock"
+
+	// EntityFolder is the entity folder name derived from Entity with a leading dot.
+	EntityFolder = "." + Entity
+
+	// CredentialsFile is the credentials filename.
+	CredentialsFile = "credentials"
+
 	// EnvPrefix is the prefix for all LEAF_* environment variables.
 	// Must be the uppercase form of AppName — update together.
 	envPrefix = "LEAF"
