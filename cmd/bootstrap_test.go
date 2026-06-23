@@ -140,6 +140,9 @@ func TestBuildApp_setsAllFields(t *testing.T) {
 	if a.Repo == nil {
 		t.Error("expected Repo to be set")
 	}
+	if a.Workspace == nil {
+		t.Error("expected Workspace to be set")
+	}
 }
 
 // TestBuildApp_propagatesLoggerError verifies that a logger build failure is propagated.

@@ -19,6 +19,7 @@ import (
 	"github.com/leaflock/core-cli/internal/terminal"
 	"github.com/leaflock/core-cli/internal/ui"
 	"github.com/leaflock/core-cli/internal/version"
+	"github.com/leaflock/core-cli/internal/workspace"
 )
 
 // run wires the build-time env into the startup sequence.
@@ -74,6 +75,11 @@ func buildApp(cfg *config.Config) (*app.App, error) {
 	inv := invocation.FromArgs()
 	repoInfo := repo.Detect()
 
+	ws, err := workspace.New("", repoInfo.RootDir)
+	if err != nil {
+		return nil, err
+	}
+
 	return app.NewBuilder().
 		WithConfig(cfg).
 		WithLogger(log).
@@ -82,5 +88,6 @@ func buildApp(cfg *config.Config) (*app.App, error) {
 		WithVersion(version.Current()).
 		WithRepo(repoInfo).
 		WithInvocation(inv).
+		WithWorkspace(ws).
 		Build(), nil
 }
