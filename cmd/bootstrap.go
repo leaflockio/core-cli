@@ -12,6 +12,7 @@ import (
 	"github.com/leaflock/core-cli/internal/app"
 	"github.com/leaflock/core-cli/internal/config"
 	"github.com/leaflock/core-cli/internal/errs"
+	"github.com/leaflock/core-cli/internal/invocation"
 	"github.com/leaflock/core-cli/internal/logger"
 	"github.com/leaflock/core-cli/internal/platform"
 	"github.com/leaflock/core-cli/internal/terminal"
@@ -69,11 +70,14 @@ func buildApp(cfg *config.Config) (*app.App, error) {
 	term := terminal.New(os.Stdout, os.Stderr, os.Stdin)
 	printer := ui.NewPrinter(term)
 	plat := platform.Detect()
+	inv := invocation.FromArgs()
+
 	return app.NewBuilder().
 		WithConfig(cfg).
 		WithLogger(log).
 		WithPrinter(printer).
 		WithPlatform(plat).
 		WithVersion(version.Current()).
+		WithInvocation(inv).
 		Build(), nil
 }

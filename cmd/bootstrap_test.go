@@ -134,6 +134,9 @@ func TestBuildApp_setsAllFields(t *testing.T) {
 	if a.Version == nil {
 		t.Error("expected Version to be set")
 	}
+	if a.Invocation == nil {
+		t.Error("expected Invocation to be set")
+	}
 }
 
 // TestBuildApp_propagatesLoggerError verifies that a logger build failure is propagated.
