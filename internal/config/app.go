@@ -22,7 +22,7 @@ const (
 	EntityFolder = "." + Entity
 
 	// CredentialsFile is the credentials filename.
-	CredentialsFile = "credentials"
+	CredentialsFile = "credentials.json"
 
 	// EnvPrefix is the prefix for all LEAF_* environment variables.
 	// Must be the uppercase form of AppName — update together.
