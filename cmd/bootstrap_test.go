@@ -137,6 +137,9 @@ func TestBuildApp_setsAllFields(t *testing.T) {
 	if a.Invocation == nil {
 		t.Error("expected Invocation to be set")
 	}
+	if a.Repo == nil {
+		t.Error("expected Repo to be set")
+	}
 }
 
 // TestBuildApp_propagatesLoggerError verifies that a logger build failure is propagated.
