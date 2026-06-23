@@ -14,6 +14,7 @@ import (
 
 	"github.com/leaflock/core-cli/internal/invocation"
 	"github.com/leaflock/core-cli/internal/platform"
+	"github.com/leaflock/core-cli/internal/repo"
 	"github.com/leaflock/core-cli/internal/terminal"
 	"github.com/leaflock/core-cli/internal/ui"
 	"github.com/leaflock/core-cli/internal/version"
@@ -66,6 +67,15 @@ func TestBuilder_WithVersion(t *testing.T) {
 
 	if a.Version.Version != "1.2.3" {
 		t.Errorf("expected Version %q, got %q", "1.2.3", a.Version.Version)
+	}
+}
+
+func TestBuilder_WithRepo(t *testing.T) {
+	r := &repo.Info{IsGit: true, RootDir: t.TempDir()}
+	a := NewBuilder().WithRepo(r).Build()
+
+	if a.Repo != r {
+		t.Error("Repo not set correctly")
 	}
 }
 

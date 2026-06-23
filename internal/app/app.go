@@ -13,6 +13,7 @@ import (
 	"github.com/leaflock/core-cli/internal/config"
 	"github.com/leaflock/core-cli/internal/invocation"
 	"github.com/leaflock/core-cli/internal/platform"
+	"github.com/leaflock/core-cli/internal/repo"
 	"github.com/leaflock/core-cli/internal/ui"
 	"github.com/leaflock/core-cli/internal/version"
 	"github.com/leaflock/core-cli/internal/workspace"
@@ -28,6 +29,7 @@ type App struct {
 	Printer    *ui.Printer
 	Platform   *platform.Platform
 	Version    *version.Info
+	Repo       *repo.Info             // detected at startup, never nil
 	Invocation *invocation.Invocation // captured from os.Args before cobra runs
 	Workspace  *workspace.Workspace   // filesystem path manager, never nil
 }
@@ -39,6 +41,7 @@ type Builder struct {
 	printer    *ui.Printer
 	plat       *platform.Platform
 	version    *version.Info
+	repoInfo   *repo.Info
 	invocation *invocation.Invocation
 	workspace  *workspace.Workspace
 }
@@ -78,6 +81,12 @@ func (b *Builder) WithVersion(v *version.Info) *Builder {
 	return b
 }
 
+// WithRepo sets the detected repository information.
+func (b *Builder) WithRepo(r *repo.Info) *Builder {
+	b.repoInfo = r
+	return b
+}
+
 // WithInvocation sets the captured invocation context.
 func (b *Builder) WithInvocation(inv *invocation.Invocation) *Builder {
 	b.invocation = inv
@@ -98,6 +107,7 @@ func (b *Builder) Build() *App {
 		Printer:    b.printer,
 		Platform:   b.plat,
 		Version:    b.version,
+		Repo:       b.repoInfo,
 		Invocation: b.invocation,
 		Workspace:  b.workspace,
 	}
