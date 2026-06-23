@@ -16,6 +16,7 @@ import (
 	"github.com/leaflock/core-cli/internal/terminal"
 	"github.com/leaflock/core-cli/internal/ui"
 	"github.com/leaflock/core-cli/internal/version"
+	"github.com/leaflock/core-cli/internal/workspace"
 )
 
 func TestNewBuilder_returnsNonNil(t *testing.T) {
@@ -64,6 +65,18 @@ func TestBuilder_WithVersion(t *testing.T) {
 
 	if a.Version.Version != "1.2.3" {
 		t.Errorf("expected Version %q, got %q", "1.2.3", a.Version.Version)
+	}
+}
+
+func TestBuilder_WithWorkspace(t *testing.T) {
+	ws, err := workspace.New(t.TempDir(), t.TempDir())
+	if err != nil {
+		t.Fatalf("workspace.New: %v", err)
+	}
+	a := NewBuilder().WithWorkspace(ws).Build()
+
+	if a.Workspace != ws {
+		t.Error("Workspace not set correctly")
 	}
 }
 
