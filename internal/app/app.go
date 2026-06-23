@@ -11,6 +11,7 @@ import (
 	"log/slog"
 
 	"github.com/leaflock/core-cli/internal/config"
+	"github.com/leaflock/core-cli/internal/invocation"
 	"github.com/leaflock/core-cli/internal/platform"
 	"github.com/leaflock/core-cli/internal/ui"
 	"github.com/leaflock/core-cli/internal/version"
@@ -22,22 +23,24 @@ import (
 // only requires a new field, a new With* method, and updating main — no other
 // wiring changes needed.
 type App struct {
-	Config    *config.Config
-	Log       *slog.Logger
-	Printer   *ui.Printer
-	Platform  *platform.Platform
-	Version   *version.Info
-	Workspace *workspace.Workspace // filesystem path manager, never nil
+	Config     *config.Config
+	Log        *slog.Logger
+	Printer    *ui.Printer
+	Platform   *platform.Platform
+	Version    *version.Info
+	Invocation *invocation.Invocation // captured from os.Args before cobra runs
+	Workspace  *workspace.Workspace   // filesystem path manager, never nil
 }
 
 // Builder constructs an App using a fluent chain of With* calls.
 type Builder struct {
-	cfg       *config.Config
-	log       *slog.Logger
-	printer   *ui.Printer
-	plat      *platform.Platform
-	version   *version.Info
-	workspace *workspace.Workspace
+	cfg        *config.Config
+	log        *slog.Logger
+	printer    *ui.Printer
+	plat       *platform.Platform
+	version    *version.Info
+	invocation *invocation.Invocation
+	workspace  *workspace.Workspace
 }
 
 // NewBuilder returns an empty Builder.
@@ -75,6 +78,12 @@ func (b *Builder) WithVersion(v *version.Info) *Builder {
 	return b
 }
 
+// WithInvocation sets the captured invocation context.
+func (b *Builder) WithInvocation(inv *invocation.Invocation) *Builder {
+	b.invocation = inv
+	return b
+}
+
 // WithWorkspace sets the filesystem path manager.
 func (b *Builder) WithWorkspace(ws *workspace.Workspace) *Builder {
 	b.workspace = ws
@@ -84,11 +93,12 @@ func (b *Builder) WithWorkspace(ws *workspace.Workspace) *Builder {
 // Build assembles and returns the App.
 func (b *Builder) Build() *App {
 	return &App{
-		Config:    b.cfg,
-		Log:       b.log,
-		Printer:   b.printer,
-		Platform:  b.plat,
-		Version:   b.version,
-		Workspace: b.workspace,
+		Config:     b.cfg,
+		Log:        b.log,
+		Printer:    b.printer,
+		Platform:   b.plat,
+		Version:    b.version,
+		Invocation: b.invocation,
+		Workspace:  b.workspace,
 	}
 }

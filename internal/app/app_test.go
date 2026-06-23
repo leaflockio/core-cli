@@ -12,6 +12,7 @@ import (
 	"log/slog"
 	"testing"
 
+	"github.com/leaflock/core-cli/internal/invocation"
 	"github.com/leaflock/core-cli/internal/platform"
 	"github.com/leaflock/core-cli/internal/terminal"
 	"github.com/leaflock/core-cli/internal/ui"
@@ -65,6 +66,15 @@ func TestBuilder_WithVersion(t *testing.T) {
 
 	if a.Version.Version != "1.2.3" {
 		t.Errorf("expected Version %q, got %q", "1.2.3", a.Version.Version)
+	}
+}
+
+func TestBuilder_WithInvocation(t *testing.T) {
+	inv := &invocation.Invocation{Raw: []string{"run", "--all"}}
+	a := NewBuilder().WithInvocation(inv).Build()
+
+	if a.Invocation != inv {
+		t.Error("Invocation not set correctly")
 	}
 }
 
