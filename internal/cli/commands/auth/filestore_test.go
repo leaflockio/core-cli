@@ -14,7 +14,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/leaflock/core-cli/internal/cli/auth"
+	"github.com/leaflock/core-cli/internal/cli/commands/auth"
 	"github.com/leaflock/core-cli/internal/errs"
 	"github.com/leaflock/core-cli/internal/platform"
 )

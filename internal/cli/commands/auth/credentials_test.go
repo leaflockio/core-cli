@@ -11,7 +11,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/leaflock/core-cli/internal/cli/auth"
+	"github.com/leaflock/core-cli/internal/cli/commands/auth"
 )
 
 // TestIsExpired_zero verifies that credentials with a zero ExpiresAt never expire.

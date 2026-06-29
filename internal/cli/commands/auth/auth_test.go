@@ -11,7 +11,7 @@ import (
 	"path/filepath"
 	"testing"
 
-	"github.com/leaflock/core-cli/internal/cli/auth"
+	"github.com/leaflock/core-cli/internal/cli/commands/auth"
 	"github.com/leaflock/core-cli/internal/platform"
 )
 
