@@ -36,8 +36,7 @@ func TestDefinition_WithGroup(t *testing.T) {
 
 func TestDefinition_WithFlags(t *testing.T) {
 	var v bool
-	f := flags.CommandFlag[flags.BoolValue]{
-		Sub:   flags.SubLiteral,
+	f := flags.CommandFlag[*flags.BoolValue]{
 		Value: flags.Bool("verbose", "").WithShorthand("v").WithDest(&v),
 	}
 	d := cli.NewDefinition(cli.NewMeta("foo", "short", "")).WithFlags([]flags.Flag{f})

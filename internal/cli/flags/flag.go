@@ -18,7 +18,7 @@ type Flag interface {
 // ValueType constrains the set of value descriptors that can be held by a flag.
 // All supported value types must be added to this union.
 type ValueType interface {
-	BoolValue | StringValue | StringSliceValue
+	*BoolValue | *StringValue | *StringSliceValue
 	meta() Meta
 	Validate() error
 }
