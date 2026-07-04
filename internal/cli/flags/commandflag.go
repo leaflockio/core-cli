@@ -9,7 +9,8 @@ package flags
 
 // CommandFlag is a typed flag whose value is consumed directly by its command.
 type CommandFlag[V ValueType] struct {
-	Value V
+	Value    V
+	Resolver Resolver
 }
 
 // Definition returns the complete declaration of this flag.

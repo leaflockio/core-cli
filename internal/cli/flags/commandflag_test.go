@@ -57,3 +57,21 @@ func TestCommandFlag_Definition_sub_is_empty(t *testing.T) {
 		t.Errorf("Meta.Sub = %q, want empty", got)
 	}
 }
+
+func TestCommandFlag_Resolver_is_nil_by_default(t *testing.T) {
+	f := flags.CommandFlag[*flags.BoolValue]{}
+	if f.Resolver != nil {
+		t.Error("Resolver must be nil for a literal flag")
+	}
+}
+
+func TestCommandFlag_Resolver_is_retained(t *testing.T) {
+	r := stubResolver{}
+	f := flags.CommandFlag[*flags.StringSliceValue]{Resolver: r}
+	if f.Resolver == nil {
+		t.Fatal("Resolver must not be nil after being set")
+	}
+	if _, ok := f.Resolver.(stubResolver); !ok {
+		t.Error("Resolver must be the value that was assigned")
+	}
+}
