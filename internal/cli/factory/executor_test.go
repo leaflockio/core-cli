@@ -1,0 +1,190 @@
+// Copyright 2026 LeafLock. All rights reserved.
+//
+// This source code is proprietary and confidential.
+// Unauthorized copying, modification, distribution, or use of this
+// software, via any medium, is strictly prohibited without prior
+// written permission from LeafLock.
+
+package factory
+
+import (
+	"errors"
+	"testing"
+
+	"github.com/leaflock/core-cli/internal/app"
+	"github.com/leaflock/core-cli/internal/cli"
+	"github.com/leaflock/core-cli/internal/cli/flags"
+)
+
+var errResolve = errors.New("resolve failed")
+
+func TestExecute_builds_command_with_correct_metadata(t *testing.T) {
+	plan := assembledPlan("mycmd", "short desc", "long desc")
+	cmd, err := (&Factory{}).execute(plan, nil)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if cmd.Use != "mycmd" {
+		t.Errorf("Use = %q, want %q", cmd.Use, "mycmd")
+	}
+	if cmd.Short != "short desc" {
+		t.Errorf("Short = %q, want %q", cmd.Short, "short desc")
+	}
+	if cmd.Long != "long desc" {
+		t.Errorf("Long = %q, want %q", cmd.Long, "long desc")
+	}
+}
+
+func TestExecute_registers_flags_on_command(t *testing.T) {
+	plan := assembledPlan("mycmd", "", "")
+	plan.flags = append(plan.flags, mustPlanFlag(
+		flags.CommandFlag[*flags.BoolValue]{Value: flags.Bool("verbose", "enable verbose")},
+	))
+
+	cmd, err := (&Factory{}).execute(plan, nil)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if cmd.Flags().Lookup("verbose") == nil {
+		t.Error("flag 'verbose' must be registered on the command")
+	}
+}
+
+func TestExecute_RunE_fires_system_effects(t *testing.T) {
+	var effectCalled bool
+	f := flags.SystemFlag[*flags.BoolValue]{
+		Sub:    flags.SubImplicit,
+		Value:  flags.Bool("test-sys", ""),
+		Effect: func(_ *app.App) { effectCalled = true },
+	}
+	plan := assembledPlan("mycmd", "", "")
+	plan.flags = []assembledFlag{mustPlanFlag(f)}
+
+	cmd, err := (&Factory{}).execute(plan, nil)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	if err := cmd.Flags().Parse([]string{"--test-sys"}); err != nil {
+		t.Fatalf("Parse failed: %v", err)
+	}
+	if err := cmd.RunE(cmd, nil); err != nil {
+		t.Fatalf("RunE failed: %v", err)
+	}
+	if !effectCalled {
+		t.Error("system flag effect must fire when flag is set")
+	}
+}
+
+func TestExecute_RunE_does_not_fire_effect_when_flag_not_set(t *testing.T) {
+	var effectCalled bool
+	f := flags.SystemFlag[*flags.BoolValue]{
+		Sub:    flags.SubImplicit,
+		Value:  flags.Bool("test-sys", ""),
+		Effect: func(_ *app.App) { effectCalled = true },
+	}
+	plan := assembledPlan("mycmd", "", "")
+	plan.flags = []assembledFlag{mustPlanFlag(f)}
+
+	cmd, err := (&Factory{}).execute(plan, nil)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if err := cmd.RunE(cmd, nil); err != nil {
+		t.Fatalf("RunE failed: %v", err)
+	}
+	if effectCalled {
+		t.Error("system flag effect must not fire when flag is not set")
+	}
+}
+
+func TestExecute_RunE_runs_resolver(t *testing.T) {
+	r := &stubStringSliceResolver{}
+	f := flags.CommandFlag[*flags.StringSliceValue]{
+		Value:    flags.StringSlice("tags", ""),
+		Resolver: r,
+	}
+	plan := assembledPlan("mycmd", "", "")
+	plan.flags = []assembledFlag{mustPlanFlag(f)}
+
+	cmd, err := (&Factory{}).execute(plan, nil)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if err := cmd.Flags().Parse([]string{"--tags", "foo"}); err != nil {
+		t.Fatalf("Parse failed: %v", err)
+	}
+	if err := cmd.RunE(cmd, nil); err != nil {
+		t.Fatalf("RunE failed: %v", err)
+	}
+	if !r.called {
+		t.Error("resolver must be called during RunE")
+	}
+}
+
+func TestExecute_RunE_returns_resolver_error(t *testing.T) {
+	r := &errStringSliceResolver{err: errResolve}
+	f := flags.CommandFlag[*flags.StringSliceValue]{
+		Value:    flags.StringSlice("tags", ""),
+		Resolver: r,
+	}
+	plan := assembledPlan("mycmd", "", "")
+	plan.flags = []assembledFlag{mustPlanFlag(f)}
+
+	cmd, err := (&Factory{}).execute(plan, nil)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if err := cmd.RunE(cmd, nil); err == nil {
+		t.Fatal("expected error from resolver, got nil")
+	}
+}
+
+func TestExecute_RunE_calls_handler(t *testing.T) {
+	var handlerCalled bool
+	plan := assembledPlan("mycmd", "", "")
+	plan.def.Handler = func(_ *app.App, _ []string) error {
+		handlerCalled = true
+		return nil
+	}
+
+	cmd, err := (&Factory{}).execute(plan, nil)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if err := cmd.RunE(cmd, nil); err != nil {
+		t.Fatalf("RunE failed: %v", err)
+	}
+	if !handlerCalled {
+		t.Error("handler must be called during RunE")
+	}
+}
+
+func TestExecute_adds_children_as_subcommands(t *testing.T) {
+	child := &stubCommand{use: "child"}
+	plan := assembledPlan("parent", "", "")
+	plan.def.Children = []cli.Command{child}
+	plan.hasChildren = true
+
+	cmd, err := (&Factory{}).execute(plan, nil)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	for _, sub := range cmd.Commands() {
+		if sub.Use == "child" {
+			return
+		}
+	}
+	t.Error("child command must be registered as a subcommand")
+}
+
+func TestExecute_returns_error_when_child_build_fails(t *testing.T) {
+	plan := assembledPlan("parent", "", "")
+	plan.def.Children = []cli.Command{&nilHandlerCommand{}}
+	plan.hasChildren = true
+
+	_, err := (&Factory{}).execute(plan, nil)
+	if err == nil {
+		t.Fatal("expected error when child build fails, got nil")
+	}
+}
