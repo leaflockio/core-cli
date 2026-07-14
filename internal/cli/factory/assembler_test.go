@@ -19,14 +19,25 @@ import (
 
 // — assemble —
 
-func TestAssemble_returns_error_when_handler_nil(t *testing.T) {
+func TestAssemble_returns_error_when_handler_nil_and_no_children(t *testing.T) {
 	def := cli.Definition{Meta: cli.Meta{Use: "test"}}
 	_, err := assemble(&def)
 	if err == nil {
-		t.Fatal("expected error for nil Handler, got nil")
+		t.Fatal("expected error for nil Handler with no children, got nil")
 	}
 	if !strings.Contains(err.Error(), "handler must not be nil") {
 		t.Errorf("error = %q, want to contain %q", err.Error(), "handler must not be nil")
+	}
+}
+
+func TestAssemble_allows_nil_handler_when_children_declared(t *testing.T) {
+	def := &cli.Definition{
+		Meta:     cli.Meta{Use: "parent"},
+		Children: []cli.Command{&stubCommand{use: "child"}},
+	}
+	_, err := assemble(def)
+	if err != nil {
+		t.Fatalf("unexpected error for nil Handler with children declared: %v", err)
 	}
 }
 
@@ -94,13 +105,17 @@ func TestAssemble_hasChildren_true_when_children_declared(t *testing.T) {
 	}
 }
 
-func TestAssemble_implicit_flags_included_in_plan(t *testing.T) {
+func TestAssemble_implicit_flags_go_to_persistent_flags(t *testing.T) {
 	plan, err := assemble(minDef("test"))
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-	if len(plan.flags) < len(implicitSystemFlags) {
-		t.Errorf("plan.flags has %d entries, want at least %d (implicit)", len(plan.flags), len(implicitSystemFlags))
+	if len(plan.persistentFlags) < len(implicitSystemFlags) {
+		t.Errorf("plan.persistentFlags has %d entries, want at least %d (implicit)",
+			len(plan.persistentFlags), len(implicitSystemFlags))
+	}
+	if len(plan.flags) != 0 {
+		t.Errorf("plan.flags has %d entries, want 0 when no def.Flags declared", len(plan.flags))
 	}
 }
 
@@ -136,26 +151,26 @@ func TestAssemble_returns_error_when_implicit_flag_planning_fails(t *testing.T) 
 	}
 }
 
-// — validateDuplicates —
+// — validateNoDuplicateFlags —
 
-func TestValidateDuplicates_returns_nil_when_no_duplicates(t *testing.T) {
+func TestValidateNoDuplicateFlags_returns_nil_when_no_duplicates(t *testing.T) {
 	def := minDef("test")
 	def.Flags = []flags.Flag{
 		flags.CommandFlag[*flags.BoolValue]{Value: flags.Bool("verbose", "").WithShorthand("v")},
 		flags.CommandFlag[*flags.StringValue]{Value: flags.String("output", "").WithShorthand("o")},
 	}
-	if err := validateDuplicates(def); err != nil {
+	if err := validateNoDuplicateFlags(def); err != nil {
 		t.Errorf("unexpected error: %v", err)
 	}
 }
 
-func TestValidateDuplicates_returns_error_for_duplicate_name(t *testing.T) {
+func TestValidateNoDuplicateFlags_returns_error_for_duplicate_name(t *testing.T) {
 	def := minDef("test")
 	def.Flags = []flags.Flag{
 		flags.CommandFlag[*flags.BoolValue]{Value: flags.Bool("verbose", "")},
 		flags.CommandFlag[*flags.StringValue]{Value: flags.String("verbose", "")},
 	}
-	err := validateDuplicates(def)
+	err := validateNoDuplicateFlags(def)
 	if err == nil {
 		t.Fatal("expected error for duplicate flag name, got nil")
 	}
@@ -164,13 +179,13 @@ func TestValidateDuplicates_returns_error_for_duplicate_name(t *testing.T) {
 	}
 }
 
-func TestValidateDuplicates_returns_error_for_duplicate_shorthand(t *testing.T) {
+func TestValidateNoDuplicateFlags_returns_error_for_duplicate_shorthand(t *testing.T) {
 	def := minDef("test")
 	def.Flags = []flags.Flag{
 		flags.CommandFlag[*flags.BoolValue]{Value: flags.Bool("verbose", "").WithShorthand("v")},
 		flags.CommandFlag[*flags.StringValue]{Value: flags.String("version", "").WithShorthand("v")},
 	}
-	err := validateDuplicates(def)
+	err := validateNoDuplicateFlags(def)
 	if err == nil {
 		t.Fatal("expected error for duplicate shorthand, got nil")
 	}
@@ -179,13 +194,13 @@ func TestValidateDuplicates_returns_error_for_duplicate_shorthand(t *testing.T) 
 	}
 }
 
-func TestValidateDuplicates_reports_all_violations(t *testing.T) {
+func TestValidateNoDuplicateFlags_reports_all_violations(t *testing.T) {
 	def := minDef("test")
 	def.Flags = []flags.Flag{
 		flags.CommandFlag[*flags.BoolValue]{Value: flags.Bool("flag", "").WithShorthand("f")},
 		flags.CommandFlag[*flags.StringValue]{Value: flags.String("flag", "").WithShorthand("f")},
 	}
-	err := validateDuplicates(def)
+	err := validateNoDuplicateFlags(def)
 	if err == nil {
 		t.Fatal("expected error for multiple violations, got nil")
 	}
@@ -197,12 +212,12 @@ func TestValidateDuplicates_reports_all_violations(t *testing.T) {
 	}
 }
 
-func TestValidateDuplicates_detects_clash_with_implicit_flags(t *testing.T) {
+func TestValidateNoDuplicateFlags_detects_clash_with_implicit_flags(t *testing.T) {
 	def := minDef("test")
 	def.Flags = []flags.Flag{
 		flags.CommandFlag[*flags.BoolValue]{Value: flags.Bool("no-color", "")},
 	}
-	err := validateDuplicates(def)
+	err := validateNoDuplicateFlags(def)
 	if err == nil {
 		t.Fatal("expected error for clash with implicit no-color flag, got nil")
 	}
@@ -347,6 +362,46 @@ func TestPlanFlag_returns_error_for_unrecognized_type(t *testing.T) {
 }
 
 // — system flag effect —
+//
+// System flag effects fire immediately when pflag parses the flag (via the
+// effectValue wrapper — see effectvalue.go), not via a separate post-parse
+// check. So these tests assert on state after Parse alone.
+
+func TestPlanBoolSystemFlag_effects_do_not_cross_trigger_between_flags(t *testing.T) {
+	var aCalled, bCalled bool
+	fa := flags.SystemFlag[*flags.BoolValue]{
+		Sub:    flags.SubImplicit,
+		Value:  flags.Bool("flag-a", ""),
+		Effect: func(_ *app.App) { aCalled = true },
+	}
+	fb := flags.SystemFlag[*flags.BoolValue]{
+		Sub:    flags.SubImplicit,
+		Value:  flags.Bool("flag-b", ""),
+		Effect: func(_ *app.App) { bCalled = true },
+	}
+	pa, err := planFlag(fa)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	pb, err := planFlag(fb)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	fs := pflag.NewFlagSet("test", pflag.ContinueOnError)
+	pa.register(fs, nil)
+	pb.register(fs, nil)
+
+	if err := fs.Parse([]string{"--flag-a"}); err != nil {
+		t.Fatalf("Parse failed: %v", err)
+	}
+	if !aCalled {
+		t.Error("flag-a's effect must fire when only flag-a is set")
+	}
+	if bCalled {
+		t.Error("flag-b's effect must not fire when only flag-a is set")
+	}
+}
 
 func TestPlanBoolSystemFlag_effect_fires_when_flag_is_changed(t *testing.T) {
 	var called bool
@@ -361,11 +416,10 @@ func TestPlanBoolSystemFlag_effect_fires_when_flag_is_changed(t *testing.T) {
 	}
 
 	fs := pflag.NewFlagSet("test", pflag.ContinueOnError)
-	p.register(fs)
+	p.register(fs, nil)
 	if err := fs.Parse([]string{"--test-flag"}); err != nil {
 		t.Fatalf("Parse failed: %v", err)
 	}
-	p.effect(fs, nil)
 
 	if !called {
 		t.Error("effect must fire when flag is explicitly set")
@@ -385,11 +439,10 @@ func TestPlanBoolSystemFlag_effect_does_not_fire_when_flag_not_set(t *testing.T)
 	}
 
 	fs := pflag.NewFlagSet("test", pflag.ContinueOnError)
-	p.register(fs)
+	p.register(fs, nil)
 	if err := fs.Parse([]string{}); err != nil {
 		t.Fatalf("Parse failed: %v", err)
 	}
-	p.effect(fs, nil)
 
 	if called {
 		t.Error("effect must not fire when flag is not set")
@@ -411,11 +464,10 @@ func TestPlanStringSystemFlag_effect_fires_when_flag_is_changed(t *testing.T) {
 	}
 
 	fs := pflag.NewFlagSet("test", pflag.ContinueOnError)
-	p.register(fs)
+	p.register(fs, nil)
 	if err := fs.Parse([]string{"--test-str", "val"}); err != nil {
 		t.Fatalf("Parse failed: %v", err)
 	}
-	p.effect(fs, nil)
 
 	if !called {
 		t.Error("effect must fire when string system flag is explicitly set")
@@ -435,9 +487,8 @@ func TestPlanStringSystemFlag_effect_does_not_fire_when_flag_not_set(t *testing.
 	}
 
 	fs := pflag.NewFlagSet("test", pflag.ContinueOnError)
-	p.register(fs)
+	p.register(fs, nil)
 	_ = fs.Parse([]string{})
-	p.effect(fs, nil)
 
 	if called {
 		t.Error("effect must not fire when string system flag is not set")
@@ -459,11 +510,10 @@ func TestPlanStringSliceSystemFlag_effect_fires_when_flag_is_changed(t *testing.
 	}
 
 	fs := pflag.NewFlagSet("test", pflag.ContinueOnError)
-	p.register(fs)
+	p.register(fs, nil)
 	if err := fs.Parse([]string{"--test-slice", "a"}); err != nil {
 		t.Fatalf("Parse failed: %v", err)
 	}
-	p.effect(fs, nil)
 
 	if !called {
 		t.Error("effect must fire when string slice system flag is explicitly set")
@@ -483,9 +533,8 @@ func TestPlanStringSliceSystemFlag_effect_does_not_fire_when_flag_not_set(t *tes
 	}
 
 	fs := pflag.NewFlagSet("test", pflag.ContinueOnError)
-	p.register(fs)
+	p.register(fs, nil)
 	_ = fs.Parse([]string{})
-	p.effect(fs, nil)
 
 	if called {
 		t.Error("effect must not fire when string slice system flag is not set")
@@ -506,7 +555,7 @@ func TestPlanBoolResolverFlag_resolve_calls_resolver(t *testing.T) {
 	}
 
 	fs := pflag.NewFlagSet("test", pflag.ContinueOnError)
-	p.register(fs)
+	p.register(fs, nil)
 	if err := fs.Parse([]string{"--dry-run"}); err != nil {
 		t.Fatalf("Parse failed: %v", err)
 	}
@@ -534,7 +583,7 @@ func TestPlanStringResolverFlag_resolve_calls_resolver(t *testing.T) {
 	}
 
 	fs := pflag.NewFlagSet("test", pflag.ContinueOnError)
-	p.register(fs)
+	p.register(fs, nil)
 	if err := fs.Parse([]string{"--format", "json"}); err != nil {
 		t.Fatalf("Parse failed: %v", err)
 	}
@@ -562,7 +611,7 @@ func TestPlanStringSliceResolverFlag_resolve_calls_resolver(t *testing.T) {
 	}
 
 	fs := pflag.NewFlagSet("test", pflag.ContinueOnError)
-	p.register(fs)
+	p.register(fs, nil)
 	if err := fs.Parse([]string{"--var", "a", "--var", "b"}); err != nil {
 		t.Fatalf("Parse failed: %v", err)
 	}
