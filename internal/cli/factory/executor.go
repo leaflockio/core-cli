@@ -11,7 +11,6 @@ import (
 	"fmt"
 
 	"github.com/leaflock/core-cli/internal/app"
-	"github.com/leaflock/core-cli/internal/cli/flags"
 	"github.com/spf13/cobra"
 )
 
@@ -29,31 +28,29 @@ func (f *Factory) execute(plan *assembled, a *app.App) (*cobra.Command, error) {
 	}
 
 	for _, fp := range plan.flags {
-		fp.register(cmd.Flags())
+		fp.register(cmd.Flags(), a)
 	}
 
-	cmd.RunE = func(cobraCmd *cobra.Command, args []string) error {
-		fs := cobraCmd.Flags()
+	// Nil Handler means this command only holds children — leave RunE nil so
+	// cobra's own non-Runnable fallback shows help.
+	if def.Handler != nil {
+		cmd.RunE = func(cobraCmd *cobra.Command, args []string) error {
+			fs := cobraCmd.Flags()
 
-		for _, fp := range plan.flags {
-			if fp.kind == flags.KindSystem {
-				fp.effect(fs, a)
-			}
-		}
-
-		for _, fp := range plan.flags {
-			if fp.hasResolver {
-				if err := fp.resolve(fs); err != nil {
-					return fmt.Errorf("factory[execute]: command %q: flag %q: %w", def.Meta.Use, fp.name, err)
+			for _, fp := range plan.flags {
+				if fp.hasResolver {
+					if err := fp.resolve(fs); err != nil {
+						return fmt.Errorf("factory[execute]: command %q: flag %q: %w", def.Meta.Use, fp.name, err)
+					}
 				}
 			}
-		}
 
-		return def.Handler(a, args)
+			return def.Handler(a, args)
+		}
 	}
 
 	for _, child := range def.Children {
-		childCmd, err := f.Build(child, a)
+		_, childCmd, err := f.buildNode(child, a)
 		if err != nil {
 			return nil, fmt.Errorf("factory[execute]: command %q: child %w", def.Meta.Use, err)
 		}
