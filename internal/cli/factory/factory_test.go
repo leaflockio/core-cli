@@ -8,11 +8,14 @@
 package factory_test
 
 import (
+	"bytes"
 	"testing"
 
 	"github.com/leaflock/core-cli/internal/app"
 	"github.com/leaflock/core-cli/internal/cli"
 	"github.com/leaflock/core-cli/internal/cli/factory"
+	"github.com/leaflock/core-cli/internal/terminal"
+	"github.com/leaflock/core-cli/internal/ui"
 )
 
 func TestFactory_Build_returns_error_for_nil_command(t *testing.T) {
@@ -42,12 +45,124 @@ func TestFactory_Build_returns_error_when_definition_invalid(t *testing.T) {
 	}
 }
 
+func TestFactory_Build_registers_no_color_as_persistent_flag_on_root(t *testing.T) {
+	cmd, err := factory.New().Build(&stubCmd{use: "test"}, nil)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if cmd.PersistentFlags().Lookup("no-color") == nil {
+		t.Error("expected --no-color to be registered as a persistent flag on the built root command")
+	}
+}
+
+func TestFactory_Build_child_does_not_get_its_own_no_color_flag(t *testing.T) {
+	parent := &parentStubCmd{use: "parent", children: []cli.Command{&stubCmd{use: "child"}}}
+
+	cmd, err := factory.New().Build(parent, nil)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	child := cmd.Commands()[0]
+	if child.Flags().Lookup("no-color") != nil {
+		t.Error("child command must not have its own local --no-color flag")
+	}
+	if child.PersistentFlags().Lookup("no-color") != nil {
+		t.Error("child command must not have its own persistent --no-color flag")
+	}
+}
+
+func TestFactory_Build_no_color_effect_fires_on_parse(t *testing.T) {
+	printer := ui.NewPrinter(terminal.New(&bytes.Buffer{}, &bytes.Buffer{}, nil))
+	a := app.NewBuilder().WithPrinter(printer).Build()
+
+	cmd, err := factory.New().Build(&stubCmd{use: "test"}, a)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	cmd.SetArgs([]string{"--no-color"})
+	if err := cmd.Execute(); err != nil {
+		t.Fatalf("execute failed: %v", err)
+	}
+	if got := printer.Primary("x"); got != "x" {
+		t.Errorf("expected plain text after --no-color, got %q", got)
+	}
+}
+
+func TestFactory_Build_no_color_effect_fires_when_set_after_subcommand(t *testing.T) {
+	printer := ui.NewPrinter(terminal.New(&bytes.Buffer{}, &bytes.Buffer{}, nil))
+	a := app.NewBuilder().WithPrinter(printer).Build()
+
+	parent := &parentStubCmd{use: "parent", children: []cli.Command{&stubCmd{use: "child"}}}
+	cmd, err := factory.New().Build(parent, a)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	cmd.SetArgs([]string{"child", "--no-color"})
+	if err := cmd.Execute(); err != nil {
+		t.Fatalf("execute failed: %v", err)
+	}
+	if got := printer.Primary("x"); got != "x" {
+		t.Errorf("expected plain text after --no-color set on child, got %q", got)
+	}
+}
+
+// TestFactory_Build_no_color_effect_fires_on_handlerless_bare_invocation guards
+// against a regression where a Handler-less command (like root) invoked with no
+// subcommand — e.g. `leaf --no-color` — relied on cobra's built-in non-Runnable
+// shortcut, which returns flag.ErrHelp before cobra's preRun() ever runs,
+// silently skipping PersistentPreRunE. Firing the effect at flag-parse time
+// instead (see effectvalue.go) sidesteps that shortcut entirely: parsing always
+// happens, Runnable or not, so the effect fires regardless.
+func TestFactory_Build_no_color_effect_fires_on_handlerless_bare_invocation(t *testing.T) {
+	printer := ui.NewPrinter(terminal.New(&bytes.Buffer{}, &bytes.Buffer{}, nil))
+	a := app.NewBuilder().WithPrinter(printer).Build()
+
+	parent := &handlerlessParentStubCmd{use: "parent", children: []cli.Command{&stubCmd{use: "child"}}}
+	cmd, err := factory.New().Build(parent, a)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	cmd.SetOut(&bytes.Buffer{})
+	cmd.SetArgs([]string{"--no-color"})
+	if err := cmd.Execute(); err != nil {
+		t.Fatalf("execute failed: %v", err)
+	}
+	if got := printer.Primary("x"); got != "x" {
+		t.Errorf("expected plain text after --no-color on bare handler-less invocation, got %q", got)
+	}
+}
+
 type stubCmd struct{ use string }
 
 func (c *stubCmd) Define(_ *app.App) *cli.Definition {
 	return &cli.Definition{
 		Meta:    cli.Meta{Use: c.use},
 		Handler: func(_ *app.App, _ []string) error { return nil },
+	}
+}
+
+type parentStubCmd struct {
+	use      string
+	children []cli.Command
+}
+
+func (c *parentStubCmd) Define(_ *app.App) *cli.Definition {
+	return &cli.Definition{
+		Meta:     cli.Meta{Use: c.use},
+		Handler:  func(_ *app.App, _ []string) error { return nil },
+		Children: c.children,
+	}
+}
+
+type handlerlessParentStubCmd struct {
+	use      string
+	children []cli.Command
+}
+
+func (c *handlerlessParentStubCmd) Define(_ *app.App) *cli.Definition {
+	return &cli.Definition{
+		Meta:     cli.Meta{Use: c.use},
+		Children: c.children,
 	}
 }
 
