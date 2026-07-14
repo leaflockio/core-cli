@@ -5,7 +5,6 @@
 // software, via any medium, is strictly prohibited without prior
 // written permission from LeafLock.
 
-// Package factory builds cobra commands from cli.Command definitions.
 package factory
 
 import (
