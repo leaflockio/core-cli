@@ -18,13 +18,20 @@ import (
 type assembled struct {
 	def cli.Definition
 
-	// hasFlags is true when the command declared flags beyond the implicit set.
+	// hasFlags is true when the command declared flags in its Definition.
 	hasFlags bool
 
 	// hasChildren is true when the command declared subcommands.
 	hasChildren bool
 
+	// flags holds the plans for this command's own Definition.Flags. The
+	// executor registers these on the built command's local Flags(), so they
+	// apply only to this command, not its children.
 	flags []assembledFlag
+
+	// persistentFlags holds the plans for implicitSystemFlags. Only
+	// Factory.Build registers these, on the root's PersistentFlags.
+	persistentFlags []assembledFlag
 }
 
 // assembledFlag is the execution record for a single flag.
@@ -41,11 +48,7 @@ type assembledFlag struct {
 	hasResolver bool
 
 	// register writes the flag into a pflag.FlagSet at command build time.
-	register func(*pflag.FlagSet)
-
-	// effect fires the flag's side-effect when the flag was explicitly set.
-	// Only set for system kind flags.
-	effect func(*pflag.FlagSet, *app.App)
+	register func(*pflag.FlagSet, *app.App)
 
 	// resolve reads the raw parsed value from pflag and passes it to the
 	// flag's typed Resolve() method. Only set when hasResolver is true.

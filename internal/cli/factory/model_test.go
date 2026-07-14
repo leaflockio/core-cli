@@ -22,6 +22,9 @@ func TestAssembled_zero_value(t *testing.T) {
 	if a.flags != nil {
 		t.Error("flags must be nil in zero value")
 	}
+	if a.persistentFlags != nil {
+		t.Error("persistentFlags must be nil in zero value")
+	}
 }
 
 func TestAssembledFlag_zero_value(t *testing.T) {
@@ -37,9 +40,6 @@ func TestAssembledFlag_zero_value(t *testing.T) {
 	}
 	if f.register != nil {
 		t.Error("register must be nil in zero value")
-	}
-	if f.effect != nil {
-		t.Error("effect must be nil in zero value")
 	}
 	if f.resolve != nil {
 		t.Error("resolve must be nil in zero value")
