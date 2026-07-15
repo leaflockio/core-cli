@@ -5,7 +5,6 @@
 // software, via any medium, is strictly prohibited without prior
 // written permission from LeafLock.
 
-// Package flags provides flag definitions for CLI commands.
 package flags
 
 // Flag is the interface implemented by all concrete flag kinds.
