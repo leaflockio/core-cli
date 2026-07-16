@@ -33,7 +33,7 @@ func (f *Factory) Build(cmd cli.Command, a *app.App) (*cobra.Command, error) {
 		return nil, errNilCmd
 	}
 
-	plan, cobraCmd, err := f.buildNode(cmd, a)
+	plan, cobraCmd, err := f.buildNode(cmd, a, true)
 	if err != nil {
 		return nil, err
 	}
@@ -44,10 +44,10 @@ func (f *Factory) Build(cmd cli.Command, a *app.App) (*cobra.Command, error) {
 }
 
 // buildNode assembles and wires cmd, recursing into children via itself.
-func (f *Factory) buildNode(cmd cli.Command, a *app.App) (*assembled, *cobra.Command, error) {
+func (f *Factory) buildNode(cmd cli.Command, a *app.App, isAppRoot bool) (*assembled, *cobra.Command, error) {
 	def := cmd.Define(a)
 
-	plan, err := assemble(def)
+	plan, err := assemble(def, isAppRoot)
 	if err != nil {
 		return nil, nil, err
 	}

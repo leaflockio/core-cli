@@ -38,10 +38,35 @@ func TestFactory_Build_returns_cobra_command(t *testing.T) {
 	}
 }
 
-func TestFactory_Build_returns_error_when_definition_invalid(t *testing.T) {
-	_, err := factory.New().Build(&nilHandlerCmd{}, nil)
+func TestFactory_Build_returns_error_when_child_definition_invalid(t *testing.T) {
+	parent := &parentStubCmd{use: "parent", children: []cli.Command{&nilHandlerCmd{}}}
+	_, err := factory.New().Build(parent, nil)
 	if err == nil {
-		t.Fatal("expected error for invalid definition, got nil")
+		t.Fatal("expected error for invalid child definition, got nil")
+	}
+}
+
+func TestFactory_Build_allows_root_with_nil_handler_and_no_children(t *testing.T) {
+	cmd, err := factory.New().Build(&nilHandlerCmd{}, nil)
+	if err != nil {
+		t.Fatalf("unexpected error for root with nil Handler and no Children: %v", err)
+	}
+	if cmd == nil {
+		t.Fatal("Build must return a non-nil cobra.Command")
+	}
+}
+
+// TestFactory_Build_returns_error_when_grandchild_definition_invalid guards
+// against the exemption leaking past the literal command passed to Build: a
+// mid-tree command with its own children (e.g. a "license" group) must not
+// be treated as a root just because it's the top of its own subtree.
+func TestFactory_Build_returns_error_when_grandchild_definition_invalid(t *testing.T) {
+	mid := &parentStubCmd{use: "mid", children: []cli.Command{&nilHandlerCmd{}}}
+	root := &parentStubCmd{use: "root", children: []cli.Command{mid}}
+
+	_, err := factory.New().Build(root, nil)
+	if err == nil {
+		t.Fatal("expected error for invalid grandchild definition, got nil")
 	}
 }
 

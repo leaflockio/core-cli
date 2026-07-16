@@ -26,8 +26,8 @@ var (
 )
 
 // assemble validates def and produces an assembled plan.
-func assemble(def *cli.Definition) (*assembled, error) {
-	if def.Handler == nil && len(def.Children) == 0 {
+func assemble(def *cli.Definition, isAppRoot bool) (*assembled, error) {
+	if !isAppRoot && def.Handler == nil && len(def.Children) == 0 {
 		return nil, fmt.Errorf("factory[assemble]: command %q: %w", def.Meta.Use, errHandlerNil)
 	}
 
