@@ -13,7 +13,7 @@ import (
 	"os"
 
 	"github.com/charmbracelet/lipgloss"
-	"github.com/leaflock/core-cli/internal/terminal"
+	"github.com/leaflockio/core-cli/internal/terminal"
 )
 
 // Printer writes styled output to the writers provided by a Terminal. Commands
@@ -67,6 +67,9 @@ func (p *Printer) Muted(text string) string { return p.render(&StyleMuted, text)
 
 // Flag returns text styled as a flag name (--flag, -f).
 func (p *Printer) Flag(text string) string { return p.render(&StyleFlag, text) }
+
+// Header returns text styled as a bold section header.
+func (p *Printer) Header(text string) string { return p.render(&StyleHeader, text) }
 
 // Success prints a success message to Out.
 func (p *Printer) Success(msg string) {

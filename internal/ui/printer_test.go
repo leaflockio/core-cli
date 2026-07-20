@@ -185,3 +185,12 @@ func TestPrinter_Flag(t *testing.T) {
 		t.Errorf("expected Flag to contain %q, got %q", "--verbose", result)
 	}
 }
+
+func TestPrinter_Header(t *testing.T) {
+	printer, _, _ := newTestPrinter(t)
+
+	result := printer.Header("FLAGS:")
+	if !strings.Contains(result, "FLAGS:") {
+		t.Errorf("expected Header to contain %q, got %q", "FLAGS:", result)
+	}
+}
