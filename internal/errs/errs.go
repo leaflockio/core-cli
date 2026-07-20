@@ -12,9 +12,10 @@ type Code string
 
 // Exit code constants.
 const (
-	ExitSuccess  = 0 // clean exit
-	ExitUser     = 1 // caller error — bad input, missing configuration, missing tool
-	ExitInternal = 2 // unexpected failure — indicates a bug
+	ExitSuccess    = 0 // clean exit
+	ExitUser       = 1 // caller error — bad input, missing configuration, missing tool
+	ExitInternal   = 2 // unexpected failure — indicates a bug
+	ExitValidation = 3 // check ran successfully but found issues (e.g. missing license headers)
 )
 
 // Context pairs a cause with its resolution. Use multiple contexts when an
@@ -51,6 +52,20 @@ func Caller(code Code, message string, err error, contexts ...Context) *Error {
 		Message:  message,
 		Contexts: contexts,
 		ExitCode: ExitUser,
+		Err:      err,
+	}
+}
+
+// Validation returns an Error for check commands that ran successfully but
+// found issues (exit 3). This distinguishes "check ran, found problems" from
+// a caller error (exit 1) or internal bug (exit 2). CI can key on exit 3 to
+// identify failed validations without treating them as infrastructure errors.
+func Validation(code Code, message string, err error, contexts ...Context) *Error {
+	return &Error{
+		Code:     code,
+		Message:  message,
+		Contexts: contexts,
+		ExitCode: ExitValidation,
 		Err:      err,
 	}
 }

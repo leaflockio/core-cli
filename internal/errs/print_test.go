@@ -14,7 +14,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/leaflock/core-cli/internal/errs"
+	"github.com/leaflockio/core-cli/internal/errs"
 )
 
 // captureStderr runs fn and returns everything written to os.Stderr during that call.

@@ -12,7 +12,7 @@ import (
 	"fmt"
 	"testing"
 
-	"github.com/leaflock/core-cli/internal/errs"
+	"github.com/leaflockio/core-cli/internal/errs"
 )
 
 // testCode is a stable code used across tests. It is not a real error
@@ -72,6 +72,35 @@ func TestUnexpected(t *testing.T) {
 	}
 	if !errors.Is(e, errUnderlying) {
 		t.Error("errors.Is failed through Unexpected error chain")
+	}
+}
+
+func TestValidation(t *testing.T) {
+	e := errs.Validation(testCode, "header missing", errUnderlying)
+
+	if e.Code != testCode {
+		t.Errorf("Code = %q, want %q", e.Code, testCode)
+	}
+	if e.ExitCode != errs.ExitValidation {
+		t.Errorf("ExitCode = %d, want %d", e.ExitCode, errs.ExitValidation)
+	}
+	if !errors.Is(e, errUnderlying) {
+		t.Error("errors.Is failed through Validation error chain")
+	}
+}
+
+func TestValidation_withContexts(t *testing.T) {
+	ctx := errs.Context{Cause: "file lacks header", Resolution: "run leaf license add"}
+	e := errs.Validation(testCode, "header missing", nil, ctx)
+
+	if len(e.Contexts) != 1 {
+		t.Fatalf("len(Contexts) = %d, want 1", len(e.Contexts))
+	}
+	if e.Contexts[0].Cause != ctx.Cause {
+		t.Errorf("Cause = %q, want %q", e.Contexts[0].Cause, ctx.Cause)
+	}
+	if e.Contexts[0].Resolution != ctx.Resolution {
+		t.Errorf("Resolution = %q, want %q", e.Contexts[0].Resolution, ctx.Resolution)
 	}
 }
 
