@@ -62,7 +62,7 @@ func TestRenderUsage_noSubcommands(t *testing.T) {
 	cmd := newCmd("leaf", "")
 
 	got := renderUsage(cmd, printer)
-	if !strings.Contains(got, "Usage:") {
+	if !strings.Contains(got, "USAGE:") {
 		t.Errorf("expected Usage header, got %q", got)
 	}
 	if strings.Contains(got, "[command]") {
@@ -119,6 +119,19 @@ func TestStyledCommandPath_withSubcommand(t *testing.T) {
 	}
 }
 
+// TestStyledCommandPath_groupsAncestorsTogether guards against splitting on
+// the first space instead of the last: "leaf license" (the ancestors) must
+// be styled as one unit, distinct from "add" (the invoked command itself).
+func TestStyledCommandPath_groupsAncestorsTogether(t *testing.T) {
+	printer, _ := newTestPrinter(t)
+
+	got := styledCommandPath("leaf license add", printer)
+	want := printer.Primary("leaf license") + " " + printer.Secondary("add")
+	if got != want {
+		t.Errorf("got %q, want %q", got, want)
+	}
+}
+
 // --- visibleCommands / renderCommands ---
 
 func TestVisibleCommands_filtersHidden(t *testing.T) {
@@ -163,7 +176,7 @@ func TestRenderCommands_grouped(t *testing.T) {
 	parent.AddCommand(sub)
 
 	got := renderCommands(parent, printer)
-	if !strings.Contains(got, "Tools") {
+	if !strings.Contains(got, "TOOLS") {
 		t.Errorf("expected group title in output, got %q", got)
 	}
 	if !strings.Contains(got, "license") {
@@ -171,15 +184,15 @@ func TestRenderCommands_grouped(t *testing.T) {
 	}
 }
 
-func TestRenderCommands_ungroupedFallsToOther(t *testing.T) {
+func TestRenderCommands_ungroupedFallsToGeneral(t *testing.T) {
 	printer, _ := newTestPrinter(t)
 	parent := newCmd("leaf", "")
 	parent.AddGroup(&cobra.Group{ID: "tools", Title: "Tools"})
 	parent.AddCommand(newCmd("orphan", "No group"))
 
 	got := renderCommands(parent, printer)
-	if !strings.Contains(got, "Other") {
-		t.Errorf("expected Other section, got %q", got)
+	if !strings.Contains(got, "w") {
+		t.Errorf("expected General section, got %q", got)
 	}
 }
 
@@ -212,7 +225,7 @@ func TestRenderFlags_localFlag(t *testing.T) {
 	cmd.Flags().Bool("verbose", false, "Enable verbose output")
 
 	got := renderFlags(cmd, printer)
-	if !strings.Contains(got, "Flags:") {
+	if !strings.Contains(got, "FLAGS:") {
 		t.Errorf("expected Flags section, got %q", got)
 	}
 	if !strings.Contains(got, "verbose") {
@@ -230,7 +243,7 @@ func TestRenderFlags_inheritedFlag(t *testing.T) {
 	_ = parent.Execute()
 
 	got := renderFlags(child, printer)
-	if !strings.Contains(got, "Global Flags:") {
+	if !strings.Contains(got, "GLOBAL FLAGS:") {
 		t.Errorf("expected Global Flags section, got %q", got)
 	}
 	if !strings.Contains(got, "no-color") {

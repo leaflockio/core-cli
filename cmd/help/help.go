@@ -17,16 +17,14 @@ import (
 )
 
 const (
-	indentCmdWidth   = 2
-	indentGroupWidth = 4
-	colSepWidth      = 2
-	flagWidth        = 16
+	indentCmdWidth = 2
+	colSepWidth    = 2
+	flagWidth      = 16
 )
 
 var (
-	indentCmd   = strings.Repeat(" ", indentCmdWidth)
-	indentGroup = strings.Repeat(" ", indentGroupWidth)
-	colSep      = strings.Repeat(" ", colSepWidth)
+	indentCmd = strings.Repeat(" ", indentCmdWidth)
+	colSep    = strings.Repeat(" ", colSepWidth)
 )
 
 // Set registers the styled help function on cmd, writing output to printer.Out().
@@ -55,24 +53,30 @@ func renderDescription(cmd *cobra.Command, printer *ui.Printer) string {
 
 func renderUsage(cmd *cobra.Command, printer *ui.Printer) string {
 	var b strings.Builder
-	b.WriteString("Usage:\n")
+	b.WriteString(printer.Header("USAGE:"))
+	b.WriteString("\n")
 	styledPath := styledCommandPath(cmd.CommandPath(), printer)
 	useLine := strings.Replace(cmd.UseLine(), cmd.CommandPath(), styledPath, 1)
-	b.WriteString(indentCmd + useLine + "\n")
+	b.WriteString(indentCmd)
+	b.WriteString(useLine)
+	b.WriteString("\n")
 	if cmd.HasAvailableSubCommands() {
-		b.WriteString(indentCmd + styledPath + " [command]\n")
+		b.WriteString(indentCmd)
+		b.WriteString(styledPath)
+		b.WriteString(" [command]\n")
 	}
 	return b.String()
 }
 
-// styledCommandPath styles each segment of the command path individually:
-// the root (e.g. "leaf") gets Primary, subcommands (e.g. "license") get Secondary.
+// styledCommandPath styles the command path in two parts. Every segment
+// except the last is the invoked command's ancestors, and gets Primary. The
+// last segment — the invoked command itself — gets Secondary.
 func styledCommandPath(path string, printer *ui.Printer) string {
-	parts := strings.SplitN(path, " ", 2)
-	if len(parts) == 1 {
-		return printer.Primary(parts[0])
+	i := strings.LastIndex(path, " ")
+	if i == -1 {
+		return printer.Primary(path)
 	}
-	return printer.Primary(parts[0]) + " " + printer.Secondary(parts[1])
+	return printer.Primary(path[:i]) + " " + printer.Secondary(path[i+1:])
 }
 
 func renderCommands(cmd *cobra.Command, printer *ui.Printer) string {
@@ -82,17 +86,12 @@ func renderCommands(cmd *cobra.Command, printer *ui.Printer) string {
 	}
 
 	width := maxNameWidth(visible)
-	var b strings.Builder
-	b.WriteString("\nAvailable Commands:\n")
-
 	groups := cmd.Groups()
 	if len(groups) == 0 {
-		b.WriteString(renderUngrouped(printer, visible, width, indentCmd))
-		return b.String()
+		return renderUngrouped(printer, visible, width, indentCmd)
 	}
 
-	b.WriteString(renderGrouped(printer, visible, groups, width))
-	return b.String()
+	return renderGrouped(printer, visible, groups, width)
 }
 
 func renderGrouped(printer *ui.Printer, visible []*cobra.Command, groups []*cobra.Group, width int) string {
@@ -112,13 +111,17 @@ func renderGrouped(printer *ui.Printer, visible []*cobra.Command, groups []*cobr
 		if len(cmds) == 0 {
 			continue
 		}
-		b.WriteString("\n" + indentCmd + g.Title + "\n")
-		b.WriteString(renderUngrouped(printer, cmds, width, indentGroup))
+		b.WriteString("\n")
+		b.WriteString(printer.Header(strings.ToUpper(g.Title)))
+		b.WriteString("\n")
+		b.WriteString(renderUngrouped(printer, cmds, width, indentCmd))
 	}
 
 	if len(ungrouped) > 0 {
-		b.WriteString("\n" + indentCmd + "Other\n")
-		b.WriteString(renderUngrouped(printer, ungrouped, width, indentGroup))
+		b.WriteString("\n")
+		b.WriteString(printer.Header("w"))
+		b.WriteString("\n")
+		b.WriteString(renderUngrouped(printer, ungrouped, width, indentCmd))
 	}
 
 	return b.String()
@@ -128,7 +131,10 @@ func renderUngrouped(printer *ui.Printer, cmds []*cobra.Command, width int, inde
 	var b strings.Builder
 	for _, c := range cmds {
 		name := printer.Secondary(fmt.Sprintf("%s%-*s", indent, width, c.Name()))
-		b.WriteString(name + colSep + c.Short + "\n")
+		b.WriteString(name)
+		b.WriteString(colSep)
+		b.WriteString(c.Short)
+		b.WriteByte('\n')
 	}
 	return b.String()
 }
@@ -139,7 +145,9 @@ func renderFlags(cmd *cobra.Command, printer *ui.Printer) string {
 
 	var b strings.Builder
 	if local.HasAvailableFlags() {
-		b.WriteString("\nFlags:\n")
+		b.WriteString("\n")
+		b.WriteString(printer.Header("FLAGS:"))
+		b.WriteString("\n")
 		local.VisitAll(func(f *pflag.Flag) {
 			if !f.Hidden {
 				b.WriteString(formatFlag(f, printer))
@@ -148,7 +156,9 @@ func renderFlags(cmd *cobra.Command, printer *ui.Printer) string {
 	}
 
 	if inherited.HasAvailableFlags() {
-		b.WriteString("\nGlobal Flags:\n")
+		b.WriteString("\n")
+		b.WriteString(printer.Header("GLOBAL FLAGS:"))
+		b.WriteString("\n")
 		inherited.VisitAll(func(f *pflag.Flag) {
 			if !f.Hidden {
 				b.WriteString(formatFlag(f, printer))
