@@ -11,7 +11,7 @@ import "github.com/leaflockio/core-cli/internal/app"
 
 // Command is implemented by every command package.
 // Define returns the complete declaration of the command — its identity, group,
-// flags, guards, hooks, handler, and any nested subcommands.
+// flags, handler, and any nested subcommands.
 type Command interface {
 	Define(a *app.App) *Definition
 }

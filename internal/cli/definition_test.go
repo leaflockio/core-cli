@@ -13,8 +13,6 @@ import (
 	"github.com/leaflockio/core-cli/internal/app"
 	"github.com/leaflockio/core-cli/internal/cli"
 	"github.com/leaflockio/core-cli/internal/cli/flags"
-	"github.com/leaflockio/core-cli/internal/cli/guards"
-	"github.com/leaflockio/core-cli/internal/cli/hooks"
 )
 
 func TestNewDefinition_defaults(t *testing.T) {
@@ -42,22 +40,6 @@ func TestDefinition_WithFlags(t *testing.T) {
 	d := cli.NewDefinition(cli.NewMeta("foo", "short", "")).WithFlags([]flags.Flag{f})
 	if len(d.Flags) != 1 {
 		t.Errorf("Flags length = %d, want 1", len(d.Flags))
-	}
-}
-
-func TestDefinition_WithGuards(t *testing.T) {
-	d := cli.NewDefinition(cli.NewMeta("foo", "short", "")).
-		WithGuards([]guards.Guard{guards.Auth()})
-	if len(d.Guards) != 1 {
-		t.Errorf("Guards length = %d, want 1", len(d.Guards))
-	}
-}
-
-func TestDefinition_WithHooks(t *testing.T) {
-	d := cli.NewDefinition(cli.NewMeta("foo", "short", "")).
-		WithHooks([]hooks.Hook{hooks.PreRun})
-	if len(d.Hooks) != 1 {
-		t.Errorf("Hooks length = %d, want 1", len(d.Hooks))
 	}
 }
 
