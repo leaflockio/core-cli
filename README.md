@@ -1,14 +1,15 @@
 # core-cli
 
-![CI](https://github.com/leaflock/core-cli/actions/workflows/ci.yml/badge.svg)
+![CI](https://github.com/leaflockio/core-cli/actions/workflows/ci.yml/badge.svg)
 
-The `leaf` CLI — the primary command-line interface for the LeafLock platform. Responsible for authentication, environment management, and developer tooling.
+The `leaf` CLI — developer experience tooling by LeafLock.
 
 ---
 
 ## Tech Stack
 
-- Go
+- [Go](https://go.dev)
+- [Cobra](https://github.com/spf13/cobra) — CLI framework
 - [Viper](https://github.com/spf13/viper) — configuration loading
 - [golangci-lint](https://golangci-lint.run) — linting
 
@@ -16,10 +17,10 @@ The `leaf` CLI — the primary command-line interface for the LeafLock platform.
 
 ## Local Setup
 
-Prerequisites: Go 1.22+, `golangci-lint`.
+Prerequisites: Go 1.26+, `golangci-lint`.
 
 ```bash
-git clone https://github.com/leaflock/core-cli.git
+git clone https://github.com/leaflockio/core-cli.git
 cd core-cli
 go mod download
 make build-dev
@@ -39,10 +40,14 @@ make build-dev
 
 ## Available Commands
 
-Run `make help` to list all available commands.
+List all available commands using:
+
+```bash
+make help
+```
 
 ---
 
-## Deployment and Rollback
+## Documentation
 
-See [docs/](docs/) for deployment and rollback specifics for this repo.
+See [docs/](docs/).
