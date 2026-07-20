@@ -1,4 +1,4 @@
-module github.com/leaflock/core-cli
+module github.com/leaflockio/core-cli
 
 go 1.26.5
 

@@ -10,9 +10,9 @@
 package root
 
 import (
-	"github.com/leaflock/core-cli/internal/app"
-	"github.com/leaflock/core-cli/internal/cli"
-	"github.com/leaflock/core-cli/internal/config"
+	"github.com/leaflockio/core-cli/internal/app"
+	"github.com/leaflockio/core-cli/internal/cli"
+	"github.com/leaflockio/core-cli/internal/config"
 )
 
 type command struct {

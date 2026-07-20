@@ -12,10 +12,10 @@ import (
 	"path/filepath"
 	"testing"
 
-	"github.com/leaflock/core-cli/internal/app"
-	"github.com/leaflock/core-cli/internal/cli"
-	"github.com/leaflock/core-cli/internal/config"
-	"github.com/leaflock/core-cli/internal/logger"
+	"github.com/leaflockio/core-cli/internal/app"
+	"github.com/leaflockio/core-cli/internal/cli"
+	"github.com/leaflockio/core-cli/internal/config"
+	"github.com/leaflockio/core-cli/internal/logger"
 )
 
 var (

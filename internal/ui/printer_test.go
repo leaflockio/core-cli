@@ -12,7 +12,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/leaflock/core-cli/internal/terminal"
+	"github.com/leaflockio/core-cli/internal/terminal"
 )
 
 func newTestPrinter(t *testing.T) (*Printer, *bytes.Buffer, *bytes.Buffer) {

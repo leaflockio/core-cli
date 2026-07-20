@@ -10,7 +10,7 @@ import (
 	"os"
 	"path/filepath"
 
-	"github.com/leaflock/core-cli/internal/util/pathutil"
+	"github.com/leaflockio/core-cli/internal/util/pathutil"
 )
 
 const (

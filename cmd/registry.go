@@ -7,8 +7,8 @@
 package main
 
 import (
-	"github.com/leaflock/core-cli/internal/cli"
-	"github.com/leaflock/core-cli/internal/cli/commands/version"
+	"github.com/leaflockio/core-cli/internal/cli"
+	"github.com/leaflockio/core-cli/internal/cli/commands/version"
 )
 
 // commands lists every command wired into the root command tree.

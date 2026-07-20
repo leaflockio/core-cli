@@ -11,9 +11,9 @@ import (
 	"errors"
 	"os"
 
-	"github.com/leaflock/core-cli/internal/errs"
-	"github.com/leaflock/core-cli/internal/util/codec"
-	"github.com/leaflock/core-cli/internal/util/fsutil"
+	"github.com/leaflockio/core-cli/internal/errs"
+	"github.com/leaflockio/core-cli/internal/util/codec"
+	"github.com/leaflockio/core-cli/internal/util/fsutil"
 )
 
 const (

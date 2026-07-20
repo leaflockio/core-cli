@@ -8,9 +8,9 @@
 package factory
 
 import (
-	"github.com/leaflock/core-cli/internal/app"
-	"github.com/leaflock/core-cli/internal/cli"
-	"github.com/leaflock/core-cli/internal/cli/flags"
+	"github.com/leaflockio/core-cli/internal/app"
+	"github.com/leaflockio/core-cli/internal/cli"
+	"github.com/leaflockio/core-cli/internal/cli/flags"
 )
 
 // nopHandler is a minimal handler for definitions that require one.

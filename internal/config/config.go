@@ -10,8 +10,8 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/leaflock/core-cli/internal/errs"
-	"github.com/leaflock/core-cli/internal/logger"
+	"github.com/leaflockio/core-cli/internal/errs"
+	"github.com/leaflockio/core-cli/internal/logger"
 	"github.com/spf13/viper"
 )
 

@@ -10,7 +10,7 @@ package cli_test
 import (
 	"testing"
 
-	"github.com/leaflock/core-cli/internal/cli"
+	"github.com/leaflockio/core-cli/internal/cli"
 	"github.com/spf13/cobra"
 )
 

@@ -10,7 +10,7 @@ package flags_test
 import (
 	"testing"
 
-	"github.com/leaflock/core-cli/internal/cli/flags"
+	"github.com/leaflockio/core-cli/internal/cli/flags"
 )
 
 func TestDefinition_zero_value(t *testing.T) {

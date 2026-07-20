@@ -10,7 +10,7 @@ package factory
 import (
 	"fmt"
 
-	"github.com/leaflock/core-cli/internal/app"
+	"github.com/leaflockio/core-cli/internal/app"
 	"github.com/spf13/cobra"
 )
 

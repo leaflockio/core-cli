@@ -7,7 +7,7 @@
 
 package flags
 
-import "github.com/leaflock/core-cli/internal/app"
+import "github.com/leaflockio/core-cli/internal/app"
 
 // SystemFlag is a typed flag with a side effect applied at the infrastructure level.
 type SystemFlag[V ValueType] struct {

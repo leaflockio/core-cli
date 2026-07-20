@@ -10,7 +10,7 @@ package auth
 import (
 	"errors"
 
-	"github.com/leaflock/core-cli/internal/platform"
+	"github.com/leaflockio/core-cli/internal/platform"
 	"github.com/zalando/go-keyring"
 )
 

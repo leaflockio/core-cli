@@ -13,9 +13,9 @@ import (
 	"path/filepath"
 	"strings"
 
-	"github.com/leaflock/core-cli/internal/config"
-	"github.com/leaflock/core-cli/internal/errs"
-	"github.com/leaflock/core-cli/internal/util/fsutil"
+	"github.com/leaflockio/core-cli/internal/config"
+	"github.com/leaflockio/core-cli/internal/errs"
+	"github.com/leaflockio/core-cli/internal/util/fsutil"
 	"github.com/spf13/cobra"
 )
 

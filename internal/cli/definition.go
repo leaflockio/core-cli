@@ -8,10 +8,10 @@
 package cli
 
 import (
-	"github.com/leaflock/core-cli/internal/app"
-	"github.com/leaflock/core-cli/internal/cli/flags"
-	"github.com/leaflock/core-cli/internal/cli/guards"
-	"github.com/leaflock/core-cli/internal/cli/hooks"
+	"github.com/leaflockio/core-cli/internal/app"
+	"github.com/leaflockio/core-cli/internal/cli/flags"
+	"github.com/leaflockio/core-cli/internal/cli/guards"
+	"github.com/leaflockio/core-cli/internal/cli/hooks"
 )
 
 // Definition is the complete declaration of a command — what it is, what it

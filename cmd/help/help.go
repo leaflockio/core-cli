@@ -11,7 +11,7 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/leaflock/core-cli/internal/ui"
+	"github.com/leaflockio/core-cli/internal/ui"
 	"github.com/spf13/cobra"
 	"github.com/spf13/pflag"
 )

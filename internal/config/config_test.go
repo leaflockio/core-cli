@@ -9,7 +9,7 @@ package config
 import (
 	"testing"
 
-	"github.com/leaflock/core-cli/internal/logger"
+	"github.com/leaflockio/core-cli/internal/logger"
 )
 
 func TestLoad_defaults(t *testing.T) {

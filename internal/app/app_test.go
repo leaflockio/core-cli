@@ -12,13 +12,13 @@ import (
 	"log/slog"
 	"testing"
 
-	"github.com/leaflock/core-cli/internal/invocation"
-	"github.com/leaflock/core-cli/internal/platform"
-	"github.com/leaflock/core-cli/internal/repo"
-	"github.com/leaflock/core-cli/internal/terminal"
-	"github.com/leaflock/core-cli/internal/ui"
-	"github.com/leaflock/core-cli/internal/version"
-	"github.com/leaflock/core-cli/internal/workspace"
+	"github.com/leaflockio/core-cli/internal/invocation"
+	"github.com/leaflockio/core-cli/internal/platform"
+	"github.com/leaflockio/core-cli/internal/repo"
+	"github.com/leaflockio/core-cli/internal/terminal"
+	"github.com/leaflockio/core-cli/internal/ui"
+	"github.com/leaflockio/core-cli/internal/version"
+	"github.com/leaflockio/core-cli/internal/workspace"
 )
 
 func TestNewBuilder_returnsNonNil(t *testing.T) {

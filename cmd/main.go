@@ -10,7 +10,7 @@ import (
 	"errors"
 	"os"
 
-	"github.com/leaflock/core-cli/internal/errs"
+	"github.com/leaflockio/core-cli/internal/errs"
 )
 
 // env is injected at build time via -ldflags:
@@ -19,9 +19,9 @@ import (
 //
 // Version, Commit, and Date are injected into internal/version directly:
 //
-//	-X github.com/leaflock/core-cli/internal/version.Version=1.0.0
-//	-X github.com/leaflock/core-cli/internal/version.Commit=abc1234
-//	-X github.com/leaflock/core-cli/internal/version.Date=2026-04-18
+//	-X github.com/leaflockio/core-cli/internal/version.Version=1.0.0
+//	-X github.com/leaflockio/core-cli/internal/version.Commit=abc1234
+//	-X github.com/leaflockio/core-cli/internal/version.Date=2026-04-18
 var env string
 
 var (

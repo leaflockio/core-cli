@@ -10,13 +10,13 @@ package app
 import (
 	"log/slog"
 
-	"github.com/leaflock/core-cli/internal/config"
-	"github.com/leaflock/core-cli/internal/invocation"
-	"github.com/leaflock/core-cli/internal/platform"
-	"github.com/leaflock/core-cli/internal/repo"
-	"github.com/leaflock/core-cli/internal/ui"
-	"github.com/leaflock/core-cli/internal/version"
-	"github.com/leaflock/core-cli/internal/workspace"
+	"github.com/leaflockio/core-cli/internal/config"
+	"github.com/leaflockio/core-cli/internal/invocation"
+	"github.com/leaflockio/core-cli/internal/platform"
+	"github.com/leaflockio/core-cli/internal/repo"
+	"github.com/leaflockio/core-cli/internal/ui"
+	"github.com/leaflockio/core-cli/internal/version"
+	"github.com/leaflockio/core-cli/internal/workspace"
 )
 
 // App is the central DI container. It is constructed once in main and passed

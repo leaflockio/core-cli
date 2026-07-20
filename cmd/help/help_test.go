@@ -12,8 +12,8 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/leaflock/core-cli/internal/terminal"
-	"github.com/leaflock/core-cli/internal/ui"
+	"github.com/leaflockio/core-cli/internal/terminal"
+	"github.com/leaflockio/core-cli/internal/ui"
 	"github.com/spf13/cobra"
 )
 

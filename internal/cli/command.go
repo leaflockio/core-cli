@@ -7,7 +7,7 @@
 
 package cli
 
-import "github.com/leaflock/core-cli/internal/app"
+import "github.com/leaflockio/core-cli/internal/app"
 
 // Command is implemented by every command package.
 // Define returns the complete declaration of the command — its identity, group,

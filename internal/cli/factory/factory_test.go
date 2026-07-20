@@ -11,11 +11,11 @@ import (
 	"bytes"
 	"testing"
 
-	"github.com/leaflock/core-cli/internal/app"
-	"github.com/leaflock/core-cli/internal/cli"
-	"github.com/leaflock/core-cli/internal/cli/factory"
-	"github.com/leaflock/core-cli/internal/terminal"
-	"github.com/leaflock/core-cli/internal/ui"
+	"github.com/leaflockio/core-cli/internal/app"
+	"github.com/leaflockio/core-cli/internal/cli"
+	"github.com/leaflockio/core-cli/internal/cli/factory"
+	"github.com/leaflockio/core-cli/internal/terminal"
+	"github.com/leaflockio/core-cli/internal/ui"
 )
 
 func TestFactory_Build_returns_error_for_nil_command(t *testing.T) {

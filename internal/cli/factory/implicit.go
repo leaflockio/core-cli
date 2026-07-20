@@ -8,8 +8,8 @@
 package factory
 
 import (
-	"github.com/leaflock/core-cli/internal/cli/flags"
-	"github.com/leaflock/core-cli/internal/cli/flags/system/nocolor"
+	"github.com/leaflockio/core-cli/internal/cli/flags"
+	"github.com/leaflockio/core-cli/internal/cli/flags/system/nocolor"
 )
 
 // implicitSystemFlags are registered on every command unconditionally.

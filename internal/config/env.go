@@ -11,7 +11,7 @@ import (
 	"os"
 	"strings"
 
-	"github.com/leaflock/core-cli/internal/errs"
+	"github.com/leaflockio/core-cli/internal/errs"
 )
 
 const errEnvMsgFmt = "%q is not a valid environment: must be one of %s, %s, %s"

@@ -17,8 +17,8 @@ import (
 	"strings"
 
 	"github.com/google/licenseclassifier/v2/assets"
-	"github.com/leaflock/core-cli/internal/fstree"
-	"github.com/leaflock/core-cli/internal/repo/lang"
+	"github.com/leaflockio/core-cli/internal/fstree"
+	"github.com/leaflockio/core-cli/internal/repo/lang"
 )
 
 const defaultRemote = "origin"

@@ -10,8 +10,8 @@ package factory
 import (
 	"errors"
 
-	"github.com/leaflock/core-cli/internal/app"
-	"github.com/leaflock/core-cli/internal/cli"
+	"github.com/leaflockio/core-cli/internal/app"
+	"github.com/leaflockio/core-cli/internal/cli"
 	"github.com/spf13/cobra"
 )
 

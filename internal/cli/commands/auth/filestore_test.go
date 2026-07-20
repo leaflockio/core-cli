@@ -14,9 +14,9 @@ import (
 	"testing"
 	"time"
 
-	"github.com/leaflock/core-cli/internal/cli/commands/auth"
-	"github.com/leaflock/core-cli/internal/errs"
-	"github.com/leaflock/core-cli/internal/platform"
+	"github.com/leaflockio/core-cli/internal/cli/commands/auth"
+	"github.com/leaflockio/core-cli/internal/errs"
+	"github.com/leaflockio/core-cli/internal/platform"
 )
 
 // newFileStore returns a fileStore-backed Store pointed at a temp path, and the

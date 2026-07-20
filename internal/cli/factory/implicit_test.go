@@ -10,7 +10,7 @@ package factory
 import (
 	"testing"
 
-	"github.com/leaflock/core-cli/internal/cli/flags"
+	"github.com/leaflockio/core-cli/internal/cli/flags"
 )
 
 func TestImplicitSystemFlags_not_empty(t *testing.T) {

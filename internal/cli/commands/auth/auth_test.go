@@ -11,8 +11,8 @@ import (
 	"path/filepath"
 	"testing"
 
-	"github.com/leaflock/core-cli/internal/cli/commands/auth"
-	"github.com/leaflock/core-cli/internal/platform"
+	"github.com/leaflockio/core-cli/internal/cli/commands/auth"
+	"github.com/leaflockio/core-cli/internal/platform"
 )
 
 // TestNew_CI_uses_file verifies that a CI environment always selects the file backend

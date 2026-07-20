@@ -12,7 +12,7 @@ LINTER       := golangci-lint
 VERSION        := $(strip $(shell cat .version))
 COMMIT         := $(shell git rev-parse --short HEAD 2>/dev/null || echo none)
 DATE           := $(shell date -u +%Y-%m-%d)
-PKG_VERSION    := github.com/leaflock/core-cli/internal/version
+PKG_VERSION    := github.com/leaflockio/core-cli/internal/version
 GCFLAGS_DEV    := all=-N -l
 LDFLAGS_COMMON := -X $(PKG_VERSION).Version=$(VERSION) -X $(PKG_VERSION).Commit=$(COMMIT) -X $(PKG_VERSION).Date=$(DATE)
 LDFLAGS_DEV    := $(LDFLAGS_COMMON) -X $(PKG_VERSION).Version=$(VERSION)-dev -X main.env=dev

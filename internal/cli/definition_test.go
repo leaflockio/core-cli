@@ -10,11 +10,11 @@ package cli_test
 import (
 	"testing"
 
-	"github.com/leaflock/core-cli/internal/app"
-	"github.com/leaflock/core-cli/internal/cli"
-	"github.com/leaflock/core-cli/internal/cli/flags"
-	"github.com/leaflock/core-cli/internal/cli/guards"
-	"github.com/leaflock/core-cli/internal/cli/hooks"
+	"github.com/leaflockio/core-cli/internal/app"
+	"github.com/leaflockio/core-cli/internal/cli"
+	"github.com/leaflockio/core-cli/internal/cli/flags"
+	"github.com/leaflockio/core-cli/internal/cli/guards"
+	"github.com/leaflockio/core-cli/internal/cli/hooks"
 )
 
 func TestNewDefinition_defaults(t *testing.T) {

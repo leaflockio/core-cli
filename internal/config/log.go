@@ -10,7 +10,7 @@ import (
 	"os"
 	"path/filepath"
 
-	"github.com/leaflock/core-cli/internal/logger"
+	"github.com/leaflockio/core-cli/internal/logger"
 )
 
 const (

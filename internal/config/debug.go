@@ -13,7 +13,7 @@ import (
 	"runtime"
 	"strconv"
 
-	"github.com/leaflock/core-cli/internal/util/pathutil"
+	"github.com/leaflockio/core-cli/internal/util/pathutil"
 )
 
 type level string

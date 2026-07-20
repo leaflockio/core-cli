@@ -24,8 +24,8 @@
 package nocolor
 
 import (
-	"github.com/leaflock/core-cli/internal/app"
-	"github.com/leaflock/core-cli/internal/cli/flags"
+	"github.com/leaflockio/core-cli/internal/app"
+	"github.com/leaflockio/core-cli/internal/cli/flags"
 )
 
 // NoColor is the canonical --no-color system flag.

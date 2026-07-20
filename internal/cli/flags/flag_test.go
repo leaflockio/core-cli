@@ -7,7 +7,7 @@
 
 package flags_test
 
-import "github.com/leaflock/core-cli/internal/cli/flags"
+import "github.com/leaflockio/core-cli/internal/cli/flags"
 
 // Compile-time checks that both flag kinds satisfy the Flag interface.
 var (

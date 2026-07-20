@@ -14,7 +14,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/leaflock/core-cli/internal/util/codec"
+	"github.com/leaflockio/core-cli/internal/util/codec"
 )
 
 // fixture is the shared test struct used across all encode/decode tests.

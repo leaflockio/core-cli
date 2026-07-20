@@ -11,12 +11,12 @@ import (
 	"fmt"
 
 	"github.com/charmbracelet/lipgloss"
-	"github.com/leaflock/core-cli/internal/app"
-	"github.com/leaflock/core-cli/internal/cli"
-	"github.com/leaflock/core-cli/internal/cli/flags"
-	"github.com/leaflock/core-cli/internal/config"
-	"github.com/leaflock/core-cli/internal/ui"
-	ver "github.com/leaflock/core-cli/internal/version"
+	"github.com/leaflockio/core-cli/internal/app"
+	"github.com/leaflockio/core-cli/internal/cli"
+	"github.com/leaflockio/core-cli/internal/cli/flags"
+	"github.com/leaflockio/core-cli/internal/config"
+	"github.com/leaflockio/core-cli/internal/ui"
+	ver "github.com/leaflockio/core-cli/internal/version"
 )
 
 // New returns the version command.

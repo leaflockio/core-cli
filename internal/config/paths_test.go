@@ -12,7 +12,7 @@ import (
 	"path/filepath"
 	"testing"
 
-	"github.com/leaflock/core-cli/internal/util/pathutil"
+	"github.com/leaflockio/core-cli/internal/util/pathutil"
 )
 
 var (

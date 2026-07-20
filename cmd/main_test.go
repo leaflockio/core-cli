@@ -10,7 +10,7 @@ import (
 	"errors"
 	"testing"
 
-	"github.com/leaflock/core-cli/internal/errs"
+	"github.com/leaflockio/core-cli/internal/errs"
 )
 
 var errTestInternal = errors.New("unexpected failure")
