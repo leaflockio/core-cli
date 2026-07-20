@@ -9,7 +9,11 @@ package main
 import (
 	"os"
 
+	"github.com/leaflock/core-cli/cmd/help"
 	"github.com/leaflock/core-cli/internal/app"
+	"github.com/leaflock/core-cli/internal/cli"
+	"github.com/leaflock/core-cli/internal/cli/commands/root"
+	"github.com/leaflock/core-cli/internal/cli/factory"
 	"github.com/leaflock/core-cli/internal/config"
 	"github.com/leaflock/core-cli/internal/errs"
 	"github.com/leaflock/core-cli/internal/invocation"
@@ -20,6 +24,7 @@ import (
 	"github.com/leaflock/core-cli/internal/ui"
 	"github.com/leaflock/core-cli/internal/version"
 	"github.com/leaflock/core-cli/internal/workspace"
+	"github.com/spf13/cobra"
 )
 
 // run wires the build-time env into the startup sequence.
@@ -41,7 +46,29 @@ func runWith(
 	if err != nil {
 		return err
 	}
-	return (&root{app: a}).cmd().Execute()
+
+	cmd, err := buildCommandTree(a)
+	if err != nil {
+		return err
+	}
+	return cmd.Execute()
+}
+
+// buildCommandTree builds the root command tree and applies cobra-level
+// presentation on top.
+func buildCommandTree(a *app.App) (*cobra.Command, error) {
+	cmd, err := factory.New().Build(root.New(commands), a)
+	if err != nil {
+		return nil, err
+	}
+	cmd.SilenceUsage = true
+	cmd.SilenceErrors = true
+	cmd.CompletionOptions.DisableDefaultCmd = true
+	for _, g := range cli.Groups {
+		cmd.AddGroup(&cobra.Group{ID: string(g), Title: string(g)})
+	}
+	help.Set(cmd, a.Printer)
+	return cmd, nil
 }
 
 // initConfig resolves the active environment, loads configuration, and

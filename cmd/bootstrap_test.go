@@ -13,6 +13,7 @@ import (
 	"testing"
 
 	"github.com/leaflock/core-cli/internal/app"
+	"github.com/leaflock/core-cli/internal/cli"
 	"github.com/leaflock/core-cli/internal/config"
 	"github.com/leaflock/core-cli/internal/logger"
 )
@@ -21,6 +22,23 @@ var (
 	errTestConfig = errors.New("config error")
 	errTestApp    = errors.New("app error")
 )
+
+// brokenCmd declares neither a Handler nor Children, tripping the factory's
+// assemble guard when wired in as a non-root command.
+type brokenCmd struct{}
+
+func (brokenCmd) Define(*app.App) *cli.Definition {
+	return &cli.Definition{Meta: cli.Meta{Use: "broken"}}
+}
+
+// withBrokenCommands temporarily swaps commands for a slice that fails to
+// assemble, restoring the original on cleanup.
+func withBrokenCommands(t *testing.T) {
+	t.Helper()
+	original := commands
+	commands = []cli.Command{brokenCmd{}}
+	t.Cleanup(func() { commands = original })
+}
 
 // minimalCfg returns a Config with the minimum valid logger settings.
 func minimalCfg() *config.Config {
@@ -52,6 +70,26 @@ func TestRunWith_appError(t *testing.T) {
 	}
 }
 
+func TestRunWith_buildCommandTreeError(t *testing.T) {
+	withBrokenCommands(t)
+
+	err := runWith("",
+		func(string) (*config.Config, error) { return &config.Config{}, nil },
+		func(*config.Config) (*app.App, error) { return &app.App{}, nil },
+	)
+	if err == nil {
+		t.Error("expected error when buildCommandTree fails")
+	}
+}
+
+func TestBuildCommandTree_propagatesFactoryError(t *testing.T) {
+	withBrokenCommands(t)
+
+	if _, err := buildCommandTree(&app.App{}); err == nil {
+		t.Error("expected error when factory.Build fails")
+	}
+}
+
 // TestRunWith_executesCommand verifies that the root command executes successfully.
 func TestRunWith_executesCommand(t *testing.T) {
 	origArgs := os.Args
@@ -59,8 +97,8 @@ func TestRunWith_executesCommand(t *testing.T) {
 	os.Args = []string{"leaf"}
 
 	err := runWith("",
-		func(string) (*config.Config, error) { return &config.Config{}, nil },
-		func(*config.Config) (*app.App, error) { return newTestApp(t), nil },
+		func(string) (*config.Config, error) { return minimalCfg(), nil },
+		buildApp,
 	)
 	if err != nil {
 		t.Errorf("unexpected error: %v", err)
@@ -155,5 +193,13 @@ func TestBuildApp_propagatesLoggerError(t *testing.T) {
 	}
 	if _, err := buildApp(cfg); !errors.Is(err, logger.ErrNoOutputs) {
 		t.Errorf("expected ErrNoOutputs, got %v", err)
+	}
+}
+
+func TestBuildApp_propagatesWorkspaceError(t *testing.T) {
+	t.Setenv("HOME", "")
+
+	if _, err := buildApp(minimalCfg()); err == nil {
+		t.Error("expected error when workspace.New fails")
 	}
 }

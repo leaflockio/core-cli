@@ -10,18 +10,14 @@ import (
 	"testing"
 )
 
-func TestRegistry_allEntriesHaveGroupID(t *testing.T) {
-	for i, e := range registry {
-		if e.groupID == "" {
-			t.Errorf("registry[%d] has empty groupID", i)
+func TestCommands_defineSucceeds(t *testing.T) {
+	for i, c := range commands {
+		def := c.Define(nil)
+		if def == nil {
+			t.Fatalf("commands[%d]: expected non-nil Definition", i)
 		}
-	}
-}
-
-func TestRegistry_allEntriesHaveFactory(t *testing.T) {
-	for i, e := range registry {
-		if e.factory == nil {
-			t.Errorf("registry[%d] has nil factory", i)
+		if def.Meta.Use == "" {
+			t.Errorf("commands[%d]: expected non-empty Meta.Use", i)
 		}
 	}
 }

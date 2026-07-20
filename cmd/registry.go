@@ -7,18 +7,11 @@
 package main
 
 import (
-	licensecmd "github.com/leaflock/core-cli/cmd/license"
-	versioncmd "github.com/leaflock/core-cli/cmd/version"
-	"github.com/leaflock/core-cli/internal/app"
-	"github.com/spf13/cobra"
+	"github.com/leaflock/core-cli/internal/cli"
+	"github.com/leaflock/core-cli/internal/cli/commands/version"
 )
 
-// registry maps each subcommand factory to its display group.
-// Add new commands here — root.go picks them up automatically.
-var registry = []struct {
-	groupID string
-	factory func(*app.App) *cobra.Command
-}{
-	{groupGeneral, versioncmd.New},
-	{groupTools, licensecmd.New},
+// commands lists every command wired into the root command tree.
+var commands = []cli.Command{
+	version.New(),
 }
