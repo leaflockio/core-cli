@@ -21,4 +21,12 @@
 // declared side by side, so adding or reordering a group is a single edit.
 // [NewDefinition] defaults every command to [GroupCLI], so only commands
 // that need a different placement have to opt in.
+//
+// # Every command package exposes New(...) Command
+//
+// A package implementing [Command] exposes a constructor named New,
+// returning [Command] rather than its own concrete type — even when it takes
+// no arguments. This keeps every call site the same shape regardless of
+// whether a given command needs construction-time dependencies, and keeps
+// the concrete type unexported.
 package cli

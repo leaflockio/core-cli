@@ -9,7 +9,7 @@ PKG          := ./...
 LINTER       := golangci-lint
 
 # Build flags
-VERSION        := $(strip $(file <.version))
+VERSION        := $(strip $(shell cat .version))
 COMMIT         := $(shell git rev-parse --short HEAD 2>/dev/null || echo none)
 DATE           := $(shell date -u +%Y-%m-%d)
 PKG_VERSION    := github.com/leaflock/core-cli/internal/version
