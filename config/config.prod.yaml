@@ -1,0 +1,12 @@
+log:
+  level: info
+  console:
+    enabled: false
+  file:
+    enabled: true
+    format: json
+    path: /var/log/leaf
+    filename: leaf.log
+
+errors:
+  show_underlying: false
