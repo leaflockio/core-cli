@@ -1,0 +1,26 @@
+name: CI
+on:
+  pull_request:
+    branches: [pre-main, main]
+permissions:
+  contents: read
+  pull-requests: read
+jobs:
+  quality:
+    uses: leaflockio/core-actions/.github/workflows/tpl-common-ci.yml@v1
+    with:
+      core-actions-ref: v1
+    secrets:
+      APP_ID: ${{ secrets.LOCKET_CI_APP_ID }}
+      APP_PRIVATE_KEY: ${{ secrets.LOCKET_CI_PRIVATE_KEY }}
+      GITLEAKS_LICENSE: ${{ secrets.GITLEAKS_LICENSE }}
+  go:
+    uses: leaflockio/core-actions/.github/workflows/tpl-go-ci.yml@v1
+    with:
+      core-actions-ref: v1
+      build-command: make build-prod
+    secrets:
+      APP_ID: ${{ secrets.LOCKET_CI_APP_ID }}
+      APP_PRIVATE_KEY: ${{ secrets.LOCKET_CI_PRIVATE_KEY }}
+  branch-policy:
+    uses: leaflockio/core-actions/.github/workflows/tpl-branch-policy.yml@v1

@@ -11,9 +11,15 @@
 # Test binary, built with `go test -c`
 *.test
 
+# Build output
+bin/
+
+# Dev-generated output (logs, etc.)
+output/
+
 # Code coverage profiles and other test artifacts
+coverage/
 *.out
-coverage.*
 *.coverprofile
 profile.cov
 

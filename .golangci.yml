@@ -1,0 +1,255 @@
+run:
+  timeout: 2m
+  relative-path-mode: gomod
+  issues-exit-code: 1
+  tests: true
+  build-tags: []
+  modules-download-mode: readonly
+  allow-parallel-runners: false
+  allow-serial-runners: false
+  go: "1.26"
+
+severity:
+  default-severity: error
+  case-sensitive: true
+  rules: []
+
+output:
+  formats:
+    - format: colored-line-number
+      path: stdout
+  print-issued-lines: true
+  print-linter-name: true
+  path-prefix: ""
+  sort-results: true
+  sort-order:
+    - linter
+    - severity
+    - file
+  show-stats: true
+
+issues:
+  max-issues-per-linter: 0
+  max-same-issues: 0
+  uniq-by-line: true
+  # Excluding configuration per-path, per-linter, per-text and per-source
+  exclude-rules:
+    # Exclude some linters from running on tests files.
+    - path: _test\.go
+      linters:
+        - gocyclo
+        - errcheck
+        - dupl
+        - gosec
+        - funlen
+        - gocognit
+        - maintidx
+        - cyclop
+        - testpackage # Allow white-box testing for internal functions
+
+linters:
+  enable:
+    # Enabled by default
+    - errcheck
+    - gosimple
+    - govet
+    - ineffassign
+    - staticcheck
+    - unused
+    - gofmt
+    - gofumpt
+    - goimports
+    - misspell
+    - revive
+    - unconvert
+    - unparam
+    - gosec
+    - bodyclose
+    - errorlint
+    - gocritic
+    - gocyclo
+    - cyclop
+    - dupl
+    - funlen
+    - gocognit
+    - nestif
+    - whitespace
+    - stylecheck
+    - godot
+    - godox
+    - err113
+    - errname
+    - exhaustive
+    - copyloopvar
+    - goconst
+    - makezero
+    - nakedret
+    - nilerr
+    - nolintlint
+    - nosprintfhostport
+    - prealloc
+    - predeclared
+    - promlinter
+    - reassign
+    - sqlclosecheck
+    - testpackage
+    - thelper
+    - wastedassign
+    - lll
+
+  disable:
+    # Disabled linters (too noisy or opinionated for most projects)
+    - exhaustruct # Requires all struct fields to be initialized
+    - varnamelen # Variable name length checks (too strict)
+    - ireturn # Interface return checks (too opinionated)
+    - tagliatelle # Struct tag naming (too opinionated)
+    - nlreturn # Newline before return (too strict)
+    - wrapcheck # Wrap all errors (too verbose)
+    - paralleltest # Requires t.Parallel() everywhere
+    - testableexamples # Example function checks
+    - gochecknoglobals # No global variables (too strict)
+    - gochecknoinits # No init functions (too strict)
+    - depguard # Dependency restrictions (needs configuration)
+    - gomoddirectives # go.mod directives checks
+    - gomodguard # Module restrictions (needs configuration)
+    - forbidigo # Forbid certain identifiers (needs configuration)
+    - mnd # Magic number detection (too noisy)
+    - wsl # Whitespace/cuddling rules (too opinionated)
+    - intrange # Go 1.22+ integer range (too new)
+
+  presets:
+    - bugs
+    - error
+    - unused
+    - format
+    - style
+    - complexity
+
+  fast: false
+
+linters-settings:
+  lll:
+    line-length: 120
+    tab-width: 4
+
+  errcheck:
+    check-type-assertions: true
+    check-blank: true
+    exclude-functions:
+      - io/ioutil.ReadFile
+      - io.Copy(*bytes.Buffer)
+      - io.Copy(os.Stdout)
+
+  govet:
+    enable-all: true
+    disable:
+      - shadow
+      - fieldalignment
+
+  gocyclo:
+    min-complexity: 15
+
+  cyclop:
+    max-complexity: 15
+    skip-tests: true
+
+  funlen:
+    lines: 100
+    statements: 50
+    ignore-comments: true
+
+  gocognit:
+    min-complexity: 20
+
+  nestif:
+    min-complexity: 5
+
+  godot:
+    scope: declarations
+    capital: true
+
+  godox:
+    keywords:
+      - "TODO"
+      - "FIXME"
+      - "BUG"
+      - "HACK"
+
+  gofumpt:
+    extra-rules: true
+
+  gocritic:
+    enabled-tags:
+      - diagnostic
+      - style
+      - performance
+      - experimental
+      - opinionated
+    disabled-checks:
+      - whyNoLint
+      - unnamedResult
+
+  stylecheck:
+    checks: ["all", "-ST1000", "-ST1003"]
+
+  revive:
+    rules:
+      - name: exported
+        arguments:
+          - disableStutteringCheck
+      - name: unexported-return
+      - name: time-naming
+      - name: var-declaration
+      - name: package-comments
+      - name: indent-error-flow
+      - name: blank-imports
+      - name: context-as-argument
+      - name: dot-imports
+      - name: error-return
+      - name: error-strings
+      - name: error-naming
+      - name: if-return
+      - name: increment-decrement
+      - name: var-naming
+      - name: range
+      - name: receiver-naming
+      - name: errorf
+      - name: banned-characters
+        arguments: []
+      - name: file-header
+        disabled: true
+
+  goconst:
+    min-len: 3
+    min-occurrences: 1
+    ignore-tests: true
+    match-constant: true
+    numbers: false
+
+  misspell:
+    locale: US
+
+  nakedret:
+    max-func-lines: 30
+
+  prealloc:
+    simple: true
+    range-loops: true
+    for-loops: true
+
+  unparam:
+    check-exported: false
+
+  unused:
+    field-writes-are-uses: true
+    parameters-are-used: true
+    local-variables-are-used: true
+
+  whitespace:
+    multi-if: false
+    multi-func: false
+
+  gosec:
+    excludes:
+      - G404 # Weak random number generator (math/rand)
+    confidence: low
