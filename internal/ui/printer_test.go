@@ -76,6 +76,37 @@ func TestPrinter_SetNoColor(t *testing.T) {
 	}
 }
 
+func TestPrinter_SetVerbose(t *testing.T) {
+	printer, _, _ := newTestPrinter(t)
+	printer.SetVerbose(true)
+
+	if !printer.verbose {
+		t.Error("expected verbose=true after SetVerbose(true)")
+	}
+}
+
+func TestPrinter_Verbose_printsWhenEnabled(t *testing.T) {
+	printer, out, errBuf := newTestPrinter(t)
+	printer.SetVerbose(true)
+	printer.Verbose("fetching templates")
+
+	if !strings.Contains(out.String(), "fetching templates") {
+		t.Errorf("expected Out to contain %q, got %q", "fetching templates", out.String())
+	}
+	if errBuf.Len() != 0 {
+		t.Error("expected Err to be empty for Verbose")
+	}
+}
+
+func TestPrinter_Verbose_silentWhenDisabled(t *testing.T) {
+	printer, out, _ := newTestPrinter(t)
+	printer.Verbose("fetching templates")
+
+	if out.Len() != 0 {
+		t.Errorf("expected no output when verbose is disabled, got %q", out.String())
+	}
+}
+
 func TestPrinter_render_plainWhenNoColor(t *testing.T) {
 	printer, _, _ := newTestPrinter(t)
 	printer.SetNoColor(true)

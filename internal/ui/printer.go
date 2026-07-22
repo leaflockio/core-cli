@@ -22,6 +22,7 @@ import (
 type Printer struct {
 	term    *terminal.Terminal
 	noColor bool
+	verbose bool
 }
 
 // NewPrinter constructs a Printer backed by t. Color is automatically disabled
@@ -35,6 +36,18 @@ func NewPrinter(t *terminal.Terminal) *Printer {
 
 // SetNoColor enables or disables color output. Used by the --no-color flag.
 func (p *Printer) SetNoColor(v bool) { p.noColor = v }
+
+// SetVerbose enables or disables verbose output. Used by the --verbose flag.
+func (p *Printer) SetVerbose(v bool) { p.verbose = v }
+
+// Verbose prints a progress message to Out when verbose mode is enabled.
+// Commands that include flags.Verbose in their Definition.Flags call this
+// throughout their handler to surface progress information to the user.
+func (p *Printer) Verbose(msg string) {
+	if p.verbose {
+		fmt.Fprintln(p.term.Out, p.render(&StyleMuted, msg))
+	}
+}
 
 // Out returns the writer for normal output.
 func (p *Printer) Out() io.Writer { return p.term.Out }
