@@ -43,6 +43,13 @@ func TestDefinition_WithFlags(t *testing.T) {
 	}
 }
 
+func TestDefinition_WithSupportsConfig(t *testing.T) {
+	d := cli.NewDefinition(cli.NewMeta("foo", "short", "")).WithSupportsConfig(true)
+	if !d.SupportsConfig {
+		t.Error("SupportsConfig should be true after WithSupportsConfig(true)")
+	}
+}
+
 func TestDefinition_WithHandler(t *testing.T) {
 	handler := func(a *app.App, args []string) error { return nil }
 	d := cli.NewDefinition(cli.NewMeta("foo", "short", "")).WithHandler(handler)

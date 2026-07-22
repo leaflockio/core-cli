@@ -24,6 +24,9 @@ type Definition struct {
 	// Flags declares the flags this command accepts.
 	Flags []flags.Flag
 
+	// SupportsConfig declares whether this command has its own configuration.
+	SupportsConfig bool
+
 	// Handler is the command's execution logic.
 	Handler func(a *app.App, args []string) error
 
@@ -49,6 +52,12 @@ func (d *Definition) WithGroup(group GroupID) *Definition {
 // WithFlags sets Flags and returns the receiver.
 func (d *Definition) WithFlags(f []flags.Flag) *Definition {
 	d.Flags = f
+	return d
+}
+
+// WithSupportsConfig sets SupportsConfig and returns the receiver.
+func (d *Definition) WithSupportsConfig(v bool) *Definition {
+	d.SupportsConfig = v
 	return d
 }
 
