@@ -20,6 +20,7 @@ import (
 )
 
 var errHomeResolutionFailed = errors.New("home directory resolution failed")
+var errCacheResolutionFailed = errors.New("cache dir resolution failed")
 
 // Build a cobra command tree from the given sub-command names and return the
 // deepest command. For example, sub "pr", "create" returns the create command
@@ -229,6 +230,127 @@ func TestForRepo_depthFull(t *testing.T) {
 	}
 	if !strings.HasSuffix(dir, filepath.Join("pr", "create", "out")) {
 		t.Errorf("expected path to end with pr/create/out, got %q", dir)
+	}
+}
+
+// --- ForProjectRoot ---
+
+func TestForProjectRoot(t *testing.T) {
+	repo := t.TempDir()
+	ws, _ := New(t.TempDir(), repo)
+
+	cs := ws.ForProjectRoot()
+
+	dir, err := cs.Dir("templates")
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	want := filepath.Join(repo, config.AppName, "templates")
+	if dir != want {
+		t.Errorf("got %q, want %q", dir, want)
+	}
+	assertPerm(t, dir, 0o755)
+}
+
+// --- ForGenerated ---
+
+func TestForGenerated_depthCommand(t *testing.T) {
+	repo := t.TempDir()
+	ws, _ := New(t.TempDir(), repo)
+
+	cs := ws.ForGenerated(newCmd("license"), DepthCommand)
+
+	file, err := cs.File("license.lock")
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	want := filepath.Join(repo, config.AppName, "generated", "license", "license.lock")
+	if file != want {
+		t.Errorf("got %q, want %q", file, want)
+	}
+}
+
+func TestForGenerated_depthRoot(t *testing.T) {
+	repo := t.TempDir()
+	ws, _ := New(t.TempDir(), repo)
+
+	cs := ws.ForGenerated(newCmd("license"), DepthRoot)
+
+	file, err := cs.File("out.txt")
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	want := filepath.Join(repo, config.AppName, "generated", "out.txt")
+	if file != want {
+		t.Errorf("got %q, want %q", file, want)
+	}
+}
+
+// --- ForCache ---
+
+func TestForCache(t *testing.T) {
+	repo := t.TempDir()
+	ws, _ := New(t.TempDir(), repo)
+
+	cs := ws.ForCache(newCmd("license"), "templates")
+
+	dir, err := cs.Dir("abc123")
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if !strings.HasSuffix(dir, filepath.Join("license", "templates", "abc123")) {
+		t.Errorf("expected path to end with license/templates/abc123, got %q", dir)
+	}
+	assertPerm(t, dir, 0o755)
+}
+
+func TestForCache_purposeIsolation(t *testing.T) {
+	ws, _ := New(t.TempDir(), t.TempDir())
+
+	templates := ws.ForCache(newCmd("license"), "templates")
+	spdx := ws.ForCache(newCmd("license"), "spdx")
+
+	td, err := templates.Dir("h1")
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	sd, err := spdx.Dir("h1")
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if td == sd {
+		t.Errorf("expected different purposes to resolve to different dirs, both got %q", td)
+	}
+}
+
+func TestForCache_disabledWhenUnresolvable(t *testing.T) {
+	old := osUserCacheDir
+	osUserCacheDir = func() (string, error) { return "", errCacheResolutionFailed }
+	t.Cleanup(func() { osUserCacheDir = old })
+
+	ws, err := New(t.TempDir(), t.TempDir())
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	cs := ws.ForCache(newCmd("license"), "templates")
+
+	if _, err := cs.Dir("h1"); err == nil {
+		t.Fatal("Dir: expected error, got nil")
+	} else {
+		var e *errs.Error
+		if !errors.As(err, &e) || e.Code != errs.WSP002 {
+			t.Errorf("Dir: expected WSP002, got %v", err)
+		}
+	}
+
+	if _, err := cs.File("meta.json"); err == nil {
+		t.Fatal("File: expected error, got nil")
+	} else {
+		var e *errs.Error
+		if !errors.As(err, &e) || e.Code != errs.WSP002 {
+			t.Errorf("File: expected WSP002, got %v", err)
+		}
 	}
 }
 

@@ -94,6 +94,12 @@ const (
 	// construction time. This happens when os.UserHomeDir fails and no override
 	// was provided.
 	WSP001 Code = "WSP001"
+
+	// WSP002 is used when the platform cache directory cannot be resolved.
+	// Unlike WSP001, this does not fail workspace construction — it is
+	// returned later, by Dir and File on the CommandSpace that ForCache
+	// returns.
+	WSP002 Code = "WSP002"
 )
 
 // AUT domain covers errors from the auth package.
