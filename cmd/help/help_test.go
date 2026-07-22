@@ -191,7 +191,7 @@ func TestRenderCommands_ungroupedFallsToGeneral(t *testing.T) {
 	parent.AddCommand(newCmd("orphan", "No group"))
 
 	got := renderCommands(parent, printer)
-	if !strings.Contains(got, "w") {
+	if !strings.Contains(got, "GENERAL") {
 		t.Errorf("expected General section, got %q", got)
 	}
 }

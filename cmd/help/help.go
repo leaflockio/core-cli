@@ -119,7 +119,7 @@ func renderGrouped(printer *ui.Printer, visible []*cobra.Command, groups []*cobr
 
 	if len(ungrouped) > 0 {
 		b.WriteString("\n")
-		b.WriteString(printer.Header("w"))
+		b.WriteString(printer.Header("GENERAL"))
 		b.WriteString("\n")
 		b.WriteString(renderUngrouped(printer, ungrouped, width, indentCmd))
 	}
