@@ -19,8 +19,10 @@ import (
 	"github.com/spf13/cobra"
 )
 
-var errHomeResolutionFailed = errors.New("home directory resolution failed")
-var errCacheResolutionFailed = errors.New("cache dir resolution failed")
+var (
+	errHomeResolutionFailed  = errors.New("home directory resolution failed")
+	errCacheResolutionFailed = errors.New("cache dir resolution failed")
+)
 
 // Build a cobra command tree from the given sub-command names and return the
 // deepest command. For example, sub "pr", "create" returns the create command

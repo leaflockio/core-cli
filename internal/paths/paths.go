@@ -4,7 +4,11 @@
 // software, via any medium, is strictly prohibited without prior
 // written permission from LeafLock.
 
-package config
+// Package paths defines the shared vocabulary for describing filesystem
+// paths the tool cares about.
+package paths
+
+import "fmt"
 
 // Scope identifies which of Workspace's root scopes a KnownPath belongs to.
 type Scope int
@@ -17,6 +21,28 @@ const (
 	// ScopeCache paths live under Workspace's cache root (<UserCacheDir>/<AppName>/).
 	ScopeCache
 )
+
+// Scope label constants, returned by String.
+const (
+	scopeUserLabel    = "user"
+	scopeProjectLabel = "project"
+	scopeCacheLabel   = "cache"
+	scopeUnknownLabel = "unknown"
+)
+
+// String returns the human-readable label for s.
+func (s Scope) String() string {
+	switch s {
+	case ScopeUser:
+		return scopeUserLabel
+	case ScopeProject:
+		return scopeProjectLabel
+	case ScopeCache:
+		return scopeCacheLabel
+	default:
+		return scopeUnknownLabel
+	}
+}
 
 // KnownPath describes a single path the tool resolves.
 type KnownPath struct {
@@ -31,4 +57,13 @@ type KnownPath struct {
 	// Generated is true when the tool fully owns and writes this path, and
 	// false when the path is user-authored and only ever read.
 	Generated bool
+}
+
+// Print returns a human-readable representation of p. When brief is true,
+// only Path is returned; otherwise Name, Scope, Path, and Desc are included.
+func (p KnownPath) Print(brief bool) string {
+	if brief {
+		return p.Path
+	}
+	return fmt.Sprintf("%-14s %-8s %-40s %s", p.Name, p.Scope, p.Path, p.Desc)
 }
