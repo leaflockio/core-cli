@@ -11,10 +11,11 @@ import (
 	"github.com/leaflockio/core-cli/internal/app"
 	"github.com/leaflockio/core-cli/internal/cli"
 	"github.com/leaflockio/core-cli/internal/cli/flags"
+	"github.com/spf13/cobra"
 )
 
 // nopHandler is a minimal handler for definitions that require one.
-var nopHandler = func(_ *app.App, _ []string) error { return nil }
+var nopHandler = func(_ *app.App, _ *cobra.Command, _ []string) error { return nil }
 
 // minDef returns a minimal valid Definition for the given command name.
 func minDef(use string) *cli.Definition {
@@ -29,7 +30,7 @@ func assembledPlan(use, short, long string) *assembled {
 	return &assembled{
 		def: cli.Definition{
 			Meta:    cli.Meta{Use: use, Short: short, Long: long},
-			Handler: func(_ *app.App, _ []string) error { return nil },
+			Handler: func(_ *app.App, _ *cobra.Command, _ []string) error { return nil },
 		},
 	}
 }
@@ -56,7 +57,7 @@ type stubCommand struct{ use string }
 func (c *stubCommand) Define(_ *app.App) *cli.Definition {
 	return &cli.Definition{
 		Meta:    cli.Meta{Use: c.use},
-		Handler: func(_ *app.App, _ []string) error { return nil },
+		Handler: func(_ *app.App, _ *cobra.Command, _ []string) error { return nil },
 	}
 }
 

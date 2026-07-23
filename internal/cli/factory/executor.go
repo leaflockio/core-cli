@@ -45,7 +45,7 @@ func (f *Factory) execute(plan *assembled, a *app.App) (*cobra.Command, error) {
 				}
 			}
 
-			return def.Handler(a, args)
+			return def.Handler(a, cobraCmd, args)
 		}
 	}
 

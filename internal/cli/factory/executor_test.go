@@ -14,6 +14,7 @@ import (
 	"github.com/leaflockio/core-cli/internal/app"
 	"github.com/leaflockio/core-cli/internal/cli"
 	"github.com/leaflockio/core-cli/internal/cli/flags"
+	"github.com/spf13/cobra"
 )
 
 var errResolve = errors.New("resolve failed")
@@ -140,7 +141,7 @@ func TestExecute_RunE_returns_resolver_error(t *testing.T) {
 func TestExecute_RunE_calls_handler(t *testing.T) {
 	var handlerCalled bool
 	plan := assembledPlan("mycmd", "", "")
-	plan.def.Handler = func(_ *app.App, _ []string) error {
+	plan.def.Handler = func(_ *app.App, _ *cobra.Command, _ []string) error {
 		handlerCalled = true
 		return nil
 	}
@@ -154,6 +155,26 @@ func TestExecute_RunE_calls_handler(t *testing.T) {
 	}
 	if !handlerCalled {
 		t.Error("handler must be called during RunE")
+	}
+}
+
+func TestExecute_RunE_passes_the_running_command_to_handler(t *testing.T) {
+	var gotCmd *cobra.Command
+	plan := assembledPlan("mycmd", "", "")
+	plan.def.Handler = func(_ *app.App, cmd *cobra.Command, _ []string) error {
+		gotCmd = cmd
+		return nil
+	}
+
+	cmd, err := (&Factory{}).execute(plan, nil)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if err := cmd.RunE(cmd, nil); err != nil {
+		t.Fatalf("RunE failed: %v", err)
+	}
+	if gotCmd != cmd {
+		t.Error("handler must receive the same *cobra.Command that RunE was invoked with")
 	}
 }
 

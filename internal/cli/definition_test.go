@@ -13,6 +13,8 @@ import (
 	"github.com/leaflockio/core-cli/internal/app"
 	"github.com/leaflockio/core-cli/internal/cli"
 	"github.com/leaflockio/core-cli/internal/cli/flags"
+	"github.com/leaflockio/core-cli/internal/paths"
+	"github.com/spf13/cobra"
 )
 
 func TestNewDefinition_defaults(t *testing.T) {
@@ -22,6 +24,9 @@ func TestNewDefinition_defaults(t *testing.T) {
 	}
 	if d.Meta.Use != "foo" {
 		t.Errorf("Meta.Use = %q, want %q", d.Meta.Use, "foo")
+	}
+	if d.PathRegistry != nil {
+		t.Error("PathRegistry should be nil by default")
 	}
 }
 
@@ -43,15 +48,19 @@ func TestDefinition_WithFlags(t *testing.T) {
 	}
 }
 
-func TestDefinition_WithSupportsConfig(t *testing.T) {
-	d := cli.NewDefinition(cli.NewMeta("foo", "short", "")).WithSupportsConfig(true)
-	if !d.SupportsConfig {
-		t.Error("SupportsConfig should be true after WithSupportsConfig(true)")
+func TestDefinition_WithPathRegistry(t *testing.T) {
+	r := paths.NewRegistry()
+	if err := r.Add(paths.KnownPath{Name: "manifest"}); err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	d := cli.NewDefinition(cli.NewMeta("foo", "short", "")).WithPathRegistry(r)
+	if d.PathRegistry != r {
+		t.Error("PathRegistry not set correctly")
 	}
 }
 
 func TestDefinition_WithHandler(t *testing.T) {
-	handler := func(a *app.App, args []string) error { return nil }
+	handler := func(a *app.App, cmd *cobra.Command, args []string) error { return nil }
 	d := cli.NewDefinition(cli.NewMeta("foo", "short", "")).WithHandler(handler)
 	if d.Handler == nil {
 		t.Error("Handler should not be nil after WithHandler")

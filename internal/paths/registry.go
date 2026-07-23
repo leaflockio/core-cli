@@ -46,3 +46,9 @@ func (r *Registry) Add(paths ...KnownPath) error {
 func (r *Registry) All() []KnownPath {
 	return r.paths
 }
+
+// IsEmpty reports whether r has no paths registered. A nil Registry is
+// considered empty.
+func (r *Registry) IsEmpty() bool {
+	return r == nil || len(r.paths) == 0
+}

@@ -16,6 +16,7 @@ import (
 	"github.com/leaflockio/core-cli/internal/cli/factory"
 	"github.com/leaflockio/core-cli/internal/terminal"
 	"github.com/leaflockio/core-cli/internal/ui"
+	"github.com/spf13/cobra"
 )
 
 func TestFactory_Build_returns_error_for_nil_command(t *testing.T) {
@@ -162,7 +163,7 @@ type stubCmd struct{ use string }
 func (c *stubCmd) Define(_ *app.App) *cli.Definition {
 	return &cli.Definition{
 		Meta:    cli.Meta{Use: c.use},
-		Handler: func(_ *app.App, _ []string) error { return nil },
+		Handler: func(_ *app.App, _ *cobra.Command, _ []string) error { return nil },
 	}
 }
 
@@ -174,7 +175,7 @@ type parentStubCmd struct {
 func (c *parentStubCmd) Define(_ *app.App) *cli.Definition {
 	return &cli.Definition{
 		Meta:     cli.Meta{Use: c.use},
-		Handler:  func(_ *app.App, _ []string) error { return nil },
+		Handler:  func(_ *app.App, _ *cobra.Command, _ []string) error { return nil },
 		Children: c.children,
 	}
 }

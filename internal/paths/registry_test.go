@@ -108,3 +108,27 @@ func TestRegistry_Add_duplicateWithinSameCall(t *testing.T) {
 		t.Errorf("All() length = %d, want 1", got)
 	}
 }
+
+func TestRegistry_IsEmpty_new(t *testing.T) {
+	r := paths.NewRegistry()
+	if !r.IsEmpty() {
+		t.Error("IsEmpty() should be true for a freshly constructed Registry")
+	}
+}
+
+func TestRegistry_IsEmpty_afterAdd(t *testing.T) {
+	r := paths.NewRegistry()
+	if err := r.Add(paths.KnownPath{Name: "manifest"}); err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if r.IsEmpty() {
+		t.Error("IsEmpty() should be false after Add")
+	}
+}
+
+func TestRegistry_IsEmpty_nilReceiver(t *testing.T) {
+	var r *paths.Registry
+	if !r.IsEmpty() {
+		t.Error("IsEmpty() should be true for a nil Registry")
+	}
+}
