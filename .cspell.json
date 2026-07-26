@@ -111,6 +111,7 @@
     "chmod",
 
     "pathutil",
+    "fsutil",
 
     "debugf",
     "mapstructure",
