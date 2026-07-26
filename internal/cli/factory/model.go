@@ -18,6 +18,9 @@ import (
 type assembled struct {
 	def cli.Definition
 
+	// level is this command's position in the tree.
+	level level
+
 	// hasFlags is true when the command declared flags in its Definition.
 	hasFlags bool
 

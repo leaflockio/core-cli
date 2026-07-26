@@ -41,12 +41,13 @@
 // command is invoked with no matching subcommand — whatever that HelpFunc
 // does.
 //
-// # isAppRoot marks the command passed to Build
+// # level marks each command's position in the tree
 //
-// isAppRoot is true only for the command passed directly to [Factory.Build]
-// — never for a command reached through [cli.Definition.Children], no matter
-// how many children of its own it declares. It exempts that one command from
-// the Handler-or-Children guard above.
+// level is levelRoot only for the command passed directly to [Factory.Build],
+// levelTop for its direct children, and levelNested for everything below
+// that, no matter how deep. There is exactly one levelRoot command per tree —
+// the one given to Build — but any number of levelTop commands. levelRoot
+// exempts that one command from the Handler-or-Children guard above.
 //
 // # System flag effects fire at parse time, not in RunE
 //

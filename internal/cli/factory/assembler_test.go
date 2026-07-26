@@ -21,7 +21,7 @@ import (
 
 func TestAssemble_returns_error_when_handler_nil_and_no_children(t *testing.T) {
 	def := cli.Definition{Meta: cli.Meta{Use: "test"}}
-	_, err := assemble(&def, false)
+	_, err := assemble(&def, levelTop)
 	if err == nil {
 		t.Fatal("expected error for nil Handler with no children, got nil")
 	}
@@ -30,11 +30,11 @@ func TestAssemble_returns_error_when_handler_nil_and_no_children(t *testing.T) {
 	}
 }
 
-func TestAssemble_allows_nil_handler_and_no_children_when_isAppRoot(t *testing.T) {
+func TestAssemble_allows_nil_handler_and_no_children_when_levelRoot(t *testing.T) {
 	def := cli.Definition{Meta: cli.Meta{Use: "test"}}
-	_, err := assemble(&def, true)
+	_, err := assemble(&def, levelRoot)
 	if err != nil {
-		t.Fatalf("unexpected error for isAppRoot=true with nil Handler and no children: %v", err)
+		t.Fatalf("unexpected error for levelRoot with nil Handler and no children: %v", err)
 	}
 }
 
@@ -43,7 +43,7 @@ func TestAssemble_allows_nil_handler_when_children_declared(t *testing.T) {
 		Meta:     cli.Meta{Use: "parent"},
 		Children: []cli.Command{&stubCommand{use: "child"}},
 	}
-	_, err := assemble(def, false)
+	_, err := assemble(def, levelTop)
 	if err != nil {
 		t.Fatalf("unexpected error for nil Handler with children declared: %v", err)
 	}
@@ -58,7 +58,7 @@ func TestAssemble_returns_error_when_implicit_flag_in_definition(t *testing.T) {
 			Effect: func(_ *app.App) {},
 		},
 	}
-	_, err := assemble(def, false)
+	_, err := assemble(def, levelTop)
 	if err == nil {
 		t.Fatal("expected error for implicit flag in Definition.Flags, got nil")
 	}
@@ -68,7 +68,7 @@ func TestAssemble_returns_error_when_implicit_flag_in_definition(t *testing.T) {
 }
 
 func TestAssemble_hasFlags_false_when_no_flags_declared(t *testing.T) {
-	plan, err := assemble(minDef("test"), false)
+	plan, err := assemble(minDef("test"), levelTop)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -82,7 +82,7 @@ func TestAssemble_hasFlags_true_when_flags_declared(t *testing.T) {
 	def.Flags = []flags.Flag{
 		flags.CommandFlag[*flags.BoolValue]{Value: flags.Bool("verbose", "")},
 	}
-	plan, err := assemble(def, false)
+	plan, err := assemble(def, levelTop)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -91,8 +91,20 @@ func TestAssemble_hasFlags_true_when_flags_declared(t *testing.T) {
 	}
 }
 
+func TestAssemble_stores_given_level_on_plan(t *testing.T) {
+	for _, lvl := range []level{levelRoot, levelTop, levelNested} {
+		plan, err := assemble(minDef("test"), lvl)
+		if err != nil {
+			t.Fatalf("unexpected error for %v: %v", lvl, err)
+		}
+		if plan.level != lvl {
+			t.Errorf("level = %v, want %v", plan.level, lvl)
+		}
+	}
+}
+
 func TestAssemble_hasChildren_false_when_no_children(t *testing.T) {
-	plan, err := assemble(minDef("test"), false)
+	plan, err := assemble(minDef("test"), levelTop)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -104,7 +116,7 @@ func TestAssemble_hasChildren_false_when_no_children(t *testing.T) {
 func TestAssemble_hasChildren_true_when_children_declared(t *testing.T) {
 	def := minDef("parent")
 	def.Children = []cli.Command{&stubCommand{use: "child"}}
-	plan, err := assemble(def, false)
+	plan, err := assemble(def, levelTop)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -114,7 +126,7 @@ func TestAssemble_hasChildren_true_when_children_declared(t *testing.T) {
 }
 
 func TestAssemble_implicit_flags_go_to_persistent_flags(t *testing.T) {
-	plan, err := assemble(minDef("test"), false)
+	plan, err := assemble(minDef("test"), levelTop)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -133,7 +145,7 @@ func TestAssemble_returns_error_when_duplicate_flags(t *testing.T) {
 		flags.CommandFlag[*flags.BoolValue]{Value: flags.Bool("dup", "")},
 		flags.CommandFlag[*flags.StringValue]{Value: flags.String("dup", "")},
 	}
-	_, err := assemble(def, false)
+	_, err := assemble(def, levelTop)
 	if err == nil {
 		t.Fatal("expected error for duplicate flag names, got nil")
 	}
@@ -142,7 +154,7 @@ func TestAssemble_returns_error_when_duplicate_flags(t *testing.T) {
 func TestAssemble_returns_error_when_flag_type_unrecognized(t *testing.T) {
 	def := minDef("test")
 	def.Flags = []flags.Flag{unknownFlag{}}
-	_, err := assemble(def, false)
+	_, err := assemble(def, levelTop)
 	if err == nil {
 		t.Fatal("expected error for unrecognized flag type, got nil")
 	}
@@ -153,7 +165,7 @@ func TestAssemble_returns_error_when_implicit_flag_planning_fails(t *testing.T) 
 	implicitSystemFlags = []flags.Flag{unknownFlag{}}
 	defer func() { implicitSystemFlags = original }()
 
-	_, err := assemble(minDef("test"), false)
+	_, err := assemble(minDef("test"), levelTop)
 	if err == nil {
 		t.Fatal("expected error when implicit flag planning fails, got nil")
 	}
@@ -301,6 +313,12 @@ func TestPlanFlag_routes_string_literal_flag(t *testing.T) {
 	if p.kind != flags.KindCommand {
 		t.Errorf("kind = %q, want KindCommand", p.kind)
 	}
+
+	fs := pflag.NewFlagSet("test", pflag.ContinueOnError)
+	p.register(fs, nil)
+	if fs.Lookup("output") == nil {
+		t.Error("register must register the \"output\" flag on the FlagSet")
+	}
 }
 
 func TestPlanFlag_routes_string_slice_literal_flag(t *testing.T) {
@@ -311,6 +329,12 @@ func TestPlanFlag_routes_string_slice_literal_flag(t *testing.T) {
 	}
 	if p.kind != flags.KindCommand {
 		t.Errorf("kind = %q, want KindCommand", p.kind)
+	}
+
+	fs := pflag.NewFlagSet("test", pflag.ContinueOnError)
+	p.register(fs, nil)
+	if fs.Lookup("tags") == nil {
+		t.Error("register must register the \"tags\" flag on the FlagSet")
 	}
 }
 

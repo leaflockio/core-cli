@@ -226,6 +226,19 @@ func TestExecute_returns_error_when_child_build_fails(t *testing.T) {
 	}
 }
 
+func TestExecute_non_root_plan_children_are_levelNested(t *testing.T) {
+	plan := assembledPlan("license", "", "")
+	plan.level = levelTop
+	plan.def.Children = []cli.Command{&nilHandlerCommand{}}
+	plan.hasChildren = true
+
+	_, err := (&Factory{}).execute(plan, nil)
+	if err == nil {
+		t.Fatal("expected error: a non-root plan's child is levelNested, never exempt " +
+			"from the Handler-or-Children guard")
+	}
+}
+
 func TestExecute_does_not_register_persistentFlags_on_flagset(t *testing.T) {
 	f := flags.SystemFlag[*flags.BoolValue]{
 		Sub:    flags.SubImplicit,

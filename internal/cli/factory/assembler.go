@@ -26,8 +26,8 @@ var (
 )
 
 // assemble validates def and produces an assembled plan.
-func assemble(def *cli.Definition, isAppRoot bool) (*assembled, error) {
-	if !isAppRoot && def.Handler == nil && len(def.Children) == 0 {
+func assemble(def *cli.Definition, lvl level) (*assembled, error) {
+	if lvl != levelRoot && def.Handler == nil && len(def.Children) == 0 {
 		return nil, fmt.Errorf("factory[assemble]: command %q: %w", def.Meta.Use, errHandlerNil)
 	}
 
@@ -62,6 +62,7 @@ func assemble(def *cli.Definition, isAppRoot bool) (*assembled, error) {
 
 	return &assembled{
 		def:             *def,
+		level:           lvl,
 		hasFlags:        len(def.Flags) > 0,
 		hasChildren:     len(def.Children) > 0,
 		flags:           definedFlagPlans,

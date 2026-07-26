@@ -126,10 +126,13 @@
     "helpcmd",
     "licensecmd",
     "versioncmd",
+    "mycmd",
     "strutil",
 
     "capitalising",
 
-    "hujson"
+    "hujson",
+
+    "effectvalue"
   ]
 }
