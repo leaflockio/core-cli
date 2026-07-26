@@ -127,6 +127,8 @@
     "versioncmd",
     "strutil",
 
-    "capitalising"
+    "capitalising",
+
+    "hujson"
   ]
 }

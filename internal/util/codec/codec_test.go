@@ -144,6 +144,60 @@ func TestUnmarshal_YAML(t *testing.T) {
 	}
 }
 
+// TestUnmarshal_JSONC decodes JSON with line and block comments plus a
+// trailing comma, none of which are valid in plain JSON.
+func TestUnmarshal_JSONC(t *testing.T) {
+	data := []byte(`{
+  // line comment
+  "name": "leaf",
+  /* block comment */
+  "count": 5,
+  "active": true, // trailing comma below
+}`)
+	var got fixture
+	if err := codec.Unmarshal(data, codec.JSONC, &got); err != nil {
+		t.Fatalf("Unmarshal JSONC: %v", err)
+	}
+	if got.Name != "leaf" {
+		t.Errorf("Name = %q, want %q", got.Name, "leaf")
+	}
+	if got.Count != 5 {
+		t.Errorf("Count = %d, want %d", got.Count, 5)
+	}
+	if !got.Active {
+		t.Error("Active = false, want true")
+	}
+}
+
+// TestUnmarshal_JSONC_invalid verifies an error is returned for content that
+// is invalid even once comments/trailing commas are stripped.
+func TestUnmarshal_JSONC_invalid(t *testing.T) {
+	err := codec.Unmarshal([]byte(`{"name": }`), codec.JSONC, &fixture{})
+	if err == nil {
+		t.Fatal("expected error for invalid JSONC, got nil")
+	}
+}
+
+// TestMarshal_JSONC verifies Marshal produces plain JSON output for JSONC —
+// valid JSON is always valid JSONC, so no special encoding is needed.
+func TestMarshal_JSONC(t *testing.T) {
+	data, err := codec.Marshal(fixture{Name: "leaf"}, codec.JSONC)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if !strings.Contains(string(data), `"name":"leaf"`) {
+		t.Errorf("missing name field in output: %s", data)
+	}
+
+	var got fixture
+	if err := codec.Unmarshal(data, codec.JSONC, &got); err != nil {
+		t.Fatalf("round-trip Unmarshal: %v", err)
+	}
+	if got.Name != "leaf" {
+		t.Errorf("Name = %q, want %q", got.Name, "leaf")
+	}
+}
+
 // TestUnmarshal_unsupported_format verifies an error is returned for unknown formats.
 func TestUnmarshal_unsupported_format(t *testing.T) {
 	err := codec.Unmarshal([]byte(`{}`), codec.Format("toml"), &fixture{})
