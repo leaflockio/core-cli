@@ -225,6 +225,70 @@ func TestUnmarshal_YAML_invalid(t *testing.T) {
 	}
 }
 
+// TestDecodeBytes_JSON decodes JSON directly into a map, without a struct.
+func TestDecodeBytes_JSON(t *testing.T) {
+	m, err := codec.DecodeBytes([]byte(`{"name": "leaf", "count": 5}`), codec.JSON)
+	if err != nil {
+		t.Fatalf("DecodeBytes: %v", err)
+	}
+	if m["name"] != "leaf" {
+		t.Errorf("m[%q] = %v, want %q", "name", m["name"], "leaf")
+	}
+}
+
+// TestDecodeBytes_invalid verifies an error is returned for malformed input.
+func TestDecodeBytes_invalid(t *testing.T) {
+	_, err := codec.DecodeBytes([]byte(`not json`), codec.JSON)
+	if err == nil {
+		t.Fatal("expected error, got nil")
+	}
+}
+
+// TestDecodeBytes_unsupported_format verifies an error is returned for unknown formats.
+func TestDecodeBytes_unsupported_format(t *testing.T) {
+	_, err := codec.DecodeBytes([]byte(`{}`), codec.Format("toml"))
+	if !errors.Is(err, codec.ErrUnsupportedFormat) {
+		t.Errorf("expected ErrUnsupportedFormat, got: %v", err)
+	}
+}
+
+// TestDecodeMap populates a struct from an already-decoded map, matching
+// mapstructure tags.
+func TestDecodeMap(t *testing.T) {
+	m := map[string]any{"name": "leaf", "count": 5}
+	var got fixture
+	if err := codec.DecodeMap(m, &got); err != nil {
+		t.Fatalf("DecodeMap: %v", err)
+	}
+	if got.Name != "leaf" || got.Count != 5 {
+		t.Errorf("got %+v, want {Name:leaf Count:5}", got)
+	}
+}
+
+// TestUnmarshal_isDecodeBytesThenDecodeMap verifies Unmarshal produces the
+// same result as calling DecodeBytes then DecodeMap directly.
+func TestUnmarshal_isDecodeBytesThenDecodeMap(t *testing.T) {
+	data := []byte(`{"name": "leaf", "count": 5}`)
+
+	var viaUnmarshal fixture
+	if err := codec.Unmarshal(data, codec.JSON, &viaUnmarshal); err != nil {
+		t.Fatalf("Unmarshal: %v", err)
+	}
+
+	m, err := codec.DecodeBytes(data, codec.JSON)
+	if err != nil {
+		t.Fatalf("DecodeBytes: %v", err)
+	}
+	var viaSteps fixture
+	if err := codec.DecodeMap(m, &viaSteps); err != nil {
+		t.Fatalf("DecodeMap: %v", err)
+	}
+
+	if viaUnmarshal != viaSteps {
+		t.Errorf("Unmarshal = %+v, DecodeBytes+DecodeMap = %+v", viaUnmarshal, viaSteps)
+	}
+}
+
 // TestTimeField_JSON verifies time.Time fields round-trip correctly in JSON.
 func TestTimeField_JSON(t *testing.T) {
 	original := fixture{CreatedAt: fixedTime}
