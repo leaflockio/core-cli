@@ -14,6 +14,8 @@ package invocation
 import (
 	"os"
 	"strings"
+
+	"github.com/leaflockio/core-cli/internal/level"
 )
 
 const (
@@ -133,6 +135,47 @@ func (inv *Invocation) FlatFlags() []string {
 		if f.Value != "" {
 			out = append(out, f.Value)
 		}
+	}
+	return out
+}
+
+// CommandAt returns the positional token(s) in Raw at lvl. Flag tokens, and
+// any value they consume, are excluded regardless of where they appear.
+//
+//	LevelRoot   → ""    (Raw excludes the binary name)
+//	LevelTop    → the first positional token
+//	LevelNested → every remaining positional token, joined with a space
+func (inv *Invocation) CommandAt(lvl level.Level) string {
+	positional := inv.positionalTokens()
+	switch lvl {
+	case level.LevelRoot:
+		return ""
+	case level.LevelTop:
+		if len(positional) > 0 {
+			return positional[0]
+		}
+	case level.LevelNested:
+		if len(positional) > 1 {
+			return strings.Join(positional[1:], " ")
+		}
+	}
+	return ""
+}
+
+// positionalTokens returns every non-flag token in Raw, in order, skipping
+// each flag token and however many further tokens it consumes as a value.
+func (inv *Invocation) positionalTokens() []string {
+	var out []string
+	i := 0
+	for i < len(inv.Raw) {
+		tok := inv.Raw[i]
+		if !isFlag(tok) {
+			out = append(out, tok)
+			i++
+			continue
+		}
+		_, _, consumed := parseFlag(tok, inv.Raw, i)
+		i += consumed
 	}
 	return out
 }

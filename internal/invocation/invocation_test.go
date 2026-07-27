@@ -11,6 +11,8 @@ import (
 	"errors"
 	"os"
 	"testing"
+
+	"github.com/leaflockio/core-cli/internal/level"
 )
 
 func TestParseFlag(t *testing.T) {
@@ -245,5 +247,32 @@ func TestFromArgs(t *testing.T) {
 
 	if inv.CWD == "" {
 		t.Error("CWD should not be empty")
+	}
+}
+
+func TestCommandAt(t *testing.T) {
+	tests := []struct {
+		name string
+		raw  []string
+		lvl  level.Level
+		want string
+	}{
+		{"root is never represented in Raw", []string{"license", "add"}, level.LevelRoot, ""},
+		{"top-level command", []string{"license", "add", "--all"}, level.LevelTop, "license"},
+		{"top-level with leading flag", []string{"--verbose=1", "license", "add"}, level.LevelTop, "license"},
+		{"nested command", []string{"license", "add", "--all"}, level.LevelNested, "add"},
+		{"nested command, multiple segments", []string{"license", "add", "sub"}, level.LevelNested, "add sub"},
+		{"nested with interleaved flag", []string{"license", "--all=true", "add"}, level.LevelNested, "add"},
+		{"top-level only, no nested token", []string{"license", "--all"}, level.LevelNested, ""},
+		{"empty Raw", []string{}, level.LevelTop, ""},
+		{"flags only, no positional token", []string{"--all", "--var", "ORG=Acme"}, level.LevelTop, ""},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			inv := &Invocation{Raw: tt.raw}
+			if got := inv.CommandAt(tt.lvl); got != tt.want {
+				t.Errorf("CommandAt(%v) = %q, want %q", tt.lvl, got, tt.want)
+			}
+		})
 	}
 }
