@@ -15,20 +15,39 @@ import (
 	"github.com/leaflockio/core-cli/internal/app"
 	"github.com/leaflockio/core-cli/internal/cli"
 	"github.com/leaflockio/core-cli/internal/cli/flags"
+	"github.com/leaflockio/core-cli/internal/errs"
+	"github.com/leaflockio/core-cli/internal/level"
 	"github.com/spf13/pflag"
 )
 
 var (
 	errHandlerNil        = errors.New("handler must not be nil unless the command declares children")
+	errConfigNotTopLevel = errors.New("config and path registry may only be declared by a top-level command")
 	errImplicitFlagInDef = errors.New("must not appear in Definition.Flags; it is added by the engine automatically")
 	errDuplicateFlags    = errors.New("duplicate flag declarations")
 	errInvalidFlagType   = errors.New("must be a CommandFlag or SystemFlag")
 )
 
 // assemble validates def and produces an assembled plan.
-func assemble(def *cli.Definition, lvl level) (*assembled, error) {
-	if lvl != levelRoot && def.Handler == nil && len(def.Children) == 0 {
-		return nil, fmt.Errorf("factory[assemble]: command %q: %w", def.Meta.Use, errHandlerNil)
+func assemble(def *cli.Definition, lvl level.Level) (*assembled, error) {
+	if lvl != level.LevelRoot && def.Handler == nil && len(def.Children) == 0 {
+		return nil, errs.Unexpected(
+			fmt.Errorf("factory[assemble]: command %q: %w", def.Meta.Use, errHandlerNil),
+			errs.Context{
+				Cause:      fmt.Sprintf("command %q declares neither a Handler nor Children", def.Meta.Use),
+				Resolution: "add a Handler, or declare at least one child command",
+			},
+		)
+	}
+
+	if lvl != level.LevelTop && (def.Config != nil || !def.PathRegistry.IsEmpty()) {
+		return nil, errs.Unexpected(
+			fmt.Errorf("factory[assemble]: command %q: %w", def.Meta.Use, errConfigNotTopLevel),
+			errs.Context{
+				Cause:      fmt.Sprintf("command %q declares Config or PathRegistry but isn't top-level", def.Meta.Use),
+				Resolution: "only a direct child of the root command may declare Config or PathRegistry",
+			},
+		)
 	}
 
 	if err := validateNoDuplicateFlags(def); err != nil {
@@ -48,9 +67,18 @@ func assemble(def *cli.Definition, lvl level) (*assembled, error) {
 	for _, f := range def.Flags {
 		d := f.Definition()
 		if d.Meta.Sub == flags.SubImplicit {
-			return nil, fmt.Errorf(
-				"factory[assemble]: command %q: implicit system flag %q: %w",
-				def.Meta.Use, d.Meta.Name, errImplicitFlagInDef,
+			return nil, errs.Unexpected(
+				fmt.Errorf(
+					"factory[assemble]: command %q: implicit system flag %q: %w",
+					def.Meta.Use, d.Meta.Name, errImplicitFlagInDef,
+				),
+				errs.Context{
+					Cause: fmt.Sprintf(
+						"command %q declared implicit system flag %q in Definition.Flags",
+						def.Meta.Use, d.Meta.Name,
+					),
+					Resolution: "remove it — implicit system flags are added automatically by the engine",
+				},
 			)
 		}
 		p, err := planFlag(f)
@@ -102,9 +130,15 @@ func validateNoDuplicateFlags(def *cli.Definition) error {
 		}
 	}
 	if len(msgs) > 0 {
-		return fmt.Errorf(
-			"factory[assemble]: command %q: %s: %w",
-			def.Meta.Use, strings.Join(msgs, "; "), errDuplicateFlags,
+		return errs.Unexpected(
+			fmt.Errorf(
+				"factory[assemble]: command %q: %s: %w",
+				def.Meta.Use, strings.Join(msgs, "; "), errDuplicateFlags,
+			),
+			errs.Context{
+				Cause:      fmt.Sprintf("command %q: %s", def.Meta.Use, strings.Join(msgs, "; ")),
+				Resolution: "rename or remove the duplicate flag declarations",
+			},
 		)
 	}
 	return nil
@@ -136,7 +170,13 @@ func planFlag(f flags.Flag) (assembledFlag, error) {
 		return planStringSliceLiteralFlag(v)
 	}
 	meta := f.Definition().Meta
-	return assembledFlag{}, fmt.Errorf("flag %q: unrecognized type %T: %w", meta.Name, f, errInvalidFlagType)
+	return assembledFlag{}, errs.Unexpected(
+		fmt.Errorf("flag %q: unrecognized type %T: %w", meta.Name, f, errInvalidFlagType),
+		errs.Context{
+			Cause:      fmt.Sprintf("flag %q has type %T, which is not a CommandFlag or SystemFlag", meta.Name, f),
+			Resolution: "declare the flag using flags.CommandFlag or flags.SystemFlag",
+		},
+	)
 }
 
 // — System flags —
