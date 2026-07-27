@@ -15,21 +15,9 @@ import (
 
 	"github.com/leaflockio/core-cli/internal/config"
 	"github.com/leaflockio/core-cli/internal/errs"
+	"github.com/leaflockio/core-cli/internal/level"
 	"github.com/leaflockio/core-cli/internal/util/fsutil"
 	"github.com/spf13/cobra"
-)
-
-// Depth controls how much of the command path is reflected in the workspace
-// directory hierarchy.
-type Depth int
-
-const (
-	// DepthRoot roots the CommandSpace at the app root with no command segment.
-	DepthRoot Depth = iota
-	// DepthCommand roots the CommandSpace at the top-level command (e.g. pr/).
-	DepthCommand
-	// DepthFull roots the CommandSpace at the full command path (e.g. pr/create/).
-	DepthFull
 )
 
 // Workspace manages filesystem paths for the CLI across user, repo, and
@@ -84,21 +72,21 @@ func New(homeDir, repoRoot string) (*Workspace, error) {
 }
 
 // ForUser returns a CommandSpace rooted at the user-scoped directory for cmd
-// at the given depth. Directories are created with 0o700 — private to the
+// at the given level. Directories are created with 0o700 — private to the
 // owner, never readable by other users on the machine.
-func (w *Workspace) ForUser(cmd *cobra.Command, depth Depth) *CommandSpace {
+func (w *Workspace) ForUser(cmd *cobra.Command, lvl level.Level) *CommandSpace {
 	return &CommandSpace{
-		base: filepath.Join(w.userRoot, commandSubPath(cmd, depth)),
+		base: filepath.Join(w.userRoot, commandSubPath(cmd, lvl)),
 		perm: 0o700,
 	}
 }
 
 // ForRepo returns a CommandSpace rooted at the repo-scoped directory for cmd
-// at the given depth. Directories are created with 0o755 — readable by CI
+// at the given level. Directories are created with 0o755 — readable by CI
 // and other processes that access the repository.
-func (w *Workspace) ForRepo(cmd *cobra.Command, depth Depth) *CommandSpace {
+func (w *Workspace) ForRepo(cmd *cobra.Command, lvl level.Level) *CommandSpace {
 	return &CommandSpace{
-		base: filepath.Join(w.repoRoot, commandSubPath(cmd, depth)),
+		base: filepath.Join(w.repoRoot, commandSubPath(cmd, lvl)),
 		perm: 0o755,
 	}
 }
@@ -114,12 +102,12 @@ func (w *Workspace) ForProjectRoot() *CommandSpace {
 }
 
 // ForGenerated returns a CommandSpace rooted at the repo-scoped generated
-// output directory for cmd at the given depth. Generated files are files
+// output directory for cmd at the given level. Generated files are files
 // this tool fully owns and writes — lock files, derived artifacts. Directories
 // are created with 0o755, matching ForRepo.
-func (w *Workspace) ForGenerated(cmd *cobra.Command, depth Depth) *CommandSpace {
+func (w *Workspace) ForGenerated(cmd *cobra.Command, lvl level.Level) *CommandSpace {
 	return &CommandSpace{
-		base: filepath.Join(w.repoRoot, config.GeneratedDir, commandSubPath(cmd, depth)),
+		base: filepath.Join(w.repoRoot, config.GeneratedDir, commandSubPath(cmd, lvl)),
 		perm: 0o755,
 	}
 }
@@ -142,7 +130,7 @@ func (w *Workspace) ForCache(cmd *cobra.Command, purpose string) *CommandSpace {
 		)}
 	}
 	return &CommandSpace{
-		base: filepath.Join(w.cacheRoot, commandSubPath(cmd, DepthCommand), purpose),
+		base: filepath.Join(w.cacheRoot, commandSubPath(cmd, level.LevelTop), purpose),
 		perm: 0o755,
 	}
 }
@@ -180,13 +168,13 @@ func (cs *CommandSpace) Peek(name string) (string, error) {
 	return filepath.Join(cs.base, name), nil
 }
 
-// commandSubPath extracts the path segment from cmd's command path based on depth.
+// commandSubPath extracts the path segment from cmd's command path for lvl.
 //
-//	DepthRoot    → ""              (e.g. gh → <root>/)
-//	DepthCommand → "pr"            (e.g. gh pr create → <root>/pr/)
-//	DepthFull    → "pr/create"     (e.g. gh pr create → <root>/pr/create/)
-func commandSubPath(cmd *cobra.Command, depth Depth) string {
-	if depth == DepthRoot {
+//	LevelRoot   → ""               (e.g. tool → <root>/)
+//	LevelTop    → "group"          (e.g. tool group action → <root>/group/)
+//	LevelNested → "group/action"   (e.g. tool group action → <root>/group/action/)
+func commandSubPath(cmd *cobra.Command, lvl level.Level) string {
+	if lvl == level.LevelRoot {
 		return ""
 	}
 	parts := strings.Fields(cmd.CommandPath())
@@ -194,7 +182,7 @@ func commandSubPath(cmd *cobra.Command, depth Depth) string {
 		return ""
 	}
 	sub := parts[1:] // drop binary name
-	if depth == DepthCommand {
+	if lvl == level.LevelTop {
 		return sub[0]
 	}
 	return filepath.Join(sub...)

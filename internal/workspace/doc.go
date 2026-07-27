@@ -58,12 +58,12 @@
 // not create the file itself. This resolves to
 // ~/<EntityFolder>/<AppName>/license/config.yaml:
 //
-//	path, err := a.Workspace.ForUser(cmd, workspace.DepthCommand).File("config.yaml")
+//	path, err := a.Workspace.ForUser(cmd, level.LevelTop).File("config.yaml")
 //
 // ForGenerated is for output the tool writes and commits to the repo. This
 // resolves to <repo-root>/<AppName>/generated/license/license.lock:
 //
-//	path, err := a.Workspace.ForGenerated(cmd, workspace.DepthCommand).File("license.lock")
+//	path, err := a.Workspace.ForGenerated(cmd, level.LevelTop).File("license.lock")
 //
 // ForCache is for disposable data the OS may reclaim at any time. The
 // purpose argument ("templates") separates this cache from any other cache
@@ -74,11 +74,15 @@
 //
 // # Scopes
 //
-//	a.Workspace.ForUser(cmd, depth)   — reads/writes to the user's machine only
-//	a.Workspace.ForRepo(cmd, depth)   — reads/writes to the repository (may be committed)
+//	a.Workspace.ForUser(cmd, lvl)     — reads/writes to the user's machine only
+//	a.Workspace.ForRepo(cmd, lvl)     — reads/writes to the repository (may be committed)
 //	a.Workspace.ForProjectRoot()      — the bare repo-scoped root, no command segment
-//	a.Workspace.ForGenerated(cmd, depth) — repo-scoped output the tool fully owns
+//	a.Workspace.ForGenerated(cmd, lvl)   — repo-scoped output the tool fully owns
 //	a.Workspace.ForCache(cmd, purpose)   — disposable, per-command, per-purpose cache data
+//
+// lvl selects how much of cmd's own path to encode — level.LevelRoot for
+// none, level.LevelTop for just the top-level segment, level.LevelNested
+// for the full remaining path — independent of cmd's own actual level.
 //
 // # Error codes
 //

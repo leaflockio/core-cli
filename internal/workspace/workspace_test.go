@@ -16,6 +16,7 @@ import (
 
 	"github.com/leaflockio/core-cli/internal/config"
 	"github.com/leaflockio/core-cli/internal/errs"
+	"github.com/leaflockio/core-cli/internal/level"
 	"github.com/spf13/cobra"
 )
 
@@ -110,7 +111,7 @@ func TestForUser_depthRoot(t *testing.T) {
 	home := t.TempDir()
 	ws, _ := New(home, t.TempDir())
 
-	cs := ws.ForUser(newCmd(), DepthRoot)
+	cs := ws.ForUser(newCmd(), level.LevelRoot)
 
 	dir, err := cs.Dir("cache")
 	if err != nil {
@@ -127,7 +128,7 @@ func TestForUser_depthCommand(t *testing.T) {
 	home := t.TempDir()
 	ws, _ := New(home, t.TempDir())
 
-	cs := ws.ForUser(newCmd("pr", "create"), DepthCommand)
+	cs := ws.ForUser(newCmd("pr", "create"), level.LevelTop)
 
 	dir, err := cs.Dir("cache")
 	if err != nil {
@@ -142,7 +143,7 @@ func TestForUser_depthFull(t *testing.T) {
 	home := t.TempDir()
 	ws, _ := New(home, t.TempDir())
 
-	cs := ws.ForUser(newCmd("pr", "create"), DepthFull)
+	cs := ws.ForUser(newCmd("pr", "create"), level.LevelNested)
 
 	dir, err := cs.Dir("cache")
 	if err != nil {
@@ -153,12 +154,12 @@ func TestForUser_depthFull(t *testing.T) {
 	}
 }
 
-func TestForUser_rootCmdWithDepthCommand(t *testing.T) {
+func TestForUser_rootCmdWithLevelTop(t *testing.T) {
 	home := t.TempDir()
 	ws, _ := New(home, t.TempDir())
 
 	// root command has no sub-path — commandSubPath returns ""
-	cs := ws.ForUser(newCmd(), DepthCommand)
+	cs := ws.ForUser(newCmd(), level.LevelTop)
 
 	dir, err := cs.Dir("cache")
 	if err != nil {
@@ -170,11 +171,11 @@ func TestForUser_rootCmdWithDepthCommand(t *testing.T) {
 	}
 }
 
-func TestForUser_rootCmdWithDepthFull(t *testing.T) {
+func TestForUser_rootCmdWithLevelNested(t *testing.T) {
 	home := t.TempDir()
 	ws, _ := New(home, t.TempDir())
 
-	cs := ws.ForUser(newCmd(), DepthFull)
+	cs := ws.ForUser(newCmd(), level.LevelNested)
 
 	dir, err := cs.Dir("cache")
 	if err != nil {
@@ -192,7 +193,7 @@ func TestForRepo_depthRoot(t *testing.T) {
 	repo := t.TempDir()
 	ws, _ := New(t.TempDir(), repo)
 
-	cs := ws.ForRepo(newCmd(), DepthRoot)
+	cs := ws.ForRepo(newCmd(), level.LevelRoot)
 
 	dir, err := cs.Dir("out")
 	if err != nil {
@@ -209,7 +210,7 @@ func TestForRepo_depthCommand(t *testing.T) {
 	repo := t.TempDir()
 	ws, _ := New(t.TempDir(), repo)
 
-	cs := ws.ForRepo(newCmd("pr", "create"), DepthCommand)
+	cs := ws.ForRepo(newCmd("pr", "create"), level.LevelTop)
 
 	dir, err := cs.Dir("out")
 	if err != nil {
@@ -224,7 +225,7 @@ func TestForRepo_depthFull(t *testing.T) {
 	repo := t.TempDir()
 	ws, _ := New(t.TempDir(), repo)
 
-	cs := ws.ForRepo(newCmd("pr", "create"), DepthFull)
+	cs := ws.ForRepo(newCmd("pr", "create"), level.LevelNested)
 
 	dir, err := cs.Dir("out")
 	if err != nil {
@@ -260,7 +261,7 @@ func TestForGenerated_depthCommand(t *testing.T) {
 	repo := t.TempDir()
 	ws, _ := New(t.TempDir(), repo)
 
-	cs := ws.ForGenerated(newCmd("license"), DepthCommand)
+	cs := ws.ForGenerated(newCmd("license"), level.LevelTop)
 
 	file, err := cs.File("license.lock")
 	if err != nil {
@@ -276,7 +277,7 @@ func TestForGenerated_depthRoot(t *testing.T) {
 	repo := t.TempDir()
 	ws, _ := New(t.TempDir(), repo)
 
-	cs := ws.ForGenerated(newCmd("license"), DepthRoot)
+	cs := ws.ForGenerated(newCmd("license"), level.LevelRoot)
 
 	file, err := cs.File("out.txt")
 	if err != nil {
@@ -360,7 +361,7 @@ func TestForCache_disabledWhenUnresolvable(t *testing.T) {
 
 func TestCommandSpace_Dir_creates(t *testing.T) {
 	ws, _ := New(t.TempDir(), t.TempDir())
-	cs := ws.ForUser(newCmd("pr"), DepthCommand)
+	cs := ws.ForUser(newCmd("pr"), level.LevelTop)
 
 	dir, err := cs.Dir("templates")
 	if err != nil {
@@ -388,7 +389,7 @@ func TestCommandSpace_Dir_error(t *testing.T) {
 		t.Fatalf("write: %v", err)
 	}
 
-	cs := ws.ForUser(newCmd("pr"), DepthCommand)
+	cs := ws.ForUser(newCmd("pr"), level.LevelTop)
 	_, err := cs.Dir("templates")
 	if err == nil {
 		t.Fatal("expected error, got nil")
@@ -399,7 +400,7 @@ func TestCommandSpace_Dir_error(t *testing.T) {
 
 func TestCommandSpace_File_createsParent(t *testing.T) {
 	ws, _ := New(t.TempDir(), t.TempDir())
-	cs := ws.ForRepo(newCmd("pr"), DepthCommand)
+	cs := ws.ForRepo(newCmd("pr"), level.LevelTop)
 
 	path, err := cs.File("pr.lock")
 	if err != nil {
@@ -428,7 +429,7 @@ func TestCommandSpace_File_error(t *testing.T) {
 		t.Fatalf("write: %v", err)
 	}
 
-	cs := ws.ForUser(newCmd("pr"), DepthCommand)
+	cs := ws.ForUser(newCmd("pr"), level.LevelTop)
 	_, err := cs.File("pr.lock")
 	if err == nil {
 		t.Fatal("expected error, got nil")
