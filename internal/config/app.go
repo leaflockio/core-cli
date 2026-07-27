@@ -28,11 +28,11 @@ const (
 	// holds tool-generated output.
 	GeneratedDir = "generated"
 
-	// ManifestFile is the flat project-config filename.
-	ManifestFile = "manifest.yaml"
+	// ManifestFile is the combined config base name for every command — do not add an extension.
+	ManifestFile = "manifest"
 
-	// UserConfigFile is the user-level config override filename.
-	UserConfigFile = "config.yaml"
+	// UserConfigFile is the user-level config override base name — do not add an extension.
+	UserConfigFile = "config"
 
 	// EnvPrefix is the prefix for all LEAF_* environment variables.
 	// Must be the uppercase form of AppName — update together.
