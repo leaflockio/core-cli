@@ -31,6 +31,23 @@ func TestScope_String(t *testing.T) {
 	}
 }
 
+func TestKind_String(t *testing.T) {
+	tests := []struct {
+		kind paths.Kind
+		want string
+	}{
+		{paths.KindConfig, "config"},
+		{paths.KindArtifact, "artifact"},
+		{paths.KindCache, "cache"},
+		{paths.Kind(99), "unknown"},
+	}
+	for _, tt := range tests {
+		if got := tt.kind.String(); got != tt.want {
+			t.Errorf("Kind(%d).String() = %q, want %q", tt.kind, got, tt.want)
+		}
+	}
+}
+
 func TestKnownPath_Print_brief(t *testing.T) {
 	p := paths.KnownPath{
 		Name:  "manifest",
@@ -50,9 +67,10 @@ func TestKnownPath_Print_full(t *testing.T) {
 		Path:  "/repo/leaf/manifest.yaml",
 		Desc:  "flat project config",
 		Scope: paths.ScopeProject,
+		Kind:  paths.KindConfig,
 	}
 	got := p.Print(false)
-	for _, want := range []string{p.Name, p.Path, p.Desc, "project"} {
+	for _, want := range []string{p.Name, p.Path, p.Desc, "project", "config"} {
 		if !strings.Contains(got, want) {
 			t.Errorf("Print(false) = %q, want it to contain %q", got, want)
 		}

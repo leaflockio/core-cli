@@ -44,6 +44,40 @@ func (s Scope) String() string {
 	}
 }
 
+// Kind identifies what a KnownPath's content is.
+type Kind int
+
+const (
+	// KindConfig paths hold user-authored configuration.
+	KindConfig Kind = iota
+	// KindArtifact paths hold tool-generated, non-disposable content.
+	KindArtifact
+	// KindCache paths hold tool-generated, disposable content.
+	KindCache
+)
+
+// Kind label constants, returned by String.
+const (
+	kindConfigLabel   = "config"
+	kindArtifactLabel = "artifact"
+	kindCacheLabel    = "cache"
+	kindUnknownLabel  = "unknown"
+)
+
+// String returns the human-readable label for k.
+func (k Kind) String() string {
+	switch k {
+	case KindConfig:
+		return kindConfigLabel
+	case KindArtifact:
+		return kindArtifactLabel
+	case KindCache:
+		return kindCacheLabel
+	default:
+		return kindUnknownLabel
+	}
+}
+
 // KnownPath describes a single path the tool resolves.
 type KnownPath struct {
 	// Name is a stable identifier for this path.
@@ -54,16 +88,16 @@ type KnownPath struct {
 	Desc string
 	// Scope is the root scope this path was resolved under.
 	Scope Scope
-	// Generated is true when the tool fully owns and writes this path, and
-	// false when the path is user-authored and only ever read.
-	Generated bool
+	// Kind identifies what this path's content is.
+	Kind Kind
 }
 
 // Print returns a human-readable representation of p. When brief is true,
-// only Path is returned; otherwise Name, Scope, Path, and Desc are included.
+// only Path is returned; otherwise Name, Scope, Kind, Path, and Desc are
+// included.
 func (p KnownPath) Print(brief bool) string {
 	if brief {
 		return p.Path
 	}
-	return fmt.Sprintf("%-14s %-8s %-40s %s", p.Name, p.Scope, p.Path, p.Desc)
+	return fmt.Sprintf("%-14s %-8s %-8s %-40s %s", p.Name, p.Scope, p.Kind, p.Path, p.Desc)
 }

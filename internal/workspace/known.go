@@ -39,19 +39,21 @@ func (w *Workspace) Known() KnownPaths {
 			Path:  filepath.Join(w.repoRoot, config.ManifestFile),
 			Desc:  "combined config for every command",
 			Scope: paths.ScopeProject,
+			Kind:  paths.KindConfig,
 		},
 		UserConfig: paths.KnownPath{
 			Name:  "user-config",
 			Path:  filepath.Join(w.userRoot, config.UserConfigFile),
 			Desc:  "user-level config override",
 			Scope: paths.ScopeUser,
+			Kind:  paths.KindConfig,
 		},
 		Credentials: paths.KnownPath{
-			Name:      "credentials",
-			Path:      w.CredentialsPath(),
-			Desc:      "stored credentials",
-			Scope:     paths.ScopeUser,
-			Generated: true,
+			Name:  "credentials",
+			Path:  w.CredentialsPath(),
+			Desc:  "stored credentials",
+			Scope: paths.ScopeUser,
+			Kind:  paths.KindArtifact,
 		},
 	}
 }

@@ -29,8 +29,8 @@ func TestKnown(t *testing.T) {
 	if known.Manifest.Scope != paths.ScopeProject {
 		t.Errorf("Manifest.Scope = %v, want ScopeProject", known.Manifest.Scope)
 	}
-	if known.Manifest.Generated {
-		t.Error("Manifest.Generated should be false")
+	if known.Manifest.Kind != paths.KindConfig {
+		t.Errorf("Manifest.Kind = %v, want KindConfig", known.Manifest.Kind)
 	}
 
 	wantUserConfig := filepath.Join(home, config.EntityFolder, config.AppName, config.UserConfigFile)
@@ -40,6 +40,9 @@ func TestKnown(t *testing.T) {
 	if known.UserConfig.Scope != paths.ScopeUser {
 		t.Errorf("UserConfig.Scope = %v, want ScopeUser", known.UserConfig.Scope)
 	}
+	if known.UserConfig.Kind != paths.KindConfig {
+		t.Errorf("UserConfig.Kind = %v, want KindConfig", known.UserConfig.Kind)
+	}
 
 	if known.Credentials.Path != ws.CredentialsPath() {
 		t.Errorf("Credentials.Path = %q, want %q", known.Credentials.Path, ws.CredentialsPath())
@@ -47,8 +50,8 @@ func TestKnown(t *testing.T) {
 	if known.Credentials.Scope != paths.ScopeUser {
 		t.Errorf("Credentials.Scope = %v, want ScopeUser", known.Credentials.Scope)
 	}
-	if !known.Credentials.Generated {
-		t.Error("Credentials.Generated should be true")
+	if known.Credentials.Kind != paths.KindArtifact {
+		t.Errorf("Credentials.Kind = %v, want KindArtifact", known.Credentials.Kind)
 	}
 }
 
