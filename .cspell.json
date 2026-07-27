@@ -133,6 +133,8 @@
 
     "hujson",
 
+    "cmdconfig",
+    "handlerless",
     "effectvalue"
   ]
 }

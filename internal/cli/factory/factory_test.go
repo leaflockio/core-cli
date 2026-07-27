@@ -16,8 +16,27 @@ import (
 	"github.com/leaflockio/core-cli/internal/cli/factory"
 	"github.com/leaflockio/core-cli/internal/terminal"
 	"github.com/leaflockio/core-cli/internal/ui"
+	"github.com/leaflockio/core-cli/internal/workspace"
 	"github.com/spf13/cobra"
 )
+
+// testWorkspace returns a Workspace rooted at a fresh temp dir, isolated
+// from the real filesystem and from other tests.
+func testWorkspace(t *testing.T) *workspace.Workspace {
+	t.Helper()
+	ws, err := workspace.New(t.TempDir(), t.TempDir())
+	if err != nil {
+		t.Fatalf("workspace.New: %v", err)
+	}
+	return ws
+}
+
+// testApp returns a minimal *app.App with a Workspace set — Build now reads
+// a.Workspace to locate the project config directory before assembling.
+func testApp(t *testing.T) *app.App {
+	t.Helper()
+	return app.NewBuilder().WithWorkspace(testWorkspace(t)).Build()
+}
 
 func TestFactory_Build_returns_error_for_nil_command(t *testing.T) {
 	_, err := factory.New().Build(nil, nil)
@@ -27,7 +46,7 @@ func TestFactory_Build_returns_error_for_nil_command(t *testing.T) {
 }
 
 func TestFactory_Build_returns_cobra_command(t *testing.T) {
-	cmd, err := factory.New().Build(&stubCmd{use: "test"}, nil)
+	cmd, err := factory.New().Build(&stubCmd{use: "test"}, testApp(t))
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -41,14 +60,14 @@ func TestFactory_Build_returns_cobra_command(t *testing.T) {
 
 func TestFactory_Build_returns_error_when_child_definition_invalid(t *testing.T) {
 	parent := &parentStubCmd{use: "parent", children: []cli.Command{&nilHandlerCmd{}}}
-	_, err := factory.New().Build(parent, nil)
+	_, err := factory.New().Build(parent, testApp(t))
 	if err == nil {
 		t.Fatal("expected error for invalid child definition, got nil")
 	}
 }
 
 func TestFactory_Build_allows_root_with_nil_handler_and_no_children(t *testing.T) {
-	cmd, err := factory.New().Build(&nilHandlerCmd{}, nil)
+	cmd, err := factory.New().Build(&nilHandlerCmd{}, testApp(t))
 	if err != nil {
 		t.Fatalf("unexpected error for root with nil Handler and no Children: %v", err)
 	}
@@ -65,14 +84,14 @@ func TestFactory_Build_returns_error_when_grandchild_definition_invalid(t *testi
 	mid := &parentStubCmd{use: "mid", children: []cli.Command{&nilHandlerCmd{}}}
 	root := &parentStubCmd{use: "root", children: []cli.Command{mid}}
 
-	_, err := factory.New().Build(root, nil)
+	_, err := factory.New().Build(root, testApp(t))
 	if err == nil {
 		t.Fatal("expected error for invalid grandchild definition, got nil")
 	}
 }
 
 func TestFactory_Build_registers_no_color_as_persistent_flag_on_root(t *testing.T) {
-	cmd, err := factory.New().Build(&stubCmd{use: "test"}, nil)
+	cmd, err := factory.New().Build(&stubCmd{use: "test"}, testApp(t))
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -84,7 +103,7 @@ func TestFactory_Build_registers_no_color_as_persistent_flag_on_root(t *testing.
 func TestFactory_Build_child_does_not_get_its_own_no_color_flag(t *testing.T) {
 	parent := &parentStubCmd{use: "parent", children: []cli.Command{&stubCmd{use: "child"}}}
 
-	cmd, err := factory.New().Build(parent, nil)
+	cmd, err := factory.New().Build(parent, testApp(t))
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -99,7 +118,7 @@ func TestFactory_Build_child_does_not_get_its_own_no_color_flag(t *testing.T) {
 
 func TestFactory_Build_no_color_effect_fires_on_parse(t *testing.T) {
 	printer := ui.NewPrinter(terminal.New(&bytes.Buffer{}, &bytes.Buffer{}, nil))
-	a := app.NewBuilder().WithPrinter(printer).Build()
+	a := app.NewBuilder().WithPrinter(printer).WithWorkspace(testWorkspace(t)).Build()
 
 	cmd, err := factory.New().Build(&stubCmd{use: "test"}, a)
 	if err != nil {
@@ -116,7 +135,7 @@ func TestFactory_Build_no_color_effect_fires_on_parse(t *testing.T) {
 
 func TestFactory_Build_no_color_effect_fires_when_set_after_subcommand(t *testing.T) {
 	printer := ui.NewPrinter(terminal.New(&bytes.Buffer{}, &bytes.Buffer{}, nil))
-	a := app.NewBuilder().WithPrinter(printer).Build()
+	a := app.NewBuilder().WithPrinter(printer).WithWorkspace(testWorkspace(t)).Build()
 
 	parent := &parentStubCmd{use: "parent", children: []cli.Command{&stubCmd{use: "child"}}}
 	cmd, err := factory.New().Build(parent, a)
@@ -141,7 +160,7 @@ func TestFactory_Build_no_color_effect_fires_when_set_after_subcommand(t *testin
 // happens, Runnable or not, so the effect fires regardless.
 func TestFactory_Build_no_color_effect_fires_on_handlerless_bare_invocation(t *testing.T) {
 	printer := ui.NewPrinter(terminal.New(&bytes.Buffer{}, &bytes.Buffer{}, nil))
-	a := app.NewBuilder().WithPrinter(printer).Build()
+	a := app.NewBuilder().WithPrinter(printer).WithWorkspace(testWorkspace(t)).Build()
 
 	parent := &handlerlessParentStubCmd{use: "parent", children: []cli.Command{&stubCmd{use: "child"}}}
 	cmd, err := factory.New().Build(parent, a)
