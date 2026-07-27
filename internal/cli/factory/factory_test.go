@@ -9,11 +9,14 @@ package factory_test
 
 import (
 	"bytes"
+	"os"
+	"path/filepath"
 	"testing"
 
 	"github.com/leaflockio/core-cli/internal/app"
 	"github.com/leaflockio/core-cli/internal/cli"
 	"github.com/leaflockio/core-cli/internal/cli/factory"
+	"github.com/leaflockio/core-cli/internal/config"
 	"github.com/leaflockio/core-cli/internal/terminal"
 	"github.com/leaflockio/core-cli/internal/ui"
 	"github.com/leaflockio/core-cli/internal/workspace"
@@ -38,10 +41,57 @@ func testApp(t *testing.T) *app.App {
 	return app.NewBuilder().WithWorkspace(testWorkspace(t)).Build()
 }
 
+// testAppWithConfigDir is like testApp, but also returns the resolved
+// project config directory path so a test can write files into it before
+// calling Build.
+func testAppWithConfigDir(t *testing.T) (*app.App, string) {
+	t.Helper()
+	repoRoot := t.TempDir()
+	ws, err := workspace.New(t.TempDir(), repoRoot)
+	if err != nil {
+		t.Fatalf("workspace.New: %v", err)
+	}
+	return app.NewBuilder().WithWorkspace(ws).Build(), filepath.Join(repoRoot, config.AppName)
+}
+
 func TestFactory_Build_returns_error_for_nil_command(t *testing.T) {
 	_, err := factory.New().Build(nil, nil)
 	if err == nil {
 		t.Fatal("expected error for nil command, got nil")
+	}
+}
+
+func TestFactory_Build_returns_error_for_nil_app(t *testing.T) {
+	_, err := factory.New().Build(&stubCmd{use: "test"}, nil)
+	if err == nil {
+		t.Fatal("expected error for nil app, got nil")
+	}
+}
+
+func TestFactory_Build_returns_error_for_nil_workspace(t *testing.T) {
+	a := app.NewBuilder().Build()
+	_, err := factory.New().Build(&stubCmd{use: "test"}, a)
+	if err == nil {
+		t.Fatal("expected error for nil Workspace, got nil")
+	}
+}
+
+func TestFactory_Build_returns_error_when_config_layout_conflicts(t *testing.T) {
+	a, configDir := testAppWithConfigDir(t)
+	if err := os.MkdirAll(configDir, 0o755); err != nil {
+		t.Fatalf("MkdirAll: %v", err)
+	}
+	if err := os.WriteFile(filepath.Join(configDir, "manifest.yaml"), []byte("x: 1\n"), 0o600); err != nil {
+		t.Fatalf("WriteFile manifest: %v", err)
+	}
+	if err := os.WriteFile(filepath.Join(configDir, "child.yaml"), []byte("x: 1\n"), 0o600); err != nil {
+		t.Fatalf("WriteFile child: %v", err)
+	}
+
+	parent := &parentStubCmd{use: "parent", children: []cli.Command{&stubCmd{use: "child"}}}
+	_, err := factory.New().Build(parent, a)
+	if err == nil {
+		t.Fatal("expected error when config layout conflicts, got nil")
 	}
 }
 

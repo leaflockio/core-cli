@@ -8,14 +8,39 @@
 package factory
 
 import (
+	"errors"
+	"testing"
+
 	"github.com/leaflockio/core-cli/internal/app"
 	"github.com/leaflockio/core-cli/internal/cli"
 	"github.com/leaflockio/core-cli/internal/cli/flags"
+	"github.com/leaflockio/core-cli/internal/errs"
 	"github.com/spf13/cobra"
 )
 
 // nopHandler is a minimal handler for definitions that require one.
 var nopHandler = func(_ *app.App, _ *cobra.Command, _ []string) error { return nil }
+
+// causeOf extracts the Cause text errs.Unexpected attaches — the detail an
+// *errs.Error carries separately from its (deliberately generic) Error()
+// message.
+func causeOf(t *testing.T, err error) string {
+	t.Helper()
+	var e *errs.Error
+	if !errors.As(err, &e) {
+		t.Fatalf("error = %v, want an *errs.Error", err)
+	}
+	if len(e.Contexts) == 0 {
+		t.Fatalf("error = %v, want at least one Context", err)
+	}
+	return e.Contexts[0].Cause
+}
+
+// stubConfigLoader is a minimal cmdconfig.ConfigLoader for Definition.Config tests.
+type stubConfigLoader struct{}
+
+func (stubConfigLoader) Load(_ map[string]any) error { return nil }
+func (stubConfigLoader) Validate() error             { return nil }
 
 // minDef returns a minimal valid Definition for the given command name.
 func minDef(use string) *cli.Definition {
