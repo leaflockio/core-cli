@@ -41,13 +41,20 @@
 // command is invoked with no matching subcommand — whatever that HelpFunc
 // does.
 //
-// # level marks each command's position in the tree
+// # [level.Level] marks each command's position in the tree
 //
-// level is levelRoot only for the command passed directly to [Factory.Build],
-// levelTop for its direct children, and levelNested for everything below
-// that, no matter how deep. There is exactly one levelRoot command per tree —
-// the one given to Build — but any number of levelTop commands. levelRoot
-// exempts that one command from the Handler-or-Children guard above.
+// [level.Level] is LevelRoot only for the command passed directly to
+// [Factory.Build], LevelTop for its direct children, and LevelNested for
+// everything below that, no matter how deep. There is exactly one LevelRoot
+// command per tree — the one given to Build — but any number of LevelTop
+// commands. LevelRoot exempts that one command from the Handler-or-Children
+// guard above.
+//
+// [level.Level] also gates [cli.Definition.Config] and
+// [cli.Definition.PathRegistry]: assemble rejects either field unless lvl is
+// LevelTop. Only a top-level command owns a config section — the root merely
+// holds top-level commands and has no config of its own, and a subcommand
+// shares its top-level parent's config.
 //
 // # System flag effects fire at parse time, not in RunE
 //

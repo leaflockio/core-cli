@@ -11,6 +11,7 @@ import (
 	"github.com/leaflockio/core-cli/internal/app"
 	"github.com/leaflockio/core-cli/internal/cli"
 	"github.com/leaflockio/core-cli/internal/cli/flags"
+	"github.com/leaflockio/core-cli/internal/level"
 	"github.com/spf13/pflag"
 )
 
@@ -19,7 +20,7 @@ type assembled struct {
 	def cli.Definition
 
 	// level is this command's position in the tree.
-	level level
+	level level.Level
 
 	// hasFlags is true when the command declared flags in its Definition.
 	hasFlags bool

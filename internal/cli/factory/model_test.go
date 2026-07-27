@@ -9,12 +9,14 @@ package factory
 
 import (
 	"testing"
+
+	"github.com/leaflockio/core-cli/internal/level"
 )
 
 func TestAssembled_zero_value(t *testing.T) {
 	var a assembled
-	if a.level != levelRoot {
-		t.Errorf("level must be levelRoot in zero value, got %v", a.level)
+	if a.level != level.LevelRoot {
+		t.Errorf("level must be LevelRoot in zero value, got %v", a.level)
 	}
 	if a.hasFlags {
 		t.Error("hasFlags must be false in zero value")

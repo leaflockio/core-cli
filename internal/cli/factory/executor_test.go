@@ -14,6 +14,7 @@ import (
 	"github.com/leaflockio/core-cli/internal/app"
 	"github.com/leaflockio/core-cli/internal/cli"
 	"github.com/leaflockio/core-cli/internal/cli/flags"
+	"github.com/leaflockio/core-cli/internal/level"
 	"github.com/spf13/cobra"
 )
 
@@ -228,7 +229,7 @@ func TestExecute_returns_error_when_child_build_fails(t *testing.T) {
 
 func TestExecute_non_root_plan_children_are_levelNested(t *testing.T) {
 	plan := assembledPlan("license", "", "")
-	plan.level = levelTop
+	plan.level = level.LevelTop
 	plan.def.Children = []cli.Command{&nilHandlerCommand{}}
 	plan.hasChildren = true
 
