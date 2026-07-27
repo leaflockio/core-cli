@@ -1,5 +1,4 @@
 // Copyright 2026 LeafLock. All rights reserved.
-//
 // This source code is proprietary and confidential.
 // Unauthorized copying, modification, distribution, or use of this
 // software, via any medium, is strictly prohibited without prior
@@ -8,11 +7,13 @@
 package store_test
 
 import (
+	"errors"
 	"os"
 	"path/filepath"
 	"strings"
 	"testing"
 
+	"github.com/leaflockio/core-cli/internal/errs"
 	"github.com/leaflockio/core-cli/internal/store"
 )
 
@@ -22,9 +23,9 @@ type fixture struct {
 }
 
 func TestLoad_notFound(t *testing.T) {
-	dir := t.TempDir()
+	base := filepath.Join(t.TempDir(), "config")
 	var v fixture
-	found, err := store.Load(dir, "config", &v)
+	found, err := store.Load(base, &v)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -34,15 +35,15 @@ func TestLoad_notFound(t *testing.T) {
 }
 
 func TestSave_thenLoad_roundTrip(t *testing.T) {
-	dir := t.TempDir()
+	base := filepath.Join(t.TempDir(), "config")
 	original := fixture{Name: "leaf", Count: 3}
 
-	if err := store.Save(dir, "config", original, 0o755, 0o644); err != nil {
+	if err := store.Save(base, original, 0o755, 0o644); err != nil {
 		t.Fatalf("Save: %v", err)
 	}
 
 	var got fixture
-	found, err := store.Load(dir, "config", &got)
+	found, err := store.Load(base, &got)
 	if err != nil {
 		t.Fatalf("Load: %v", err)
 	}
@@ -56,7 +57,7 @@ func TestSave_thenLoad_roundTrip(t *testing.T) {
 
 func TestSave_writesDefaultExtension(t *testing.T) {
 	dir := t.TempDir()
-	if err := store.Save(dir, "config", fixture{Name: "leaf"}, 0o755, 0o644); err != nil {
+	if err := store.Save(filepath.Join(dir, "config"), fixture{Name: "leaf"}, 0o755, 0o644); err != nil {
 		t.Fatalf("Save: %v", err)
 	}
 	if _, err := os.Stat(filepath.Join(dir, "config.yaml")); err != nil {
@@ -70,7 +71,7 @@ func TestSave_preservesExistingExtension(t *testing.T) {
 		t.Fatalf("write fixture: %v", err)
 	}
 
-	if err := store.Save(dir, "config", fixture{Name: "new"}, 0o755, 0o644); err != nil {
+	if err := store.Save(filepath.Join(dir, "config"), fixture{Name: "new"}, 0o755, 0o644); err != nil {
 		t.Fatalf("Save: %v", err)
 	}
 
@@ -88,7 +89,7 @@ func TestSave_preservesExistingExtension(t *testing.T) {
 
 func TestSave_createsDir(t *testing.T) {
 	dir := filepath.Join(t.TempDir(), "nested", "path")
-	if err := store.Save(dir, "config", fixture{Name: "leaf"}, 0o755, 0o644); err != nil {
+	if err := store.Save(filepath.Join(dir, "config"), fixture{Name: "leaf"}, 0o755, 0o644); err != nil {
 		t.Fatalf("Save: %v", err)
 	}
 	if _, err := os.Stat(dir); err != nil {
@@ -104,7 +105,7 @@ func TestLoad_json(t *testing.T) {
 	}
 
 	var got fixture
-	found, err := store.Load(dir, "config", &got)
+	found, err := store.Load(filepath.Join(dir, "config"), &got)
 	if err != nil {
 		t.Fatalf("Load: %v", err)
 	}
@@ -121,7 +122,7 @@ func TestLoad_yml(t *testing.T) {
 	}
 
 	var got fixture
-	found, err := store.Load(dir, "config", &got)
+	found, err := store.Load(filepath.Join(dir, "config"), &got)
 	if err != nil {
 		t.Fatalf("Load: %v", err)
 	}
@@ -142,7 +143,7 @@ func TestLoad_jsonc(t *testing.T) {
 	}
 
 	var got fixture
-	found, err := store.Load(dir, "config", &got)
+	found, err := store.Load(filepath.Join(dir, "config"), &got)
 	if err != nil {
 		t.Fatalf("Load: %v", err)
 	}
@@ -161,7 +162,7 @@ func TestLoad_firstExtensionWins(t *testing.T) {
 	}
 
 	var got fixture
-	found, err := store.Load(dir, "config", &got)
+	found, err := store.Load(filepath.Join(dir, "config"), &got)
 	if err != nil {
 		t.Fatalf("Load: %v", err)
 	}
@@ -171,8 +172,8 @@ func TestLoad_firstExtensionWins(t *testing.T) {
 }
 
 func TestExistingExtensions_none(t *testing.T) {
-	dir := t.TempDir()
-	got := store.ExistingExtensions(dir, "config")
+	base := filepath.Join(t.TempDir(), "config")
+	got := store.ExistingExtensions(base)
 	if len(got) != 0 {
 		t.Errorf("got %v, want empty", got)
 	}
@@ -187,7 +188,7 @@ func TestExistingExtensions_multiple(t *testing.T) {
 		t.Fatalf("write fixture: %v", err)
 	}
 
-	got := store.ExistingExtensions(dir, "config")
+	got := store.ExistingExtensions(filepath.Join(dir, "config"))
 	want := []string{"yaml", "json"}
 	if len(got) != len(want) {
 		t.Fatalf("got %v, want %v", got, want)
@@ -209,8 +210,83 @@ func TestLoad_readError(t *testing.T) {
 	}
 
 	var got fixture
-	_, err := store.Load(dir, "config", &got)
+	_, err := store.Load(filepath.Join(dir, "config"), &got)
 	if err == nil {
 		t.Fatal("expected error, got nil")
+	}
+}
+
+func TestLoad_decodeError(t *testing.T) {
+	dir := t.TempDir()
+	if err := os.WriteFile(filepath.Join(dir, "config.yaml"), []byte("not: [valid: yaml"), 0o644); err != nil {
+		t.Fatalf("write fixture: %v", err)
+	}
+
+	var got fixture
+	_, err := store.Load(filepath.Join(dir, "config"), &got)
+	if err == nil {
+		t.Fatal("expected error, got nil")
+	}
+}
+
+func TestSave_encodeError(t *testing.T) {
+	base := filepath.Join(t.TempDir(), "config")
+	// codec.Marshal requires a struct (or pointer to struct); a plain int
+	// fails before anything is written to disk.
+	err := store.Save(base, 42, 0o755, 0o644)
+	if err == nil {
+		t.Fatal("expected error, got nil")
+	}
+}
+
+func TestResolvedExt_none(t *testing.T) {
+	base := filepath.Join(t.TempDir(), "config")
+	if got := store.ResolvedExt(base); got != "yaml" {
+		t.Errorf("ResolvedExt() = %q, want %q", got, "yaml")
+	}
+}
+
+func TestResolvedExt_existing(t *testing.T) {
+	dir := t.TempDir()
+	if err := os.WriteFile(filepath.Join(dir, "config.json"), []byte(`{}`), 0o644); err != nil {
+		t.Fatalf("write fixture: %v", err)
+	}
+	if got := store.ResolvedExt(filepath.Join(dir, "config")); got != "json" {
+		t.Errorf("ResolvedExt() = %q, want %q", got, "json")
+	}
+}
+
+func TestResolvedExt_multiple(t *testing.T) {
+	dir := t.TempDir()
+	if err := os.WriteFile(filepath.Join(dir, "config.json"), []byte(`{}`), 0o644); err != nil {
+		t.Fatalf("write fixture: %v", err)
+	}
+	if err := os.WriteFile(filepath.Join(dir, "config.yaml"), []byte(``), 0o644); err != nil {
+		t.Fatalf("write fixture: %v", err)
+	}
+	if got := store.ResolvedExt(filepath.Join(dir, "config")); got != "yaml" {
+		t.Errorf("ResolvedExt() = %q, want %q (yaml precedes json in the discoverable order)", got, "yaml")
+	}
+}
+
+func TestLoad_baseWithExtension(t *testing.T) {
+	var v fixture
+	_, err := store.Load(filepath.Join(t.TempDir(), "config.yaml"), &v)
+	assertINT000(t, err)
+}
+
+func TestSave_baseWithExtension(t *testing.T) {
+	err := store.Save(filepath.Join(t.TempDir(), "config.yaml"), fixture{}, 0o755, 0o644)
+	assertINT000(t, err)
+}
+
+func assertINT000(t *testing.T, err error) {
+	t.Helper()
+	if err == nil {
+		t.Fatal("expected error, got nil")
+	}
+	var e *errs.Error
+	if !errors.As(err, &e) || e.Code != errs.INT000 {
+		t.Errorf("expected INT000, got %v", err)
 	}
 }

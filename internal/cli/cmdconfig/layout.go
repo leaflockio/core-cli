@@ -86,7 +86,7 @@ func DetectLayout(dir string, allCommands, configCommands []string) (*Layout, er
 	recognizedCount := 0
 
 	for _, base := range sortedKeys(extsByBase) {
-		discoverable := store.ExistingExtensions(dir, base)
+		discoverable := store.ExistingExtensions(filepath.Join(dir, base))
 		stray := notIn(extsByBase[base], discoverable)
 
 		switch {
