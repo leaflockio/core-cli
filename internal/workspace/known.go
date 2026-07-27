@@ -37,7 +37,7 @@ func (w *Workspace) Known() KnownPaths {
 		Manifest: paths.KnownPath{
 			Name:  "manifest",
 			Path:  filepath.Join(w.repoRoot, config.ManifestFile),
-			Desc:  "flat project config",
+			Desc:  "combined config for every command",
 			Scope: paths.ScopeProject,
 		},
 		UserConfig: paths.KnownPath{

@@ -170,6 +170,16 @@ func (cs *CommandSpace) File(name string) (string, error) {
 	return fsutil.EnsureParent(filepath.Join(cs.base, name), cs.perm)
 }
 
+// Peek returns the path to a named file or subdirectory within this
+// CommandSpace, or the CommandSpace's own root path when name is "". It is
+// read-only — nothing on disk is created as a result of calling it.
+func (cs *CommandSpace) Peek(name string) (string, error) {
+	if cs.err != nil {
+		return "", cs.err
+	}
+	return filepath.Join(cs.base, name), nil
+}
+
 // commandSubPath extracts the path segment from cmd's command path based on depth.
 //
 //	DepthRoot    → ""              (e.g. gh → <root>/)

@@ -435,6 +435,65 @@ func TestCommandSpace_File_error(t *testing.T) {
 	}
 }
 
+// --- Peek ---
+
+func TestCommandSpace_Peek_emptyNameReturnsBasePath(t *testing.T) {
+	repo := t.TempDir()
+	ws, _ := New(t.TempDir(), repo)
+	cs := ws.ForProjectRoot()
+
+	path, err := cs.Peek("")
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	want := filepath.Join(repo, config.AppName)
+	if path != want {
+		t.Errorf("got %q, want %q", path, want)
+	}
+	if _, err := os.Stat(path); err == nil {
+		t.Error("Peek must not create anything on disk")
+	}
+}
+
+func TestCommandSpace_Peek_returnsNamedPath(t *testing.T) {
+	repo := t.TempDir()
+	ws, _ := New(t.TempDir(), repo)
+	cs := ws.ForProjectRoot()
+
+	path, err := cs.Peek("manifest.yaml")
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	want := filepath.Join(repo, config.AppName, "manifest.yaml")
+	if path != want {
+		t.Errorf("got %q, want %q", path, want)
+	}
+	if _, err := os.Stat(path); err == nil {
+		t.Error("Peek must not create anything on disk")
+	}
+}
+
+func TestCommandSpace_Peek_error(t *testing.T) {
+	old := osUserCacheDir
+	osUserCacheDir = func() (string, error) { return "", errCacheResolutionFailed }
+	t.Cleanup(func() { osUserCacheDir = old })
+
+	ws, err := New(t.TempDir(), t.TempDir())
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	cs := ws.ForCache(newCmd("license"), "templates")
+	if _, err := cs.Peek("h1"); err == nil {
+		t.Fatal("expected error, got nil")
+	} else {
+		var e *errs.Error
+		if !errors.As(err, &e) || e.Code != errs.WSP002 {
+			t.Errorf("expected WSP002, got %v", err)
+		}
+	}
+}
+
 // assertPerm checks that the directory at path has the expected permission bits.
 func assertPerm(t *testing.T, path string, want os.FileMode) {
 	t.Helper()
