@@ -54,7 +54,12 @@ func (f *Factory) Build(cmd cli.Command, a *app.App) (*cobra.Command, error) {
 		})
 	}
 
-	if err := checkConfigLayout(cmd, a); err != nil {
+	layout, err := checkConfigLayout(cmd, a)
+	if err != nil {
+		return nil, err
+	}
+
+	if err := loadInvokedConfig(cmd, a, layout); err != nil {
 		return nil, err
 	}
 

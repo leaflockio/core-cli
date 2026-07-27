@@ -9,6 +9,8 @@ package factory
 
 import (
 	"errors"
+	"os"
+	"path/filepath"
 	"testing"
 
 	"github.com/leaflockio/core-cli/internal/app"
@@ -49,11 +51,11 @@ func (c configStubCommand) Define(_ *app.App) *cli.Definition {
 
 func TestCheckConfigLayout_returns_error_when_peek_fails(t *testing.T) {
 	old := peekProjectRoot
-	peekProjectRoot = func(_ *app.App) (string, error) { return "", errPeekProjectRootFailed }
+	peekProjectRoot = func(_ *app.App, _ string) (string, error) { return "", errPeekProjectRootFailed }
 	t.Cleanup(func() { peekProjectRoot = old })
 
 	root := &parentStubCommand{use: "root", children: []cli.Command{&stubCommand{use: "child"}}}
-	err := checkConfigLayout(root, nil)
+	_, err := checkConfigLayout(root, nil)
 	if !errors.Is(err, errPeekProjectRootFailed) {
 		t.Errorf("error = %v, want errors.Is match for errPeekProjectRootFailed", err)
 	}
@@ -62,15 +64,45 @@ func TestCheckConfigLayout_returns_error_when_peek_fails(t *testing.T) {
 func TestCheckConfigLayout_collects_config_declaring_children(t *testing.T) {
 	old := peekProjectRoot
 	dir := t.TempDir()
-	peekProjectRoot = func(_ *app.App) (string, error) { return dir, nil }
+	peekProjectRoot = func(_ *app.App, _ string) (string, error) { return dir, nil }
 	t.Cleanup(func() { peekProjectRoot = old })
 
 	root := &parentStubCommand{use: "root", children: []cli.Command{
 		configStubCommand{use: "license"},
 		&stubCommand{use: "doctor"},
 	}}
-	if err := checkConfigLayout(root, &app.App{}); err != nil {
+	layout, err := checkConfigLayout(root, &app.App{})
+	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
+	}
+	if layout == nil {
+		t.Fatal("layout should not be nil on success")
+	}
+}
+
+func TestCheckConfigLayout_returns_error_when_invoked_command_has_extension_conflict(t *testing.T) {
+	old := peekProjectRoot
+	dir := t.TempDir()
+	peekProjectRoot = func(_ *app.App, _ string) (string, error) { return dir, nil }
+	t.Cleanup(func() { peekProjectRoot = old })
+
+	if err := os.WriteFile(filepath.Join(dir, "license.yaml"), []byte("x: 1\n"), 0o600); err != nil {
+		t.Fatalf("write license.yaml: %v", err)
+	}
+	if err := os.WriteFile(filepath.Join(dir, "license.json"), []byte("{}"), 0o600); err != nil {
+		t.Fatalf("write license.json: %v", err)
+	}
+
+	root := &parentStubCommand{use: "root", children: []cli.Command{configStubCommand{use: "license"}}}
+	a := &app.App{Invocation: &invocation.Invocation{Raw: []string{"license"}}}
+
+	_, err := checkConfigLayout(root, a)
+	if err == nil {
+		t.Fatal("expected error when the invoked command's own config has an extension conflict")
+	}
+	var e *errs.Error
+	if !errors.As(err, &e) || e.Code != errs.CCF004 {
+		t.Errorf("expected CCF004, got %v", err)
 	}
 }
 

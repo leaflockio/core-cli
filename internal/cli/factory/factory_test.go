@@ -15,8 +15,10 @@ import (
 
 	"github.com/leaflockio/core-cli/internal/app"
 	"github.com/leaflockio/core-cli/internal/cli"
+	"github.com/leaflockio/core-cli/internal/cli/cmdconfig"
 	"github.com/leaflockio/core-cli/internal/cli/factory"
 	"github.com/leaflockio/core-cli/internal/config"
+	"github.com/leaflockio/core-cli/internal/invocation"
 	"github.com/leaflockio/core-cli/internal/terminal"
 	"github.com/leaflockio/core-cli/internal/ui"
 	"github.com/leaflockio/core-cli/internal/workspace"
@@ -265,4 +267,100 @@ type nilHandlerCmd struct{}
 
 func (c *nilHandlerCmd) Define(_ *app.App) *cli.Definition {
 	return &cli.Definition{Meta: cli.Meta{Use: "bad"}}
+}
+
+// nopConfigLoader is a minimal cmdconfig.ConfigLoader for Build-level tests.
+type nopConfigLoader struct{}
+
+func (nopConfigLoader) Load(_ map[string]any) error { return nil }
+func (nopConfigLoader) Validate() error             { return nil }
+
+type configStubCmd struct{ use string }
+
+func (c *configStubCmd) Define(_ *app.App) *cli.Definition {
+	return &cli.Definition{
+		Meta:    cli.Meta{Use: c.use},
+		Handler: func(_ *app.App, _ *cobra.Command, _ []string) error { return nil },
+		Config:  nopConfigLoader{},
+	}
+}
+
+// recordingConfigLoader records the section it was given, for Build-level
+// tests that assert on what actually got loaded.
+type recordingConfigLoader struct {
+	loadedSection map[string]any
+}
+
+func (r *recordingConfigLoader) Load(section map[string]any) error {
+	r.loadedSection = section
+	return nil
+}
+
+func (r *recordingConfigLoader) Validate() error { return nil }
+
+type configLoaderStubCmd struct {
+	use string
+	cfg cmdconfig.ConfigLoader
+}
+
+func (c *configLoaderStubCmd) Define(_ *app.App) *cli.Definition {
+	return &cli.Definition{
+		Meta:    cli.Meta{Use: c.use},
+		Handler: func(_ *app.App, _ *cobra.Command, _ []string) error { return nil },
+		Config:  c.cfg,
+	}
+}
+
+func TestFactory_Build_flatMode_loadsInvokedCommandConfig(t *testing.T) {
+	repoRoot := t.TempDir()
+	ws, err := workspace.New(t.TempDir(), repoRoot)
+	if err != nil {
+		t.Fatalf("workspace.New: %v", err)
+	}
+	configDir := filepath.Join(repoRoot, config.AppName)
+	if err := os.MkdirAll(configDir, 0o755); err != nil {
+		t.Fatalf("MkdirAll: %v", err)
+	}
+	manifest := "child:\n  name: leaf\n"
+	if err := os.WriteFile(filepath.Join(configDir, "manifest.yaml"), []byte(manifest), 0o600); err != nil {
+		t.Fatalf("WriteFile manifest: %v", err)
+	}
+	a := app.NewBuilder().
+		WithWorkspace(ws).
+		WithInvocation(&invocation.Invocation{Raw: []string{"child"}}).
+		Build()
+
+	rec := &recordingConfigLoader{}
+	parent := &parentStubCmd{use: "parent", children: []cli.Command{&configLoaderStubCmd{use: "child", cfg: rec}}}
+	if _, err := factory.New().Build(parent, a); err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if rec.loadedSection["name"] != "leaf" {
+		t.Errorf("loadedSection = %v, want name=leaf", rec.loadedSection)
+	}
+}
+
+func TestFactory_Build_returns_error_when_invoked_config_unreadable(t *testing.T) {
+	repoRoot := t.TempDir()
+	ws, err := workspace.New(t.TempDir(), repoRoot)
+	if err != nil {
+		t.Fatalf("workspace.New: %v", err)
+	}
+	configDir := filepath.Join(repoRoot, config.AppName)
+	if err := os.MkdirAll(configDir, 0o755); err != nil {
+		t.Fatalf("MkdirAll: %v", err)
+	}
+	if err := os.WriteFile(filepath.Join(configDir, "child.yaml"), []byte("not: [valid: yaml"), 0o600); err != nil {
+		t.Fatalf("WriteFile child: %v", err)
+	}
+	a := app.NewBuilder().
+		WithWorkspace(ws).
+		WithInvocation(&invocation.Invocation{Raw: []string{"child"}}).
+		Build()
+
+	parent := &parentStubCmd{use: "parent", children: []cli.Command{&configStubCmd{use: "child"}}}
+	_, err = factory.New().Build(parent, a)
+	if err == nil {
+		t.Fatal("expected error when the invoked command's config file can't be decoded, got nil")
+	}
 }
