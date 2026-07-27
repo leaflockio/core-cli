@@ -9,6 +9,7 @@ package cli
 
 import (
 	"github.com/leaflockio/core-cli/internal/app"
+	"github.com/leaflockio/core-cli/internal/cli/cmdconfig"
 	"github.com/leaflockio/core-cli/internal/cli/flags"
 	"github.com/leaflockio/core-cli/internal/paths"
 	"github.com/spf13/cobra"
@@ -28,6 +29,9 @@ type Definition struct {
 
 	// PathRegistry declares the paths this command registers.
 	PathRegistry *paths.Registry
+
+	// Config declares this command's config type.
+	Config cmdconfig.ConfigLoader
 
 	// Handler is the command's execution logic.
 	Handler func(a *app.App, cmd *cobra.Command, args []string) error
@@ -60,6 +64,12 @@ func (d *Definition) WithFlags(f []flags.Flag) *Definition {
 // WithPathRegistry sets PathRegistry and returns the receiver.
 func (d *Definition) WithPathRegistry(r *paths.Registry) *Definition {
 	d.PathRegistry = r
+	return d
+}
+
+// WithConfig sets Config and returns the receiver.
+func (d *Definition) WithConfig(c cmdconfig.ConfigLoader) *Definition {
+	d.Config = c
 	return d
 }
 

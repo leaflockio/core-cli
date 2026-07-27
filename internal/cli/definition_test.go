@@ -17,6 +17,12 @@ import (
 	"github.com/spf13/cobra"
 )
 
+// stubConfigLoader is a minimal cmdconfig.ConfigLoader for Definition.Config tests.
+type stubConfigLoader struct{}
+
+func (stubConfigLoader) Load(_ map[string]any) error { return nil }
+func (stubConfigLoader) Validate() error             { return nil }
+
 func TestNewDefinition_defaults(t *testing.T) {
 	d := cli.NewDefinition(cli.NewMeta("foo", "short", ""))
 	if d.Group != cli.GroupCLI {
@@ -27,6 +33,9 @@ func TestNewDefinition_defaults(t *testing.T) {
 	}
 	if d.PathRegistry != nil {
 		t.Error("PathRegistry should be nil by default")
+	}
+	if d.Config != nil {
+		t.Error("Config should be nil by default")
 	}
 }
 
@@ -56,6 +65,14 @@ func TestDefinition_WithPathRegistry(t *testing.T) {
 	d := cli.NewDefinition(cli.NewMeta("foo", "short", "")).WithPathRegistry(r)
 	if d.PathRegistry != r {
 		t.Error("PathRegistry not set correctly")
+	}
+}
+
+func TestDefinition_WithConfig(t *testing.T) {
+	c := stubConfigLoader{}
+	d := cli.NewDefinition(cli.NewMeta("foo", "short", "")).WithConfig(c)
+	if d.Config != c {
+		t.Error("Config not set correctly")
 	}
 }
 
