@@ -17,6 +17,7 @@ import (
 	"github.com/leaflockio/core-cli/internal/config"
 	"github.com/leaflockio/core-cli/internal/ui"
 	ver "github.com/leaflockio/core-cli/internal/version"
+	"github.com/spf13/cobra"
 )
 
 // New returns the version command.
@@ -38,7 +39,7 @@ func (c *command) Define(a *app.App) *cli.Definition {
 		WithHandler(c.run)
 }
 
-func (c *command) run(a *app.App, _ []string) error {
+func (c *command) run(a *app.App, _ *cobra.Command, _ []string) error {
 	if c.short {
 		fmt.Fprintln(a.Printer.Out(), a.Version.Version)
 		return nil

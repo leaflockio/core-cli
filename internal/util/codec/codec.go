@@ -6,10 +6,10 @@
 // written permission from LeafLock.
 
 // Package codec provides format-agnostic encode/decode helpers for structs
-// that carry mapstructure tags. Both JSON and YAML are supported through a
-// shared map[string]any intermediate: the struct is first decoded into a map
-// via mapstructure (preserving tag names as keys), and the map is then encoded
-// to the target format. Decoding reverses the process.
+// that carry mapstructure tags. JSON, YAML, and JSONC are supported through
+// a shared map[string]any intermediate: the struct is first decoded into a
+// map via mapstructure (preserving tag names as keys), and the map is then
+// encoded to the target format. Decoding reverses the process.
 //
 // Structs must use mapstructure tags to control field names:
 //
@@ -31,6 +31,7 @@ import (
 	"time"
 
 	"github.com/go-viper/mapstructure/v2"
+	"github.com/tailscale/hujson"
 	"go.yaml.in/yaml/v3"
 )
 
@@ -56,6 +57,8 @@ const (
 	JSON Format = "json"
 	// YAML encodes and decodes using go.yaml.in/yaml/v3.
 	YAML Format = "yaml"
+	// JSONC decodes using hujson, then encoding/json; encodes identically to JSON.
+	JSONC Format = "jsonc"
 )
 
 // JSONOptions controls JSON-specific encoding behavior.
@@ -92,7 +95,7 @@ func MarshalWith(v any, format Format, opts JSONOptions) ([]byte, error) {
 		return nil, fmt.Errorf("codec: marshal: %w", err)
 	}
 	switch format {
-	case JSON:
+	case JSON, JSONC:
 		out, err := opts.marshalJSON(m)
 		if err != nil {
 			return nil, fmt.Errorf("codec: marshal json: %w", err)
@@ -113,19 +116,43 @@ func MarshalWith(v any, format Format, opts JSONOptions) ([]byte, error) {
 // a non-nil pointer to a struct with mapstructure tags. RFC3339 strings are
 // decoded back into time.Time fields automatically.
 func Unmarshal(data []byte, format Format, v any) error {
+	m, err := DecodeBytes(data, format)
+	if err != nil {
+		return err
+	}
+	return DecodeMap(m, v)
+}
+
+// DecodeBytes decodes data in the given format into a map[string]any.
+func DecodeBytes(data []byte, format Format) (map[string]any, error) {
 	var m map[string]any
 	switch format {
 	case JSON:
 		if err := json.Unmarshal(data, &m); err != nil {
-			return fmt.Errorf("codec: unmarshal json: %w", err)
+			return nil, fmt.Errorf("codec: unmarshal json: %w", err)
 		}
 	case YAML:
 		if err := yaml.Unmarshal(data, &m); err != nil {
-			return fmt.Errorf("codec: unmarshal yaml: %w", err)
+			return nil, fmt.Errorf("codec: unmarshal yaml: %w", err)
+		}
+	case JSONC:
+		standard, err := hujson.Standardize(data)
+		if err != nil {
+			return nil, fmt.Errorf("codec: unmarshal jsonc: %w", err)
+		}
+		if err := json.Unmarshal(standard, &m); err != nil {
+			return nil, fmt.Errorf("codec: unmarshal jsonc: %w", err)
 		}
 	default:
-		return fmt.Errorf("%w: %q", ErrUnsupportedFormat, format)
+		return nil, fmt.Errorf("%w: %q", ErrUnsupportedFormat, format)
 	}
+	return m, nil
+}
+
+// DecodeMap populates v from a map[string]any, matching keys to
+// mapstructure tags. The v parameter must be a non-nil pointer to a struct.
+// RFC3339 strings are decoded back into time.Time fields automatically.
+func DecodeMap(m map[string]any, v any) error {
 	return mapToStruct(m, v)
 }
 

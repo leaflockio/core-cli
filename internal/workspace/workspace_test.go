@@ -16,10 +16,14 @@ import (
 
 	"github.com/leaflockio/core-cli/internal/config"
 	"github.com/leaflockio/core-cli/internal/errs"
+	"github.com/leaflockio/core-cli/internal/level"
 	"github.com/spf13/cobra"
 )
 
-var errHomeResolutionFailed = errors.New("home directory resolution failed")
+var (
+	errHomeResolutionFailed  = errors.New("home directory resolution failed")
+	errCacheResolutionFailed = errors.New("cache dir resolution failed")
+)
 
 // Build a cobra command tree from the given sub-command names and return the
 // deepest command. For example, sub "pr", "create" returns the create command
@@ -107,7 +111,7 @@ func TestForUser_depthRoot(t *testing.T) {
 	home := t.TempDir()
 	ws, _ := New(home, t.TempDir())
 
-	cs := ws.ForUser(newCmd(), DepthRoot)
+	cs := ws.ForUser(newCmd(), level.LevelRoot)
 
 	dir, err := cs.Dir("cache")
 	if err != nil {
@@ -124,7 +128,7 @@ func TestForUser_depthCommand(t *testing.T) {
 	home := t.TempDir()
 	ws, _ := New(home, t.TempDir())
 
-	cs := ws.ForUser(newCmd("pr", "create"), DepthCommand)
+	cs := ws.ForUser(newCmd("pr", "create"), level.LevelTop)
 
 	dir, err := cs.Dir("cache")
 	if err != nil {
@@ -139,7 +143,7 @@ func TestForUser_depthFull(t *testing.T) {
 	home := t.TempDir()
 	ws, _ := New(home, t.TempDir())
 
-	cs := ws.ForUser(newCmd("pr", "create"), DepthFull)
+	cs := ws.ForUser(newCmd("pr", "create"), level.LevelNested)
 
 	dir, err := cs.Dir("cache")
 	if err != nil {
@@ -150,12 +154,12 @@ func TestForUser_depthFull(t *testing.T) {
 	}
 }
 
-func TestForUser_rootCmdWithDepthCommand(t *testing.T) {
+func TestForUser_rootCmdWithLevelTop(t *testing.T) {
 	home := t.TempDir()
 	ws, _ := New(home, t.TempDir())
 
 	// root command has no sub-path — commandSubPath returns ""
-	cs := ws.ForUser(newCmd(), DepthCommand)
+	cs := ws.ForUser(newCmd(), level.LevelTop)
 
 	dir, err := cs.Dir("cache")
 	if err != nil {
@@ -167,11 +171,11 @@ func TestForUser_rootCmdWithDepthCommand(t *testing.T) {
 	}
 }
 
-func TestForUser_rootCmdWithDepthFull(t *testing.T) {
+func TestForUser_rootCmdWithLevelNested(t *testing.T) {
 	home := t.TempDir()
 	ws, _ := New(home, t.TempDir())
 
-	cs := ws.ForUser(newCmd(), DepthFull)
+	cs := ws.ForUser(newCmd(), level.LevelNested)
 
 	dir, err := cs.Dir("cache")
 	if err != nil {
@@ -189,7 +193,7 @@ func TestForRepo_depthRoot(t *testing.T) {
 	repo := t.TempDir()
 	ws, _ := New(t.TempDir(), repo)
 
-	cs := ws.ForRepo(newCmd(), DepthRoot)
+	cs := ws.ForRepo(newCmd(), level.LevelRoot)
 
 	dir, err := cs.Dir("out")
 	if err != nil {
@@ -206,7 +210,7 @@ func TestForRepo_depthCommand(t *testing.T) {
 	repo := t.TempDir()
 	ws, _ := New(t.TempDir(), repo)
 
-	cs := ws.ForRepo(newCmd("pr", "create"), DepthCommand)
+	cs := ws.ForRepo(newCmd("pr", "create"), level.LevelTop)
 
 	dir, err := cs.Dir("out")
 	if err != nil {
@@ -221,7 +225,7 @@ func TestForRepo_depthFull(t *testing.T) {
 	repo := t.TempDir()
 	ws, _ := New(t.TempDir(), repo)
 
-	cs := ws.ForRepo(newCmd("pr", "create"), DepthFull)
+	cs := ws.ForRepo(newCmd("pr", "create"), level.LevelNested)
 
 	dir, err := cs.Dir("out")
 	if err != nil {
@@ -232,11 +236,132 @@ func TestForRepo_depthFull(t *testing.T) {
 	}
 }
 
+// --- ForProjectRoot ---
+
+func TestForProjectRoot(t *testing.T) {
+	repo := t.TempDir()
+	ws, _ := New(t.TempDir(), repo)
+
+	cs := ws.ForProjectRoot()
+
+	dir, err := cs.Dir("templates")
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	want := filepath.Join(repo, config.AppName, "templates")
+	if dir != want {
+		t.Errorf("got %q, want %q", dir, want)
+	}
+	assertPerm(t, dir, 0o755)
+}
+
+// --- ForGenerated ---
+
+func TestForGenerated_depthCommand(t *testing.T) {
+	repo := t.TempDir()
+	ws, _ := New(t.TempDir(), repo)
+
+	cs := ws.ForGenerated(newCmd("license"), level.LevelTop)
+
+	file, err := cs.File("license.lock")
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	want := filepath.Join(repo, config.AppName, "generated", "license", "license.lock")
+	if file != want {
+		t.Errorf("got %q, want %q", file, want)
+	}
+}
+
+func TestForGenerated_depthRoot(t *testing.T) {
+	repo := t.TempDir()
+	ws, _ := New(t.TempDir(), repo)
+
+	cs := ws.ForGenerated(newCmd("license"), level.LevelRoot)
+
+	file, err := cs.File("out.txt")
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	want := filepath.Join(repo, config.AppName, "generated", "out.txt")
+	if file != want {
+		t.Errorf("got %q, want %q", file, want)
+	}
+}
+
+// --- ForCache ---
+
+func TestForCache(t *testing.T) {
+	repo := t.TempDir()
+	ws, _ := New(t.TempDir(), repo)
+
+	cs := ws.ForCache(newCmd("license"), "templates")
+
+	dir, err := cs.Dir("abc123")
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if !strings.HasSuffix(dir, filepath.Join("license", "templates", "abc123")) {
+		t.Errorf("expected path to end with license/templates/abc123, got %q", dir)
+	}
+	assertPerm(t, dir, 0o755)
+}
+
+func TestForCache_purposeIsolation(t *testing.T) {
+	ws, _ := New(t.TempDir(), t.TempDir())
+
+	templates := ws.ForCache(newCmd("license"), "templates")
+	spdx := ws.ForCache(newCmd("license"), "spdx")
+
+	td, err := templates.Dir("h1")
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	sd, err := spdx.Dir("h1")
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if td == sd {
+		t.Errorf("expected different purposes to resolve to different dirs, both got %q", td)
+	}
+}
+
+func TestForCache_disabledWhenUnresolvable(t *testing.T) {
+	old := osUserCacheDir
+	osUserCacheDir = func() (string, error) { return "", errCacheResolutionFailed }
+	t.Cleanup(func() { osUserCacheDir = old })
+
+	ws, err := New(t.TempDir(), t.TempDir())
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	cs := ws.ForCache(newCmd("license"), "templates")
+
+	if _, err := cs.Dir("h1"); err == nil {
+		t.Fatal("Dir: expected error, got nil")
+	} else {
+		var e *errs.Error
+		if !errors.As(err, &e) || e.Code != errs.WSP002 {
+			t.Errorf("Dir: expected WSP002, got %v", err)
+		}
+	}
+
+	if _, err := cs.File("meta.json"); err == nil {
+		t.Fatal("File: expected error, got nil")
+	} else {
+		var e *errs.Error
+		if !errors.As(err, &e) || e.Code != errs.WSP002 {
+			t.Errorf("File: expected WSP002, got %v", err)
+		}
+	}
+}
+
 // --- Dir ---
 
 func TestCommandSpace_Dir_creates(t *testing.T) {
 	ws, _ := New(t.TempDir(), t.TempDir())
-	cs := ws.ForUser(newCmd("pr"), DepthCommand)
+	cs := ws.ForUser(newCmd("pr"), level.LevelTop)
 
 	dir, err := cs.Dir("templates")
 	if err != nil {
@@ -264,7 +389,7 @@ func TestCommandSpace_Dir_error(t *testing.T) {
 		t.Fatalf("write: %v", err)
 	}
 
-	cs := ws.ForUser(newCmd("pr"), DepthCommand)
+	cs := ws.ForUser(newCmd("pr"), level.LevelTop)
 	_, err := cs.Dir("templates")
 	if err == nil {
 		t.Fatal("expected error, got nil")
@@ -275,7 +400,7 @@ func TestCommandSpace_Dir_error(t *testing.T) {
 
 func TestCommandSpace_File_createsParent(t *testing.T) {
 	ws, _ := New(t.TempDir(), t.TempDir())
-	cs := ws.ForRepo(newCmd("pr"), DepthCommand)
+	cs := ws.ForRepo(newCmd("pr"), level.LevelTop)
 
 	path, err := cs.File("pr.lock")
 	if err != nil {
@@ -304,10 +429,69 @@ func TestCommandSpace_File_error(t *testing.T) {
 		t.Fatalf("write: %v", err)
 	}
 
-	cs := ws.ForUser(newCmd("pr"), DepthCommand)
+	cs := ws.ForUser(newCmd("pr"), level.LevelTop)
 	_, err := cs.File("pr.lock")
 	if err == nil {
 		t.Fatal("expected error, got nil")
+	}
+}
+
+// --- Peek ---
+
+func TestCommandSpace_Peek_emptyNameReturnsBasePath(t *testing.T) {
+	repo := t.TempDir()
+	ws, _ := New(t.TempDir(), repo)
+	cs := ws.ForProjectRoot()
+
+	path, err := cs.Peek("")
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	want := filepath.Join(repo, config.AppName)
+	if path != want {
+		t.Errorf("got %q, want %q", path, want)
+	}
+	if _, err := os.Stat(path); err == nil {
+		t.Error("Peek must not create anything on disk")
+	}
+}
+
+func TestCommandSpace_Peek_returnsNamedPath(t *testing.T) {
+	repo := t.TempDir()
+	ws, _ := New(t.TempDir(), repo)
+	cs := ws.ForProjectRoot()
+
+	path, err := cs.Peek("manifest.yaml")
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	want := filepath.Join(repo, config.AppName, "manifest.yaml")
+	if path != want {
+		t.Errorf("got %q, want %q", path, want)
+	}
+	if _, err := os.Stat(path); err == nil {
+		t.Error("Peek must not create anything on disk")
+	}
+}
+
+func TestCommandSpace_Peek_error(t *testing.T) {
+	old := osUserCacheDir
+	osUserCacheDir = func() (string, error) { return "", errCacheResolutionFailed }
+	t.Cleanup(func() { osUserCacheDir = old })
+
+	ws, err := New(t.TempDir(), t.TempDir())
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	cs := ws.ForCache(newCmd("license"), "templates")
+	if _, err := cs.Peek("h1"); err == nil {
+		t.Fatal("expected error, got nil")
+	} else {
+		var e *errs.Error
+		if !errors.As(err, &e) || e.Code != errs.WSP002 {
+			t.Errorf("expected WSP002, got %v", err)
+		}
 	}
 }
 

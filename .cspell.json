@@ -111,6 +111,7 @@
     "chmod",
 
     "pathutil",
+    "fsutil",
 
     "debugf",
     "mapstructure",
@@ -125,8 +126,17 @@
     "helpcmd",
     "licensecmd",
     "versioncmd",
+    "mycmd",
     "strutil",
+    "licence",
 
-    "capitalising"
+    "capitalising",
+
+    "hujson",
+
+    "cmdconfig",
+    "handlerless",
+    "effectvalue",
+    "Validatable"
   ]
 }

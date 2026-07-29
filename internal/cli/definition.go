@@ -9,7 +9,10 @@ package cli
 
 import (
 	"github.com/leaflockio/core-cli/internal/app"
+	"github.com/leaflockio/core-cli/internal/cli/cmdconfig"
 	"github.com/leaflockio/core-cli/internal/cli/flags"
+	"github.com/leaflockio/core-cli/internal/paths"
+	"github.com/spf13/cobra"
 )
 
 // Definition is the complete declaration of a command — what it is, what it
@@ -24,8 +27,14 @@ type Definition struct {
 	// Flags declares the flags this command accepts.
 	Flags []flags.Flag
 
+	// PathRegistry declares the paths this command registers.
+	PathRegistry *paths.Registry
+
+	// Config declares this command's config type.
+	Config cmdconfig.ConfigLoader
+
 	// Handler is the command's execution logic.
-	Handler func(a *app.App, args []string) error
+	Handler func(a *app.App, cmd *cobra.Command, args []string) error
 
 	// Children declares the subcommands nested under this command.
 	Children []Command
@@ -52,8 +61,20 @@ func (d *Definition) WithFlags(f []flags.Flag) *Definition {
 	return d
 }
 
+// WithPathRegistry sets PathRegistry and returns the receiver.
+func (d *Definition) WithPathRegistry(r *paths.Registry) *Definition {
+	d.PathRegistry = r
+	return d
+}
+
+// WithConfig sets Config and returns the receiver.
+func (d *Definition) WithConfig(c cmdconfig.ConfigLoader) *Definition {
+	d.Config = c
+	return d
+}
+
 // WithHandler sets Handler and returns the receiver.
-func (d *Definition) WithHandler(h func(a *app.App, args []string) error) *Definition {
+func (d *Definition) WithHandler(h func(a *app.App, cmd *cobra.Command, args []string) error) *Definition {
 	d.Handler = h
 	return d
 }

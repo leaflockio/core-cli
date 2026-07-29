@@ -23,10 +23,11 @@
 //
 // # Solution
 //
-// workspace defines two root directories and derives all paths from them:
+// workspace defines three root directories and derives all paths from them:
 //
 //	User scope  — ~/<EntityFolder>/<AppName>/   (per machine, never committed)
 //	Repo scope  — <repo-root>/<AppName>/        (per repository, committed to git)
+//	Cache scope — <UserCacheDir>/<AppName>/     (per machine, disposable)
 //
 // The entity folder is a directory in the user home directory named after the
 // parent entity. It acts as a namespace so all products under the same entity
@@ -35,36 +36,61 @@
 // Full layout example:
 //
 //	~/<EntityFolder>/<AppName>/
-//	  license/
-//	    templates/     ← remote and SPDX template cache
 //	  config.yaml      ← user-level config override
 //	  logs/            ← application logs
 //
 //	<repo-root>/<AppName>/
+//	  generated/
+//	    license/
+//	      license.lock ← template history lock file (committed)
+//
+//	<UserCacheDir>/<AppName>/
 //	  license/
-//	    license.lock   ← template history lock file (committed)
+//	    templates/     ← remote and SPDX template cache
 //
 // # Usage
 //
 // Workspace is constructed once in main and stored on app.App. Commands access
-// it through the app context — they never construct paths themselves:
+// it through the app context — they never construct paths themselves. The
+// examples below all assume cmd is the *cobra.Command for "leaf license".
 //
-//	// user-scoped: template cache, rooted at the top-level command directory
-//	dir, err := a.Workspace.ForUser(cmd, workspace.DepthCommand).Dir("templates")
+// File ensures the parent directory exists and returns the path — it does
+// not create the file itself. This resolves to
+// ~/<EntityFolder>/<AppName>/license/config.yaml:
 //
-//	// repo-scoped: lock file, rooted at the top-level command directory
-//	file, err := a.Workspace.ForRepo(cmd, workspace.DepthCommand).File("pr.lock")
+//	path, err := a.Workspace.ForUser(cmd, level.LevelTop).File("config.yaml")
+//
+// ForGenerated is for output the tool writes and commits to the repo. This
+// resolves to <repo-root>/<AppName>/generated/license/license.lock:
+//
+//	path, err := a.Workspace.ForGenerated(cmd, level.LevelTop).File("license.lock")
+//
+// ForCache is for disposable data the OS may reclaim at any time. The
+// purpose argument ("templates") separates this cache from any other cache
+// the license command keeps. This resolves to
+// <UserCacheDir>/<AppName>/license/templates/<hash>/:
+//
+//	dir, err := a.Workspace.ForCache(cmd, "templates").Dir(hash)
 //
 // # Scopes
 //
-//	a.Workspace.ForUser(cmd, depth)  — reads/writes to the user's machine only
-//	a.Workspace.ForRepo(cmd, depth)  — reads/writes to the repository (may be committed)
+//	a.Workspace.ForUser(cmd, lvl)     — reads/writes to the user's machine only
+//	a.Workspace.ForRepo(cmd, lvl)     — reads/writes to the repository (may be committed)
+//	a.Workspace.ForProjectRoot()      — the bare repo-scoped root, no command segment
+//	a.Workspace.ForGenerated(cmd, lvl)   — repo-scoped output the tool fully owns
+//	a.Workspace.ForCache(cmd, purpose)   — disposable, per-command, per-purpose cache data
+//
+// lvl selects how much of cmd's own path to encode — level.LevelRoot for
+// none, level.LevelTop for just the top-level segment, level.LevelNested
+// for the full remaining path — independent of cmd's own actual level.
 //
 // # Error codes
 //
 // Workspace operations return errors using the WSP domain:
 //
 //	WSP001 — home directory could not be resolved at construction time
+//	WSP002 — cache directory could not be resolved; returned by Dir and File
+//	         on the CommandSpace ForCache returns, not by New
 //
 // # Testing
 //

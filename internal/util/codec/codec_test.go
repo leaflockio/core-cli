@@ -144,6 +144,60 @@ func TestUnmarshal_YAML(t *testing.T) {
 	}
 }
 
+// TestUnmarshal_JSONC decodes JSON with line and block comments plus a
+// trailing comma, none of which are valid in plain JSON.
+func TestUnmarshal_JSONC(t *testing.T) {
+	data := []byte(`{
+  // line comment
+  "name": "leaf",
+  /* block comment */
+  "count": 5,
+  "active": true, // trailing comma below
+}`)
+	var got fixture
+	if err := codec.Unmarshal(data, codec.JSONC, &got); err != nil {
+		t.Fatalf("Unmarshal JSONC: %v", err)
+	}
+	if got.Name != "leaf" {
+		t.Errorf("Name = %q, want %q", got.Name, "leaf")
+	}
+	if got.Count != 5 {
+		t.Errorf("Count = %d, want %d", got.Count, 5)
+	}
+	if !got.Active {
+		t.Error("Active = false, want true")
+	}
+}
+
+// TestUnmarshal_JSONC_invalid verifies an error is returned for content that
+// is invalid even once comments/trailing commas are stripped.
+func TestUnmarshal_JSONC_invalid(t *testing.T) {
+	err := codec.Unmarshal([]byte(`{"name": }`), codec.JSONC, &fixture{})
+	if err == nil {
+		t.Fatal("expected error for invalid JSONC, got nil")
+	}
+}
+
+// TestMarshal_JSONC verifies Marshal produces plain JSON output for JSONC —
+// valid JSON is always valid JSONC, so no special encoding is needed.
+func TestMarshal_JSONC(t *testing.T) {
+	data, err := codec.Marshal(fixture{Name: "leaf"}, codec.JSONC)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if !strings.Contains(string(data), `"name":"leaf"`) {
+		t.Errorf("missing name field in output: %s", data)
+	}
+
+	var got fixture
+	if err := codec.Unmarshal(data, codec.JSONC, &got); err != nil {
+		t.Fatalf("round-trip Unmarshal: %v", err)
+	}
+	if got.Name != "leaf" {
+		t.Errorf("Name = %q, want %q", got.Name, "leaf")
+	}
+}
+
 // TestUnmarshal_unsupported_format verifies an error is returned for unknown formats.
 func TestUnmarshal_unsupported_format(t *testing.T) {
 	err := codec.Unmarshal([]byte(`{}`), codec.Format("toml"), &fixture{})
@@ -168,6 +222,70 @@ func TestUnmarshal_YAML_invalid(t *testing.T) {
 	err := codec.Unmarshal([]byte(":\tbroken: [yaml"), codec.YAML, &fixture{})
 	if err == nil {
 		t.Fatal("expected error for invalid YAML, got nil")
+	}
+}
+
+// TestDecodeBytes_JSON decodes JSON directly into a map, without a struct.
+func TestDecodeBytes_JSON(t *testing.T) {
+	m, err := codec.DecodeBytes([]byte(`{"name": "leaf", "count": 5}`), codec.JSON)
+	if err != nil {
+		t.Fatalf("DecodeBytes: %v", err)
+	}
+	if m["name"] != "leaf" {
+		t.Errorf("m[%q] = %v, want %q", "name", m["name"], "leaf")
+	}
+}
+
+// TestDecodeBytes_invalid verifies an error is returned for malformed input.
+func TestDecodeBytes_invalid(t *testing.T) {
+	_, err := codec.DecodeBytes([]byte(`not json`), codec.JSON)
+	if err == nil {
+		t.Fatal("expected error, got nil")
+	}
+}
+
+// TestDecodeBytes_unsupported_format verifies an error is returned for unknown formats.
+func TestDecodeBytes_unsupported_format(t *testing.T) {
+	_, err := codec.DecodeBytes([]byte(`{}`), codec.Format("toml"))
+	if !errors.Is(err, codec.ErrUnsupportedFormat) {
+		t.Errorf("expected ErrUnsupportedFormat, got: %v", err)
+	}
+}
+
+// TestDecodeMap populates a struct from an already-decoded map, matching
+// mapstructure tags.
+func TestDecodeMap(t *testing.T) {
+	m := map[string]any{"name": "leaf", "count": 5}
+	var got fixture
+	if err := codec.DecodeMap(m, &got); err != nil {
+		t.Fatalf("DecodeMap: %v", err)
+	}
+	if got.Name != "leaf" || got.Count != 5 {
+		t.Errorf("got %+v, want {Name:leaf Count:5}", got)
+	}
+}
+
+// TestUnmarshal_isDecodeBytesThenDecodeMap verifies Unmarshal produces the
+// same result as calling DecodeBytes then DecodeMap directly.
+func TestUnmarshal_isDecodeBytesThenDecodeMap(t *testing.T) {
+	data := []byte(`{"name": "leaf", "count": 5}`)
+
+	var viaUnmarshal fixture
+	if err := codec.Unmarshal(data, codec.JSON, &viaUnmarshal); err != nil {
+		t.Fatalf("Unmarshal: %v", err)
+	}
+
+	m, err := codec.DecodeBytes(data, codec.JSON)
+	if err != nil {
+		t.Fatalf("DecodeBytes: %v", err)
+	}
+	var viaSteps fixture
+	if err := codec.DecodeMap(m, &viaSteps); err != nil {
+		t.Fatalf("DecodeMap: %v", err)
+	}
+
+	if viaUnmarshal != viaSteps {
+		t.Errorf("Unmarshal = %+v, DecodeBytes+DecodeMap = %+v", viaUnmarshal, viaSteps)
 	}
 }
 

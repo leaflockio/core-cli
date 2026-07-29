@@ -45,12 +45,12 @@ func (f *Factory) execute(plan *assembled, a *app.App) (*cobra.Command, error) {
 				}
 			}
 
-			return def.Handler(a, args)
+			return def.Handler(a, cobraCmd, args)
 		}
 	}
 
 	for _, child := range def.Children {
-		_, childCmd, err := f.buildNode(child, a, false)
+		_, childCmd, err := f.buildNode(child, a, plan.level.Next())
 		if err != nil {
 			return nil, fmt.Errorf("factory[execute]: command %q: child %w", def.Meta.Use, err)
 		}

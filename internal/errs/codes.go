@@ -94,6 +94,38 @@ const (
 	// construction time. This happens when os.UserHomeDir fails and no override
 	// was provided.
 	WSP001 Code = "WSP001"
+
+	// WSP002 is used when the platform cache directory cannot be resolved.
+	// Unlike WSP001, this does not fail workspace construction — it is
+	// returned later, by Dir and File on the CommandSpace that ForCache
+	// returns.
+	WSP002 Code = "WSP002"
+)
+
+// CCF domain covers errors caused by how a directory of per-command config
+// files is laid out: a flat manifest, or one file per command.
+const (
+	// CCF001 is used when the flat manifest file exists under more than one
+	// discoverable extension — ambiguous, since there's no way to know
+	// which one is meant to apply.
+	CCF001 Code = "CCF001"
+
+	// CCF002 is used when a flat manifest file coexists with one or more
+	// per-command config files — ambiguous which layout is active.
+	CCF002 Code = "CCF002"
+
+	// CCF003 is used when the config directory exists but cannot be read
+	// (e.g. a permissions error). A directory that does not exist at all is
+	// not an error.
+	CCF003 Code = "CCF003"
+
+	// CCF004 is used when the command actually being run has its own config
+	// file under more than one discoverable extension.
+	CCF004 Code = "CCF004"
+
+	// CCF005 is used when the command actually being run has a config file
+	// that exists but could not be read or decoded.
+	CCF005 Code = "CCF005"
 )
 
 // AUT domain covers errors from the auth package.

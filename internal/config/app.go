@@ -24,6 +24,16 @@ const (
 	// CredentialsFile is the credentials filename.
 	CredentialsFile = "credentials.json"
 
+	// GeneratedDir is the name of the subdirectory, under the repo scope, that
+	// holds tool-generated output.
+	GeneratedDir = "generated"
+
+	// ManifestFile is the combined config base name for every command — do not add an extension.
+	ManifestFile = "manifest"
+
+	// UserConfigFile is the user-level config override base name — do not add an extension.
+	UserConfigFile = "config"
+
 	// EnvPrefix is the prefix for all LEAF_* environment variables.
 	// Must be the uppercase form of AppName — update together.
 	envPrefix = "LEAF"
