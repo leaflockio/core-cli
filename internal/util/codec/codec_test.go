@@ -424,3 +424,90 @@ func TestMarshal_non_nil_pointer(t *testing.T) {
 		t.Errorf("nested struct name should be present, got: %s", data)
 	}
 }
+
+// TestMarshal_mapInput verifies an already-built map[string]any is encoded
+// as-is, skipping struct conversion entirely.
+func TestMarshal_mapInput(t *testing.T) {
+	m := map[string]any{"name": "leaf", "count": 5}
+	data, err := codec.Marshal(m, codec.JSON)
+	if err != nil {
+		t.Fatalf("Marshal: %v", err)
+	}
+	if !strings.Contains(string(data), `"name":"leaf"`) {
+		t.Errorf("expected name field in output, got: %s", data)
+	}
+	if !strings.Contains(string(data), `"count":5`) {
+		t.Errorf("expected count field in output, got: %s", data)
+	}
+}
+
+// TestDecodeValue_scalar decodes a plain scalar into a matching destination.
+func TestDecodeValue_scalar(t *testing.T) {
+	var got string
+	if err := codec.DecodeValue("leaf", &got); err != nil {
+		t.Fatalf("DecodeValue: %v", err)
+	}
+	if got != "leaf" {
+		t.Errorf("got %q, want %q", got, "leaf")
+	}
+}
+
+// TestDecodeValue_duration verifies a duration string decodes into
+// time.Duration, using the same hook DecodeMap relies on.
+func TestDecodeValue_duration(t *testing.T) {
+	var got time.Duration
+	if err := codec.DecodeValue("1h30m", &got); err != nil {
+		t.Fatalf("DecodeValue: %v", err)
+	}
+	if got != 90*time.Minute {
+		t.Errorf("got %v, want %v", got, 90*time.Minute)
+	}
+}
+
+// TestDecodeValue_time verifies an RFC3339 string decodes into time.Time,
+// using the same hook DecodeMap relies on.
+func TestDecodeValue_time(t *testing.T) {
+	var got time.Time
+	if err := codec.DecodeValue("2026-06-23T12:00:00Z", &got); err != nil {
+		t.Fatalf("DecodeValue: %v", err)
+	}
+	if !got.Equal(fixedTime) {
+		t.Errorf("got %v, want %v", got, fixedTime)
+	}
+}
+
+// TestDecodeValue_invalid verifies an error is returned when raw can't
+// convert into dest's type.
+func TestDecodeValue_invalid(t *testing.T) {
+	var got int
+	err := codec.DecodeValue("not-a-number", &got)
+	if err == nil {
+		t.Fatal("expected error, got nil")
+	}
+}
+
+// TestDecodeValue_nonPointerDest verifies an error is returned when dest is
+// not a pointer, exercising the mapstructure decoder construction failure
+// path shared by DecodeMap and DecodeValue.
+func TestDecodeValue_nonPointerDest(t *testing.T) {
+	err := codec.DecodeValue("leaf", "not-a-pointer")
+	if err == nil {
+		t.Fatal("expected error, got nil")
+	}
+}
+
+// unencodableFixture has a field of a type neither JSON nor YAML can encode,
+// for exercising Marshal's own encoding-failure paths (distinct from
+// structToMap's conversion, which already succeeds for this struct).
+type unencodableFixture struct {
+	Ch chan int `mapstructure:"ch"`
+}
+
+// TestMarshal_JSON_encodeError verifies an error is returned when the
+// underlying JSON encoder can't encode a field's value.
+func TestMarshal_JSON_encodeError(t *testing.T) {
+	_, err := codec.Marshal(unencodableFixture{Ch: make(chan int)}, codec.JSON)
+	if err == nil {
+		t.Fatal("expected error, got nil")
+	}
+}
