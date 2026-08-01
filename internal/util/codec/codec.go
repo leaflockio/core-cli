@@ -169,6 +169,19 @@ func DecodeValue(raw, dest any) error {
 	return decodeInto(raw, dest)
 }
 
+// EncodeValue converts v — a scalar, slice, map, or struct with
+// mapstructure tags, at any nesting depth — into a form safe to hand
+// directly to json.Marshal or yaml.Marshal: every struct becomes a
+// map[string]any keyed by its mapstructure tags, wherever it appears,
+// including inside a slice or map. A time.Time becomes an RFC3339 string.
+func EncodeValue(v any) (any, error) {
+	encoded, err := encodeValue(reflect.ValueOf(v))
+	if errors.Is(err, errOmit) {
+		err = nil
+	}
+	return encoded, err
+}
+
 // structToMap converts a struct to map[string]any using mapstructure tag names
 // as keys. Uses reflection so that time.Time fields are converted to RFC3339
 // strings rather than being recursed into as plain structs (which mapstructure
@@ -216,6 +229,9 @@ func encodeStruct(rv reflect.Value) (map[string]any, error) {
 }
 
 func encodeValue(rv reflect.Value) (any, error) {
+	if !rv.IsValid() {
+		return nil, errOmit
+	}
 	if rv.Type() == timeType {
 		t, ok := rv.Interface().(time.Time)
 		if !ok || t.IsZero() {
@@ -223,16 +239,62 @@ func encodeValue(rv reflect.Value) (any, error) {
 		}
 		return t.UTC().Format(time.RFC3339), nil
 	}
-	if rv.Kind() == reflect.Ptr {
+	kind := rv.Kind()
+	if kind == reflect.Ptr {
 		if rv.IsNil() {
 			return nil, errOmit
 		}
 		return encodeValue(rv.Elem())
 	}
-	if rv.Kind() == reflect.Struct {
+	if kind == reflect.Struct {
 		return encodeStruct(rv)
 	}
+	if kind == reflect.Slice || kind == reflect.Array {
+		return encodeSequence(rv)
+	}
+	if kind == reflect.Map {
+		return encodeMap(rv)
+	}
 	return rv.Interface(), nil
+}
+
+// encodeSequence encodes each element of a slice or array, so a struct
+// element (at any position) goes through encodeStruct rather than being
+// passed through with its raw Go field names.
+func encodeSequence(rv reflect.Value) (any, error) {
+	out := make([]any, rv.Len())
+	for i := range rv.Len() {
+		encoded, err := encodeValue(rv.Index(i))
+		if errors.Is(err, errOmit) {
+			out[i] = nil
+			continue
+		}
+		if err != nil {
+			return nil, err
+		}
+		out[i] = encoded
+	}
+	return out, nil
+}
+
+// encodeMap encodes each value of a map, so a struct value goes through
+// encodeStruct rather than being passed through with its raw Go field
+// names. Keys are converted to string via fmt.Sprint, matching how config
+// maps are always string-keyed in practice.
+func encodeMap(rv reflect.Value) (any, error) {
+	out := make(map[string]any, rv.Len())
+	iter := rv.MapRange()
+	for iter.Next() {
+		encoded, err := encodeValue(iter.Value())
+		if errors.Is(err, errOmit) {
+			continue
+		}
+		if err != nil {
+			return nil, err
+		}
+		out[fmt.Sprint(iter.Key().Interface())] = encoded
+	}
+	return out, nil
 }
 
 // decodeInto populates v from raw using mapstructure, decoding an RFC3339

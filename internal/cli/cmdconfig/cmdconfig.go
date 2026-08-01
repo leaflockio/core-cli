@@ -8,7 +8,11 @@
 // knowing its concrete type.
 package cmdconfig
 
-import "github.com/leaflockio/core-cli/internal/util/codec"
+import (
+	"io/fs"
+
+	"github.com/leaflockio/core-cli/internal/store"
+)
 
 // Validatable requires a Validate method that reports whether a config
 // value is internally consistent.
@@ -22,9 +26,9 @@ type ConfigLoader interface {
 	Validate() error
 }
 
-// CommandConfig binds a command's config struct as its Definition's config
-// declaration. PT is constrained to *T and Validatable, so every command's
-// config type is required, at compile time, to implement Validate.
+// CommandConfig is a ConfigLoader that decodes into and validates Dest. PT
+// is constrained to *T and Validatable, so every instantiation is required,
+// at compile time, to implement Validate.
 type CommandConfig[T any, PT interface {
 	*T
 	Validatable
@@ -32,12 +36,25 @@ type CommandConfig[T any, PT interface {
 	Dest PT
 }
 
-// Load decodes section into Dest. A nil section leaves Dest unchanged.
+// Load requires Dest to be shaped entirely from Field values, then decodes
+// section into it. A nil section leaves Dest unchanged.
 func (c CommandConfig[T, PT]) Load(section map[string]any) error {
-	return codec.DecodeMap(section, c.Dest)
+	if err := Validate(c.Dest); err != nil {
+		return err
+	}
+	return Decode(section, c.Dest)
 }
 
 // Validate calls Dest's own Validate.
 func (c CommandConfig[T, PT]) Validate() error {
 	return c.Dest.Validate()
+}
+
+// Save flattens Dest and writes it to base.
+func (c CommandConfig[T, PT]) Save(base string, dirPerm, filePerm fs.FileMode) error {
+	m, err := Flatten(c.Dest)
+	if err != nil {
+		return err
+	}
+	return store.Save(base, m, dirPerm, filePerm)
 }

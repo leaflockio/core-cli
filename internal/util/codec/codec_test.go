@@ -10,6 +10,7 @@ package codec_test
 import (
 	"bytes"
 	"errors"
+	"reflect"
 	"strings"
 	"testing"
 	"time"
@@ -509,5 +510,138 @@ func TestMarshal_JSON_encodeError(t *testing.T) {
 	_, err := codec.Marshal(unencodableFixture{Ch: make(chan int)}, codec.JSON)
 	if err == nil {
 		t.Fatal("expected error, got nil")
+	}
+}
+
+// TestEncodeValue_scalar verifies a plain scalar passes through unchanged.
+func TestEncodeValue_scalar(t *testing.T) {
+	got, err := codec.EncodeValue(5)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if got != 5 {
+		t.Errorf("got %v, want 5", got)
+	}
+}
+
+// TestEncodeValue_nil verifies a nil input is treated as omitted.
+func TestEncodeValue_nil(t *testing.T) {
+	got, err := codec.EncodeValue(nil)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if got != nil {
+		t.Errorf("got %v, want nil", got)
+	}
+}
+
+// TestEncodeValue_time verifies a non-zero time.Time becomes an RFC3339
+// string, and a zero one is treated as omitted.
+func TestEncodeValue_time(t *testing.T) {
+	got, err := codec.EncodeValue(fixedTime)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if got != "2026-06-23T12:00:00Z" {
+		t.Errorf("got %v, want RFC3339 string", got)
+	}
+
+	got, err = codec.EncodeValue(time.Time{})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if got != nil {
+		t.Errorf("got %v, want nil for zero time.Time", got)
+	}
+}
+
+// TestEncodeValue_nilPointer verifies a nil pointer is treated as omitted.
+func TestEncodeValue_nilPointer(t *testing.T) {
+	var p *int
+	got, err := codec.EncodeValue(p)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if got != nil {
+		t.Errorf("got %v, want nil", got)
+	}
+}
+
+// encodeItem is a plain mapstructure-tagged struct, used as a slice/map
+// element below.
+type encodeItem struct {
+	Name string `mapstructure:"name"`
+}
+
+// TestEncodeValue_sliceOfStruct verifies a struct element is keyed by its
+// mapstructure tags, not its raw Go field name.
+func TestEncodeValue_sliceOfStruct(t *testing.T) {
+	got, err := codec.EncodeValue([]encodeItem{{Name: "a"}, {Name: "b"}})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	want := []any{
+		map[string]any{"name": "a"},
+		map[string]any{"name": "b"},
+	}
+	if !reflect.DeepEqual(got, want) {
+		t.Errorf("got %#v, want %#v", got, want)
+	}
+}
+
+// TestEncodeValue_arrayOfStruct verifies a fixed-size array behaves the
+// same way as a slice.
+func TestEncodeValue_arrayOfStruct(t *testing.T) {
+	got, err := codec.EncodeValue([2]encodeItem{{Name: "a"}, {Name: "b"}})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	want := []any{
+		map[string]any{"name": "a"},
+		map[string]any{"name": "b"},
+	}
+	if !reflect.DeepEqual(got, want) {
+		t.Errorf("got %#v, want %#v", got, want)
+	}
+}
+
+// TestEncodeValue_mapOfStruct verifies a struct map value is keyed by its
+// mapstructure tags, not its raw Go field name.
+func TestEncodeValue_mapOfStruct(t *testing.T) {
+	got, err := codec.EncodeValue(map[string]encodeItem{"x": {Name: "a"}})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	want := map[string]any{"x": map[string]any{"name": "a"}}
+	if !reflect.DeepEqual(got, want) {
+		t.Errorf("got %#v, want %#v", got, want)
+	}
+}
+
+// TestEncodeValue_sliceWithNilPointerElement verifies a nil pointer element
+// becomes nil in place, preserving the slice's length and order, rather
+// than being dropped and shifting later elements.
+func TestEncodeValue_sliceWithNilPointerElement(t *testing.T) {
+	got, err := codec.EncodeValue([]*encodeItem{{Name: "a"}, nil})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	want := []any{map[string]any{"name": "a"}, nil}
+	if !reflect.DeepEqual(got, want) {
+		t.Errorf("got %#v, want %#v", got, want)
+	}
+}
+
+// TestEncodeValue_mapWithNilPointerValue verifies a nil pointer value is
+// dropped from the map entirely, matching how a nil pointer struct field is
+// omitted at the top level.
+func TestEncodeValue_mapWithNilPointerValue(t *testing.T) {
+	got, err := codec.EncodeValue(map[string]*encodeItem{"x": {Name: "a"}, "y": nil})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	want := map[string]any{"x": map[string]any{"name": "a"}}
+	if !reflect.DeepEqual(got, want) {
+		t.Errorf("got %#v, want %#v", got, want)
 	}
 }
