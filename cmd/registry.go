@@ -8,10 +8,12 @@ package main
 
 import (
 	"github.com/leaflockio/core-cli/internal/cli"
+	"github.com/leaflockio/core-cli/internal/cli/commands/license"
 	"github.com/leaflockio/core-cli/internal/cli/commands/version"
 )
 
 // commands lists every command wired into the root command tree.
 var commands = []cli.Command{
 	version.New(),
+	license.New(),
 }
