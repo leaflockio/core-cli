@@ -10,6 +10,7 @@ package codec_test
 import (
 	"bytes"
 	"errors"
+	"reflect"
 	"strings"
 	"testing"
 	"time"
@@ -422,5 +423,225 @@ func TestMarshal_non_nil_pointer(t *testing.T) {
 	}
 	if !strings.Contains(string(data), "inner") {
 		t.Errorf("nested struct name should be present, got: %s", data)
+	}
+}
+
+// TestMarshal_mapInput verifies an already-built map[string]any is encoded
+// as-is, skipping struct conversion entirely.
+func TestMarshal_mapInput(t *testing.T) {
+	m := map[string]any{"name": "leaf", "count": 5}
+	data, err := codec.Marshal(m, codec.JSON)
+	if err != nil {
+		t.Fatalf("Marshal: %v", err)
+	}
+	if !strings.Contains(string(data), `"name":"leaf"`) {
+		t.Errorf("expected name field in output, got: %s", data)
+	}
+	if !strings.Contains(string(data), `"count":5`) {
+		t.Errorf("expected count field in output, got: %s", data)
+	}
+}
+
+// TestDecodeValue_scalar decodes a plain scalar into a matching destination.
+func TestDecodeValue_scalar(t *testing.T) {
+	var got string
+	if err := codec.DecodeValue("leaf", &got); err != nil {
+		t.Fatalf("DecodeValue: %v", err)
+	}
+	if got != "leaf" {
+		t.Errorf("got %q, want %q", got, "leaf")
+	}
+}
+
+// TestDecodeValue_duration verifies a duration string decodes into
+// time.Duration, using the same hook DecodeMap relies on.
+func TestDecodeValue_duration(t *testing.T) {
+	var got time.Duration
+	if err := codec.DecodeValue("1h30m", &got); err != nil {
+		t.Fatalf("DecodeValue: %v", err)
+	}
+	if got != 90*time.Minute {
+		t.Errorf("got %v, want %v", got, 90*time.Minute)
+	}
+}
+
+// TestDecodeValue_time verifies an RFC3339 string decodes into time.Time,
+// using the same hook DecodeMap relies on.
+func TestDecodeValue_time(t *testing.T) {
+	var got time.Time
+	if err := codec.DecodeValue("2026-06-23T12:00:00Z", &got); err != nil {
+		t.Fatalf("DecodeValue: %v", err)
+	}
+	if !got.Equal(fixedTime) {
+		t.Errorf("got %v, want %v", got, fixedTime)
+	}
+}
+
+// TestDecodeValue_invalid verifies an error is returned when raw can't
+// convert into dest's type.
+func TestDecodeValue_invalid(t *testing.T) {
+	var got int
+	err := codec.DecodeValue("not-a-number", &got)
+	if err == nil {
+		t.Fatal("expected error, got nil")
+	}
+}
+
+// TestDecodeValue_nonPointerDest verifies an error is returned when dest is
+// not a pointer, exercising the mapstructure decoder construction failure
+// path shared by DecodeMap and DecodeValue.
+func TestDecodeValue_nonPointerDest(t *testing.T) {
+	err := codec.DecodeValue("leaf", "not-a-pointer")
+	if err == nil {
+		t.Fatal("expected error, got nil")
+	}
+}
+
+// unencodableFixture has a field of a type neither JSON nor YAML can encode,
+// for exercising Marshal's own encoding-failure paths (distinct from
+// structToMap's conversion, which already succeeds for this struct).
+type unencodableFixture struct {
+	Ch chan int `mapstructure:"ch"`
+}
+
+// TestMarshal_JSON_encodeError verifies an error is returned when the
+// underlying JSON encoder can't encode a field's value.
+func TestMarshal_JSON_encodeError(t *testing.T) {
+	_, err := codec.Marshal(unencodableFixture{Ch: make(chan int)}, codec.JSON)
+	if err == nil {
+		t.Fatal("expected error, got nil")
+	}
+}
+
+// TestEncodeValue_scalar verifies a plain scalar passes through unchanged.
+func TestEncodeValue_scalar(t *testing.T) {
+	got, err := codec.EncodeValue(5)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if got != 5 {
+		t.Errorf("got %v, want 5", got)
+	}
+}
+
+// TestEncodeValue_nil verifies a nil input is treated as omitted.
+func TestEncodeValue_nil(t *testing.T) {
+	got, err := codec.EncodeValue(nil)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if got != nil {
+		t.Errorf("got %v, want nil", got)
+	}
+}
+
+// TestEncodeValue_time verifies a non-zero time.Time becomes an RFC3339
+// string, and a zero one is treated as omitted.
+func TestEncodeValue_time(t *testing.T) {
+	got, err := codec.EncodeValue(fixedTime)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if got != "2026-06-23T12:00:00Z" {
+		t.Errorf("got %v, want RFC3339 string", got)
+	}
+
+	got, err = codec.EncodeValue(time.Time{})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if got != nil {
+		t.Errorf("got %v, want nil for zero time.Time", got)
+	}
+}
+
+// TestEncodeValue_nilPointer verifies a nil pointer is treated as omitted.
+func TestEncodeValue_nilPointer(t *testing.T) {
+	var p *int
+	got, err := codec.EncodeValue(p)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if got != nil {
+		t.Errorf("got %v, want nil", got)
+	}
+}
+
+// encodeItem is a plain mapstructure-tagged struct, used as a slice/map
+// element below.
+type encodeItem struct {
+	Name string `mapstructure:"name"`
+}
+
+// TestEncodeValue_sliceOfStruct verifies a struct element is keyed by its
+// mapstructure tags, not its raw Go field name.
+func TestEncodeValue_sliceOfStruct(t *testing.T) {
+	got, err := codec.EncodeValue([]encodeItem{{Name: "a"}, {Name: "b"}})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	want := []any{
+		map[string]any{"name": "a"},
+		map[string]any{"name": "b"},
+	}
+	if !reflect.DeepEqual(got, want) {
+		t.Errorf("got %#v, want %#v", got, want)
+	}
+}
+
+// TestEncodeValue_arrayOfStruct verifies a fixed-size array behaves the
+// same way as a slice.
+func TestEncodeValue_arrayOfStruct(t *testing.T) {
+	got, err := codec.EncodeValue([2]encodeItem{{Name: "a"}, {Name: "b"}})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	want := []any{
+		map[string]any{"name": "a"},
+		map[string]any{"name": "b"},
+	}
+	if !reflect.DeepEqual(got, want) {
+		t.Errorf("got %#v, want %#v", got, want)
+	}
+}
+
+// TestEncodeValue_mapOfStruct verifies a struct map value is keyed by its
+// mapstructure tags, not its raw Go field name.
+func TestEncodeValue_mapOfStruct(t *testing.T) {
+	got, err := codec.EncodeValue(map[string]encodeItem{"x": {Name: "a"}})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	want := map[string]any{"x": map[string]any{"name": "a"}}
+	if !reflect.DeepEqual(got, want) {
+		t.Errorf("got %#v, want %#v", got, want)
+	}
+}
+
+// TestEncodeValue_sliceWithNilPointerElement verifies a nil pointer element
+// becomes nil in place, preserving the slice's length and order, rather
+// than being dropped and shifting later elements.
+func TestEncodeValue_sliceWithNilPointerElement(t *testing.T) {
+	got, err := codec.EncodeValue([]*encodeItem{{Name: "a"}, nil})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	want := []any{map[string]any{"name": "a"}, nil}
+	if !reflect.DeepEqual(got, want) {
+		t.Errorf("got %#v, want %#v", got, want)
+	}
+}
+
+// TestEncodeValue_mapWithNilPointerValue verifies a nil pointer value is
+// dropped from the map entirely, matching how a nil pointer struct field is
+// omitted at the top level.
+func TestEncodeValue_mapWithNilPointerValue(t *testing.T) {
+	got, err := codec.EncodeValue(map[string]*encodeItem{"x": {Name: "a"}, "y": nil})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	want := map[string]any{"x": map[string]any{"name": "a"}}
+	if !reflect.DeepEqual(got, want) {
+		t.Errorf("got %#v, want %#v", got, want)
 	}
 }
