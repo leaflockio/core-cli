@@ -148,6 +148,16 @@ const (
 	AUT005 Code = "AUT005"
 )
 
+// CLI domain covers errors caused by how the tool itself was invoked —
+// independent of any specific command's own logic. Use a CLI code when the
+// problem is in the command line the caller typed, not in a command's
+// business rules.
+const (
+	// CLI001 is used when a command path segment doesn't match any known
+	// subcommand.
+	CLI001 Code = "CLI001"
+)
+
 // INT domain covers unexpected internal failures that indicate a bug in leaf.
 // These codes are reserved — only errs.Internal() assigns them. Callers must
 // never construct an INT error directly.
