@@ -86,6 +86,40 @@ func (c *stubCommand) Define(_ *app.App) *cli.Definition {
 	}
 }
 
+// groupedStubCommand is a minimal cli.Command whose Group is settable, for
+// group-validation tests.
+type groupedStubCommand struct {
+	use   string
+	group cli.GroupID
+}
+
+func (c *groupedStubCommand) Define(_ *app.App) *cli.Definition {
+	return &cli.Definition{
+		Meta:    cli.Meta{Use: c.use},
+		Group:   c.group,
+		Handler: func(_ *app.App, _ *cobra.Command, _ []string) error { return nil },
+	}
+}
+
+// groupedStubCommandWithOwnGroups is like groupedStubCommand, but also
+// declares Groups (the taxonomy it offers ITS OWN children) that happens to
+// include its own group value — proving that a command's own Groups never
+// satisfies validation of its own Group, which is checked against its
+// parent's Groups instead.
+type groupedStubCommandWithOwnGroups struct {
+	use   string
+	group cli.GroupID
+}
+
+func (c *groupedStubCommandWithOwnGroups) Define(_ *app.App) *cli.Definition {
+	return &cli.Definition{
+		Meta:    cli.Meta{Use: c.use},
+		Group:   c.group,
+		Groups:  []cli.Group{{ID: c.group, Title: string(c.group)}},
+		Handler: func(_ *app.App, _ *cobra.Command, _ []string) error { return nil },
+	}
+}
+
 // stubBoolResolver records calls to Resolve.
 type stubBoolResolver struct {
 	called bool

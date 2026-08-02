@@ -9,6 +9,7 @@ package factory
 
 import (
 	"fmt"
+	"strings"
 
 	"github.com/leaflockio/core-cli/internal/app"
 	"github.com/spf13/cobra"
@@ -26,6 +27,12 @@ func (f *Factory) execute(plan *assembled, a *app.App) (*cobra.Command, error) {
 		GroupID:            string(def.Group),
 		Args:               meta.Args,
 		DisableSuggestions: meta.DisableSuggestions,
+	}
+
+	// A command declares the group taxonomy for its own children via
+	// Groups.
+	for _, g := range def.Groups {
+		cmd.AddGroup(&cobra.Group{ID: string(g.ID), Title: strings.ToUpper(g.Title)})
 	}
 
 	for _, fp := range plan.flags {

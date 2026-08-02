@@ -269,6 +269,54 @@ func (c *nilHandlerCmd) Define(_ *app.App) *cli.Definition {
 	return &cli.Definition{Meta: cli.Meta{Use: "bad"}}
 }
 
+type groupedParentStubCmd struct {
+	use      string
+	groups   []cli.Group
+	children []cli.Command
+}
+
+func (c *groupedParentStubCmd) Define(_ *app.App) *cli.Definition {
+	return &cli.Definition{
+		Meta:     cli.Meta{Use: c.use},
+		Groups:   c.groups,
+		Handler:  func(_ *app.App, _ *cobra.Command, _ []string) error { return nil },
+		Children: c.children,
+	}
+}
+
+type groupedChildStubCmd struct {
+	use   string
+	group cli.GroupID
+}
+
+func (c *groupedChildStubCmd) Define(_ *app.App) *cli.Definition {
+	return &cli.Definition{
+		Meta:    cli.Meta{Use: c.use},
+		Group:   c.group,
+		Handler: func(_ *app.App, _ *cobra.Command, _ []string) error { return nil },
+	}
+}
+
+func TestFactory_Build_returns_error_when_child_group_undeclared(t *testing.T) {
+	parent := &parentStubCmd{use: "parent", children: []cli.Command{&groupedChildStubCmd{use: "child", group: "read"}}}
+	_, err := factory.New().Build(parent, testApp(t))
+	if err == nil {
+		t.Fatal("expected error when a child's Group isn't declared in its parent's Groups, got nil")
+	}
+}
+
+func TestFactory_Build_allows_child_group_declared_in_parent_groups(t *testing.T) {
+	parent := &groupedParentStubCmd{
+		use:      "parent",
+		groups:   []cli.Group{{ID: "read", Title: "read"}},
+		children: []cli.Command{&groupedChildStubCmd{use: "child", group: "read"}},
+	}
+	_, err := factory.New().Build(parent, testApp(t))
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+}
+
 // nopConfigLoader is a minimal cmdconfig.ConfigLoader for Build-level tests.
 type nopConfigLoader struct{}
 

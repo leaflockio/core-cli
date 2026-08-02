@@ -37,6 +37,62 @@ func TestExecute_builds_command_with_correct_metadata(t *testing.T) {
 	}
 }
 
+func TestExecute_registers_declared_groups_on_command(t *testing.T) {
+	plan := assembledPlan("mycmd", "", "")
+	plan.def.Groups = []cli.Group{{ID: "read", Title: "read"}, {ID: "write", Title: "write"}}
+
+	cmd, err := (&Factory{}).execute(plan, nil)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if !cmd.ContainsGroup("read") {
+		t.Error("expected group \"read\" to be registered on the command")
+	}
+	if !cmd.ContainsGroup("write") {
+		t.Error("expected group \"write\" to be registered on the command")
+	}
+}
+
+func TestExecute_normalizes_group_title_to_upper_case(t *testing.T) {
+	plan := assembledPlan("mycmd", "", "")
+	plan.def.Groups = []cli.Group{{ID: "read", Title: "read ops"}}
+
+	cmd, err := (&Factory{}).execute(plan, nil)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	for _, g := range cmd.Groups() {
+		if g.ID == "read" && g.Title != "READ OPS" {
+			t.Errorf("Title = %q, want %q", g.Title, "READ OPS")
+		}
+	}
+}
+
+func TestExecute_registers_no_groups_when_none_declared(t *testing.T) {
+	plan := assembledPlan("mycmd", "", "")
+
+	cmd, err := (&Factory{}).execute(plan, nil)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if len(cmd.Groups()) != 0 {
+		t.Errorf("Groups() = %v, want none registered when Definition.Groups is empty", cmd.Groups())
+	}
+}
+
+func TestExecute_sets_groupID_from_def_group(t *testing.T) {
+	plan := assembledPlan("mycmd", "", "")
+	plan.def.Group = "read"
+
+	cmd, err := (&Factory{}).execute(plan, nil)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if cmd.GroupID != "read" {
+		t.Errorf("GroupID = %q, want %q", cmd.GroupID, "read")
+	}
+}
+
 func TestExecute_propagates_disableSuggestions_to_command(t *testing.T) {
 	plan := assembledPlan("mycmd", "", "")
 	plan.def.Meta.DisableSuggestions = true

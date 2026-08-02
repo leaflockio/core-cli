@@ -24,7 +24,7 @@ import (
 
 func TestAssemble_returns_error_when_handler_nil_and_no_children(t *testing.T) {
 	def := cli.Definition{Meta: cli.Meta{Use: "test"}}
-	_, err := assemble(&def, level.LevelTop)
+	_, err := assemble(&def, level.LevelTop, nil)
 	if err == nil {
 		t.Fatal("expected error for nil Handler with no children, got nil")
 	}
@@ -35,7 +35,7 @@ func TestAssemble_returns_error_when_handler_nil_and_no_children(t *testing.T) {
 
 func TestAssemble_allows_nil_handler_and_no_children_when_levelRoot(t *testing.T) {
 	def := cli.Definition{Meta: cli.Meta{Use: "test"}}
-	_, err := assemble(&def, level.LevelRoot)
+	_, err := assemble(&def, level.LevelRoot, nil)
 	if err != nil {
 		t.Fatalf("unexpected error for level.LevelRoot with nil Handler and no children: %v", err)
 	}
@@ -46,7 +46,7 @@ func TestAssemble_allows_nil_handler_when_children_declared(t *testing.T) {
 		Meta:     cli.Meta{Use: "parent"},
 		Children: []cli.Command{&stubCommand{use: "child"}},
 	}
-	_, err := assemble(def, level.LevelTop)
+	_, err := assemble(def, level.LevelTop, nil)
 	if err != nil {
 		t.Fatalf("unexpected error for nil Handler with children declared: %v", err)
 	}
@@ -55,7 +55,7 @@ func TestAssemble_allows_nil_handler_when_children_declared(t *testing.T) {
 func TestAssemble_allows_config_when_levelTop(t *testing.T) {
 	def := minDef("license")
 	def.Config = stubConfigLoader{}
-	_, err := assemble(def, level.LevelTop)
+	_, err := assemble(def, level.LevelTop, nil)
 	if err != nil {
 		t.Fatalf("unexpected error for Config declared at level.LevelTop: %v", err)
 	}
@@ -68,7 +68,7 @@ func TestAssemble_allows_path_registry_when_levelTop(t *testing.T) {
 		t.Fatalf("unexpected error adding path: %v", err)
 	}
 	def.PathRegistry = registry
-	_, err := assemble(def, level.LevelTop)
+	_, err := assemble(def, level.LevelTop, nil)
 	if err != nil {
 		t.Fatalf("unexpected error for PathRegistry declared at level.LevelTop: %v", err)
 	}
@@ -86,7 +86,7 @@ func TestAssemble_returns_error_when_config_declared_below_levelTop(t *testing.T
 		t.Run(tt.name, func(t *testing.T) {
 			def := minDef("test")
 			def.Config = stubConfigLoader{}
-			_, err := assemble(def, tt.lvl)
+			_, err := assemble(def, tt.lvl, nil)
 			if err == nil {
 				t.Fatalf("expected error for Config declared at %v, got nil", tt.lvl)
 			}
@@ -113,7 +113,7 @@ func TestAssemble_returns_error_when_path_registry_declared_below_levelTop(t *te
 				t.Fatalf("unexpected error adding path: %v", err)
 			}
 			def.PathRegistry = registry
-			_, err := assemble(def, tt.lvl)
+			_, err := assemble(def, tt.lvl, nil)
 			if err == nil {
 				t.Fatalf("expected error for PathRegistry declared at %v, got nil", tt.lvl)
 			}
@@ -130,7 +130,7 @@ func TestAssemble_returns_error_when_implicit_flag_in_definition(t *testing.T) {
 			Effect: func(_ *app.App) {},
 		},
 	}
-	_, err := assemble(def, level.LevelTop)
+	_, err := assemble(def, level.LevelTop, nil)
 	if err == nil {
 		t.Fatal("expected error for implicit flag in Definition.Flags, got nil")
 	}
@@ -140,7 +140,7 @@ func TestAssemble_returns_error_when_implicit_flag_in_definition(t *testing.T) {
 }
 
 func TestAssemble_hasFlags_false_when_no_flags_declared(t *testing.T) {
-	plan, err := assemble(minDef("test"), level.LevelTop)
+	plan, err := assemble(minDef("test"), level.LevelTop, nil)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -154,7 +154,7 @@ func TestAssemble_hasFlags_true_when_flags_declared(t *testing.T) {
 	def.Flags = []flags.Flag{
 		flags.CommandFlag[*flags.BoolValue]{Value: flags.Bool("verbose", "")},
 	}
-	plan, err := assemble(def, level.LevelTop)
+	plan, err := assemble(def, level.LevelTop, nil)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -165,7 +165,7 @@ func TestAssemble_hasFlags_true_when_flags_declared(t *testing.T) {
 
 func TestAssemble_stores_given_level_on_plan(t *testing.T) {
 	for _, lvl := range []level.Level{level.LevelRoot, level.LevelTop, level.LevelNested} {
-		plan, err := assemble(minDef("test"), lvl)
+		plan, err := assemble(minDef("test"), lvl, nil)
 		if err != nil {
 			t.Fatalf("unexpected error for %v: %v", lvl, err)
 		}
@@ -176,7 +176,7 @@ func TestAssemble_stores_given_level_on_plan(t *testing.T) {
 }
 
 func TestAssemble_hasChildren_false_when_no_children(t *testing.T) {
-	plan, err := assemble(minDef("test"), level.LevelTop)
+	plan, err := assemble(minDef("test"), level.LevelTop, nil)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -188,7 +188,7 @@ func TestAssemble_hasChildren_false_when_no_children(t *testing.T) {
 func TestAssemble_hasChildren_true_when_children_declared(t *testing.T) {
 	def := minDef("parent")
 	def.Children = []cli.Command{&stubCommand{use: "child"}}
-	plan, err := assemble(def, level.LevelTop)
+	plan, err := assemble(def, level.LevelTop, nil)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -198,7 +198,7 @@ func TestAssemble_hasChildren_true_when_children_declared(t *testing.T) {
 }
 
 func TestAssemble_implicit_flags_go_to_persistent_flags(t *testing.T) {
-	plan, err := assemble(minDef("test"), level.LevelTop)
+	plan, err := assemble(minDef("test"), level.LevelTop, nil)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -217,7 +217,7 @@ func TestAssemble_returns_error_when_duplicate_flags(t *testing.T) {
 		flags.CommandFlag[*flags.BoolValue]{Value: flags.Bool("dup", "")},
 		flags.CommandFlag[*flags.StringValue]{Value: flags.String("dup", "")},
 	}
-	_, err := assemble(def, level.LevelTop)
+	_, err := assemble(def, level.LevelTop, nil)
 	if err == nil {
 		t.Fatal("expected error for duplicate flag names, got nil")
 	}
@@ -226,7 +226,7 @@ func TestAssemble_returns_error_when_duplicate_flags(t *testing.T) {
 func TestAssemble_returns_error_when_flag_type_unrecognized(t *testing.T) {
 	def := minDef("test")
 	def.Flags = []flags.Flag{unknownFlag{}}
-	_, err := assemble(def, level.LevelTop)
+	_, err := assemble(def, level.LevelTop, nil)
 	if err == nil {
 		t.Fatal("expected error for unrecognized flag type, got nil")
 	}
@@ -237,9 +237,77 @@ func TestAssemble_returns_error_when_implicit_flag_planning_fails(t *testing.T) 
 	implicitSystemFlags = []flags.Flag{unknownFlag{}}
 	defer func() { implicitSystemFlags = original }()
 
-	_, err := assemble(minDef("test"), level.LevelTop)
+	_, err := assemble(minDef("test"), level.LevelTop, nil)
 	if err == nil {
 		t.Fatal("expected error when implicit flag planning fails, got nil")
+	}
+}
+
+// — validateChildGroups —
+
+func TestValidateChildGroups_returns_nil_when_no_children(t *testing.T) {
+	def := minDef("parent")
+	if err := validateChildGroups(def, nil); err != nil {
+		t.Errorf("unexpected error: %v", err)
+	}
+}
+
+func TestValidateChildGroups_returns_nil_when_child_group_empty(t *testing.T) {
+	def := minDef("parent")
+	def.Children = []cli.Command{&groupedStubCommand{use: "child"}}
+	if err := validateChildGroups(def, nil); err != nil {
+		t.Errorf("unexpected error for child with no Group declared: %v", err)
+	}
+}
+
+func TestValidateChildGroups_returns_nil_when_child_group_declared_in_parent(t *testing.T) {
+	def := minDef("parent")
+	def.Groups = []cli.Group{{ID: "read", Title: "read"}}
+	def.Children = []cli.Command{&groupedStubCommand{use: "child", group: "read"}}
+	if err := validateChildGroups(def, nil); err != nil {
+		t.Errorf("unexpected error for child group declared in parent's Groups: %v", err)
+	}
+}
+
+func TestValidateChildGroups_returns_error_when_child_group_undeclared(t *testing.T) {
+	def := minDef("parent")
+	def.Children = []cli.Command{&groupedStubCommand{use: "child", group: "read"}}
+	err := validateChildGroups(def, nil)
+	if err == nil {
+		t.Fatal("expected error for child group not declared in parent's Groups, got nil")
+	}
+	if !errors.Is(err, errUndeclaredGroup) {
+		t.Errorf("error = %v, want errors.Is match for errUndeclaredGroup", err)
+	}
+}
+
+func TestValidateChildGroups_ignores_own_groups_not_parents(t *testing.T) {
+	// A child's own Groups (what it offers ITS children) must have no
+	// bearing on validating the child's own Group against its parent.
+	def := minDef("parent")
+	def.Children = []cli.Command{&groupedStubCommandWithOwnGroups{use: "child", group: "read"}}
+	err := validateChildGroups(def, nil)
+	if err == nil {
+		t.Fatal("expected error: child's own Groups must not satisfy validation of its own Group")
+	}
+}
+
+func TestAssemble_returns_error_when_child_group_undeclared(t *testing.T) {
+	def := minDef("parent")
+	def.Children = []cli.Command{&groupedStubCommand{use: "child", group: "read"}}
+	_, err := assemble(def, level.LevelTop, nil)
+	if err == nil {
+		t.Fatal("expected error for undeclared child group, got nil")
+	}
+}
+
+func TestAssemble_allows_child_group_declared_in_parent_groups(t *testing.T) {
+	def := minDef("parent")
+	def.Groups = []cli.Group{{ID: "read", Title: "read"}}
+	def.Children = []cli.Command{&groupedStubCommand{use: "child", group: "read"}}
+	_, err := assemble(def, level.LevelTop, nil)
+	if err != nil {
+		t.Errorf("unexpected error: %v", err)
 	}
 }
 

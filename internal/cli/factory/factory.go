@@ -77,7 +77,7 @@ func (f *Factory) Build(cmd cli.Command, a *app.App) (*cobra.Command, error) {
 func (f *Factory) buildNode(cmd cli.Command, a *app.App, lvl level.Level) (*assembled, *cobra.Command, error) {
 	def := cmd.Define(a)
 
-	plan, err := assemble(def, lvl)
+	plan, err := assemble(def, lvl, a)
 	if err != nil {
 		return nil, nil, err
 	}
