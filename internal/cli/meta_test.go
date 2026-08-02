@@ -27,14 +27,21 @@ func TestNewMeta_sets_fields(t *testing.T) {
 	}
 }
 
-func TestNewMeta_args_defaults_to_no_args(t *testing.T) {
+func TestNewMeta_args_defaults_to_rejecting_unrecognized_commands(t *testing.T) {
 	m := cli.NewMeta("foo", "short", "")
 	if m.Args == nil {
-		t.Error("Args should default to cobra.NoArgs, got nil")
+		t.Error("Args should default to a validator, got nil")
 	}
 	cmd := &cobra.Command{}
 	if err := m.Args(cmd, []string{"unexpected"}); err == nil {
-		t.Error("default Args should reject positional arguments")
+		t.Error("default Args should reject an unrecognized positional command name")
+	}
+}
+
+func TestNewMeta_disableSuggestions_defaultsToFalse(t *testing.T) {
+	m := cli.NewMeta("foo", "short", "")
+	if m.DisableSuggestions {
+		t.Error("DisableSuggestions should default to false")
 	}
 }
 
@@ -52,5 +59,20 @@ func TestMeta_WithArgs_does_not_mutate_original(t *testing.T) {
 	cmd := &cobra.Command{}
 	if err := original.Args(cmd, []string{"unexpected"}); err == nil {
 		t.Error("WithArgs mutated the original Meta — original should still reject arguments")
+	}
+}
+
+func TestMeta_WithDisableSuggestions_setsField(t *testing.T) {
+	m := cli.NewMeta("foo", "short", "").WithDisableSuggestions()
+	if !m.DisableSuggestions {
+		t.Error("WithDisableSuggestions should set DisableSuggestions to true")
+	}
+}
+
+func TestMeta_WithDisableSuggestions_does_not_mutate_original(t *testing.T) {
+	original := cli.NewMeta("foo", "short", "")
+	_ = original.WithDisableSuggestions()
+	if original.DisableSuggestions {
+		t.Error("WithDisableSuggestions mutated the original Meta — original should still be false")
 	}
 }

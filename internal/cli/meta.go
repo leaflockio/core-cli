@@ -14,8 +14,12 @@ type Meta struct {
 	Use   string
 	Short string
 	Long  string
-	// Args is the positional argument validator. Defaults to cobra.NoArgs.
+	// Args is the positional argument validator. Defaults to a validator that
+	// rejects an unrecognized subcommand name, suggesting close matches.
 	Args cobra.PositionalArgs
+	// DisableSuggestions turns off close-match suggestions for an
+	// unrecognized subcommand name. Defaults to false.
+	DisableSuggestions bool
 }
 
 // NewMeta returns a Meta with defaults applied. Fields that have defaults can
@@ -25,7 +29,7 @@ func NewMeta(use, short, long string) Meta {
 		Use:   use,
 		Short: short,
 		Long:  long,
-		Args:  cobra.NoArgs,
+		Args:  unknownCommand,
 	}
 }
 
@@ -33,5 +37,12 @@ func NewMeta(use, short, long string) Meta {
 // commands that accept positional arguments.
 func (m Meta) WithArgs(args cobra.PositionalArgs) Meta {
 	m.Args = args
+	return m
+}
+
+// WithDisableSuggestions returns a copy of the Meta with DisableSuggestions
+// set to true.
+func (m Meta) WithDisableSuggestions() Meta {
+	m.DisableSuggestions = true
 	return m
 }
