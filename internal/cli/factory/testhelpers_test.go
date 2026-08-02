@@ -60,6 +60,16 @@ func assembledPlan(use, short, long string) *assembled {
 	}
 }
 
+// boolFlags returns one flags.Flag per name, for building
+// Definition.FlagRules in tests.
+func boolFlags(names ...string) []flags.Flag {
+	fs := make([]flags.Flag, len(names))
+	for i, n := range names {
+		fs[i] = flags.CommandFlag[*flags.BoolValue]{Value: flags.Bool(n, "")}
+	}
+	return fs
+}
+
 // mustPlanFlag calls planFlag and panics on error — only for test setup.
 func mustPlanFlag(f flags.Flag) assembledFlag {
 	p, err := planFlag(f)

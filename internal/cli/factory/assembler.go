@@ -70,8 +70,9 @@ func assemble(def *cli.Definition, lvl level.Level, a *app.App) (*assembled, err
 		implicitFlagPlans = append(implicitFlagPlans, p)
 	}
 
-	definedFlagPlans := make([]assembledFlag, 0, len(def.Flags))
-	for _, f := range def.Flags {
+	all := allFlags(def)
+	definedFlagPlans := make([]assembledFlag, 0, len(all))
+	for _, f := range all {
 		d := f.Definition()
 		if d.Meta.Sub == flags.SubImplicit {
 			return nil, errs.Unexpected(
@@ -98,11 +99,16 @@ func assemble(def *cli.Definition, lvl level.Level, a *app.App) (*assembled, err
 	return &assembled{
 		def:             *def,
 		level:           lvl,
-		hasFlags:        len(def.Flags) > 0,
+		hasFlags:        len(all) > 0,
 		hasChildren:     len(def.Children) > 0,
 		flags:           definedFlagPlans,
 		persistentFlags: implicitFlagPlans,
 	}, nil
+}
+
+// allFlags returns every flag def registers.
+func allFlags(def *cli.Definition) []flags.Flag {
+	return def.Flags
 }
 
 // validateChildGroups requires every child's own Group to be either empty or
@@ -143,9 +149,10 @@ func validateNoDuplicateFlags(def *cli.Definition) error {
 	nameCount := map[string]int{}
 	shortCount := map[string]int{}
 
-	all := make([]flags.Flag, 0, len(implicitSystemFlags)+len(def.Flags))
+	own := allFlags(def)
+	all := make([]flags.Flag, 0, len(implicitSystemFlags)+len(own))
 	all = append(all, implicitSystemFlags...)
-	all = append(all, def.Flags...)
+	all = append(all, own...)
 
 	for _, f := range all {
 		m := f.Definition().Meta

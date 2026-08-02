@@ -31,6 +31,9 @@ func TestNewDefinition_defaults(t *testing.T) {
 	if d.Groups != nil {
 		t.Errorf("Groups = %v, want nil — grouping is opt-in, never automatic", d.Groups)
 	}
+	if d.FlagRules != nil {
+		t.Errorf("FlagRules = %v, want nil by default", d.FlagRules)
+	}
 	if d.Meta.Use != "foo" {
 		t.Errorf("Meta.Use = %q, want %q", d.Meta.Use, "foo")
 	}
@@ -54,6 +57,18 @@ func TestDefinition_WithGroups(t *testing.T) {
 	d := cli.NewDefinition(cli.NewMeta("foo", "short", "")).WithGroups(groups)
 	if len(d.Groups) != 1 || d.Groups[0].ID != cli.GroupProject {
 		t.Errorf("Groups = %v, want %v", d.Groups, groups)
+	}
+}
+
+func TestDefinition_WithFlagRules(t *testing.T) {
+	all := flags.CommandFlag[*flags.BoolValue]{Value: flags.Bool("all", "")}
+	staged := flags.CommandFlag[*flags.BoolValue]{Value: flags.Bool("staged", "")}
+	pr := flags.CommandFlag[*flags.BoolValue]{Value: flags.Bool("pr", "")}
+	rules := []flags.Rule{flags.Exclusive{Flags: []flags.Flag{all, staged, pr}}}
+
+	d := cli.NewDefinition(cli.NewMeta("foo", "short", "")).WithFlagRules(rules)
+	if len(d.FlagRules) != 1 {
+		t.Errorf("FlagRules = %v, want %v", d.FlagRules, rules)
 	}
 }
 

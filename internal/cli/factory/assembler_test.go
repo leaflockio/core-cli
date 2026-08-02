@@ -163,6 +163,23 @@ func TestAssemble_hasFlags_true_when_flags_declared(t *testing.T) {
 	}
 }
 
+func TestAssemble_flagRules_do_not_register_their_own_flags(t *testing.T) {
+	visible := flags.CommandFlag[*flags.BoolValue]{Value: flags.Bool("all", "")}
+	hidden := flags.CommandFlag[*flags.BoolValue]{Value: flags.Bool("staged", "")}
+
+	def := minDef("test")
+	def.Flags = []flags.Flag{visible}
+	def.FlagRules = []flags.Rule{flags.Exclusive{Flags: []flags.Flag{visible, hidden}}}
+
+	plan, err := assemble(def, level.LevelTop, nil)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if len(plan.flags) != 1 {
+		t.Errorf("plan.flags has %d entries, want 1 — FlagRules must not register a flag on its own", len(plan.flags))
+	}
+}
+
 func TestAssemble_stores_given_level_on_plan(t *testing.T) {
 	for _, lvl := range []level.Level{level.LevelRoot, level.LevelTop, level.LevelNested} {
 		plan, err := assemble(minDef("test"), lvl, nil)

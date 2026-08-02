@@ -16,3 +16,18 @@ type Meta struct {
 	Shorthand string
 	Usage     string
 }
+
+// LongFlag returns this flag's long-form reference, e.g. "--pr". Always
+// non-empty — every flag has a Name.
+func (m *Meta) LongFlag() string {
+	return "--" + m.Name
+}
+
+// ShortFlag returns this flag's shorthand reference, e.g. "-p". Returns ""
+// when no Shorthand is registered.
+func (m *Meta) ShortFlag() string {
+	if m.Shorthand == "" {
+		return ""
+	}
+	return "-" + m.Shorthand
+}

@@ -44,3 +44,24 @@ func TestMeta_fields(t *testing.T) {
 		t.Errorf("Usage = %q, want %q", m.Usage, "disable color output")
 	}
 }
+
+func TestMeta_LongFlag(t *testing.T) {
+	m := flags.Meta{Name: "pr"}
+	if got := m.LongFlag(); got != "--pr" {
+		t.Errorf("LongFlag() = %q, want %q", got, "--pr")
+	}
+}
+
+func TestMeta_ShortFlag_withShorthand(t *testing.T) {
+	m := flags.Meta{Name: "pr", Shorthand: "p"}
+	if got := m.ShortFlag(); got != "-p" {
+		t.Errorf("ShortFlag() = %q, want %q", got, "-p")
+	}
+}
+
+func TestMeta_ShortFlag_withoutShorthand(t *testing.T) {
+	m := flags.Meta{Name: "pr"}
+	if got := m.ShortFlag(); got != "" {
+		t.Errorf("ShortFlag() = %q, want empty string when no Shorthand is set", got)
+	}
+}

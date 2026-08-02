@@ -74,18 +74,16 @@ const (
 	LIC008 Code = "LIC008"
 )
 
-// SCO domain covers errors caused by invalid combinations or usage of the
-// shared scope flags (--all, --staged, --pr, --base). Use an SCO code when
-// the problem is in how the user combined scope flags, not in the operation
-// itself.
+// FLR domain covers errors caused by invalid combinations of a command's
+// flags — not specific to any one flag or command.
 const (
-	// SCO001 is used when more than one of --all, --staged, and --pr are
-	// provided at the same time. These flags are mutually exclusive.
-	SCO001 Code = "SCO001"
+	// FLR001 is used when two or more mutually exclusive flags are set at
+	// the same time.
+	FLR001 Code = "FLR001"
 
-	// SCO002 is used when --base is provided without --pr. The --base flag
-	// only applies to --pr scope resolution.
-	SCO002 Code = "SCO002"
+	// FLR002 is used when a flag is set without another flag it depends on
+	// also being set.
+	FLR002 Code = "FLR002"
 )
 
 // WSP domain covers errors from the workspace package.

@@ -34,6 +34,11 @@ type Definition struct {
 	// Flags declares the flags this command accepts.
 	Flags []flags.Flag
 
+	// FlagRules declares relationships between flags, Checked after flags
+	// are parsed, before Handler runs. Every flag a Rule references must
+	// also be declared in Flags; FlagRules never registers a flag on its own.
+	FlagRules []flags.Rule
+
 	// PathRegistry declares the paths this command registers.
 	PathRegistry *paths.Registry
 
@@ -70,6 +75,12 @@ func (d *Definition) WithGroups(groups []Group) *Definition {
 // WithFlags sets Flags and returns the receiver.
 func (d *Definition) WithFlags(f []flags.Flag) *Definition {
 	d.Flags = f
+	return d
+}
+
+// WithFlagRules sets FlagRules and returns the receiver.
+func (d *Definition) WithFlagRules(rules []flags.Rule) *Definition {
+	d.FlagRules = rules
 	return d
 }
 

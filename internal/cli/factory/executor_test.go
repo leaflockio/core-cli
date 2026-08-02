@@ -37,6 +37,72 @@ func TestExecute_builds_command_with_correct_metadata(t *testing.T) {
 	}
 }
 
+func TestExecute_RunE_rejects_exclusive_flags_set_together(t *testing.T) {
+	plan := assembledPlan("mycmd", "", "")
+	plan.def.FlagRules = []flags.Rule{flags.Exclusive{Flags: boolFlags("all", "staged")}}
+	plan.flags = []assembledFlag{
+		mustPlanFlag(flags.CommandFlag[*flags.BoolValue]{Value: flags.Bool("all", "")}),
+		mustPlanFlag(flags.CommandFlag[*flags.BoolValue]{Value: flags.Bool("staged", "")}),
+	}
+
+	cmd, err := (&Factory{}).execute(plan, nil)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if err := cmd.Flags().Parse([]string{"--all", "--staged"}); err != nil {
+		t.Fatalf("Parse failed: %v", err)
+	}
+	if err := cmd.RunE(cmd, nil); err == nil {
+		t.Error("expected RunE to reject two flags from the same exclusive group")
+	}
+}
+
+func TestExecute_RunE_does_not_call_handler_when_exclusive_flags_conflict(t *testing.T) {
+	var handlerCalled bool
+	plan := assembledPlan("mycmd", "", "")
+	plan.def.Handler = func(_ *app.App, _ *cobra.Command, _ []string) error {
+		handlerCalled = true
+		return nil
+	}
+	plan.def.FlagRules = []flags.Rule{flags.Exclusive{Flags: boolFlags("all", "staged")}}
+	plan.flags = []assembledFlag{
+		mustPlanFlag(flags.CommandFlag[*flags.BoolValue]{Value: flags.Bool("all", "")}),
+		mustPlanFlag(flags.CommandFlag[*flags.BoolValue]{Value: flags.Bool("staged", "")}),
+	}
+
+	cmd, err := (&Factory{}).execute(plan, nil)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if err := cmd.Flags().Parse([]string{"--all", "--staged"}); err != nil {
+		t.Fatalf("Parse failed: %v", err)
+	}
+	_ = cmd.RunE(cmd, nil)
+	if handlerCalled {
+		t.Error("Handler must not be called when exclusive flags conflict")
+	}
+}
+
+func TestExecute_RunE_allows_single_exclusive_flag(t *testing.T) {
+	plan := assembledPlan("mycmd", "", "")
+	plan.def.FlagRules = []flags.Rule{flags.Exclusive{Flags: boolFlags("all", "staged")}}
+	plan.flags = []assembledFlag{
+		mustPlanFlag(flags.CommandFlag[*flags.BoolValue]{Value: flags.Bool("all", "")}),
+		mustPlanFlag(flags.CommandFlag[*flags.BoolValue]{Value: flags.Bool("staged", "")}),
+	}
+
+	cmd, err := (&Factory{}).execute(plan, nil)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if err := cmd.Flags().Parse([]string{"--all"}); err != nil {
+		t.Fatalf("Parse failed: %v", err)
+	}
+	if err := cmd.RunE(cmd, nil); err != nil {
+		t.Errorf("unexpected error for a single exclusive flag: %v", err)
+	}
+}
+
 func TestExecute_registers_declared_groups_on_command(t *testing.T) {
 	plan := assembledPlan("mycmd", "", "")
 	plan.def.Groups = []cli.Group{{ID: "read", Title: "read"}, {ID: "write", Title: "write"}}

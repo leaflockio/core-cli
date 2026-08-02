@@ -43,6 +43,12 @@ func (f *Factory) execute(plan *assembled, a *app.App) (*cobra.Command, error) {
 		cmd.RunE = func(cobraCmd *cobra.Command, args []string) error {
 			fs := cobraCmd.Flags()
 
+			for _, rule := range def.FlagRules {
+				if err := rule.Check(fs.Changed); err != nil {
+					return err
+				}
+			}
+
 			for _, fp := range plan.flags {
 				if fp.hasResolver {
 					if err := fp.resolve(fs); err != nil {
