@@ -25,8 +25,11 @@ func (stubConfigLoader) Validate() error             { return nil }
 
 func TestNewDefinition_defaults(t *testing.T) {
 	d := cli.NewDefinition(cli.NewMeta("foo", "short", ""))
-	if d.Group != cli.GroupCLI {
-		t.Errorf("Group = %q, want %q", d.Group, cli.GroupCLI)
+	if d.Group != "" {
+		t.Errorf("Group = %q, want empty — grouping is opt-in, never automatic", d.Group)
+	}
+	if d.Groups != nil {
+		t.Errorf("Groups = %v, want nil — grouping is opt-in, never automatic", d.Groups)
 	}
 	if d.Meta.Use != "foo" {
 		t.Errorf("Meta.Use = %q, want %q", d.Meta.Use, "foo")
@@ -43,6 +46,14 @@ func TestDefinition_WithGroup(t *testing.T) {
 	d := cli.NewDefinition(cli.NewMeta("foo", "short", "")).WithGroup(cli.GroupProject)
 	if d.Group != cli.GroupProject {
 		t.Errorf("Group = %q, want %q", d.Group, cli.GroupProject)
+	}
+}
+
+func TestDefinition_WithGroups(t *testing.T) {
+	groups := []cli.Group{{ID: cli.GroupProject, Title: "Project"}}
+	d := cli.NewDefinition(cli.NewMeta("foo", "short", "")).WithGroups(groups)
+	if len(d.Groups) != 1 || d.Groups[0].ID != cli.GroupProject {
+		t.Errorf("Groups = %v, want %v", d.Groups, groups)
 	}
 }
 

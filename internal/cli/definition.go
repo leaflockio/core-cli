@@ -21,8 +21,15 @@ type Definition struct {
 	// Meta holds the command's identity — Use, Short, Long, Args.
 	Meta Meta
 
-	// Group is the display group for this command. Defaults to GroupCLI.
+	// Group is which of the parent's Groups this command belongs to.
+	// Validated against the parent Definition's own Groups — never this
+	// Definition's. Empty by default, meaning the command renders ungrouped.
 	Group GroupID
+
+	// Groups declares the groups this Definition's own children may set
+	// their Group to. Unrelated to this Definition's own Group. Empty by
+	// default, meaning children render ungrouped.
+	Groups []Group
 
 	// Flags declares the flags this command accepts.
 	Flags []flags.Flag
@@ -40,18 +47,23 @@ type Definition struct {
 	Children []Command
 }
 
-// NewDefinition returns a Definition with Group defaulting to GroupCLI.
-// Use the WithX methods to override individual fields.
+// NewDefinition returns a Definition with Meta set. Use the WithX methods
+// to set any other fields.
 func NewDefinition(meta Meta) *Definition {
 	return &Definition{
-		Meta:  meta,
-		Group: GroupCLI,
+		Meta: meta,
 	}
 }
 
 // WithGroup sets Group and returns the receiver.
 func (d *Definition) WithGroup(group GroupID) *Definition {
 	d.Group = group
+	return d
+}
+
+// WithGroups sets Groups and returns the receiver.
+func (d *Definition) WithGroups(groups []Group) *Definition {
+	d.Groups = groups
 	return d
 }
 
