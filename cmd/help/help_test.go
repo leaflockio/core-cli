@@ -12,6 +12,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/leaflockio/core-cli/internal/cli"
 	"github.com/leaflockio/core-cli/internal/terminal"
 	"github.com/leaflockio/core-cli/internal/ui"
 	"github.com/spf13/cobra"
@@ -326,5 +327,32 @@ func TestSet_writesToPrinterOut(t *testing.T) {
 
 	if !strings.Contains(out.String(), "A great tool") {
 		t.Errorf("expected help output in printer.Out(), got %q", out.String())
+	}
+}
+
+func TestSet_helpCommand_showsKnownCommandHelp(t *testing.T) {
+	printer, out := newTestPrinter(t)
+	root := &cobra.Command{Use: "leaf", Args: cli.NewMeta("leaf", "", "").Args}
+	root.AddCommand(newCmd("version", "Print the version"))
+	Set(root, printer)
+
+	root.SetArgs([]string{"help", "version"})
+	if err := root.Execute(); err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if !strings.Contains(out.String(), "Print the version") {
+		t.Errorf("expected version's help in output, got %q", out.String())
+	}
+}
+
+func TestSet_helpCommand_rejectsUnknownTopic(t *testing.T) {
+	printer, _ := newTestPrinter(t)
+	root := &cobra.Command{Use: "leaf", Args: cli.NewMeta("leaf", "", "").Args, SilenceErrors: true, SilenceUsage: true}
+	root.AddCommand(newCmd("version", "Print the version"))
+	Set(root, printer)
+
+	root.SetArgs([]string{"help", "banana"})
+	if err := root.Execute(); err == nil {
+		t.Error("expected an error for an unrecognized help topic, got nil")
 	}
 }

@@ -11,6 +11,7 @@ import (
 	"fmt"
 	"strings"
 
+	"github.com/leaflockio/core-cli/internal/cli"
 	"github.com/leaflockio/core-cli/internal/ui"
 	"github.com/spf13/cobra"
 	"github.com/spf13/pflag"
@@ -27,10 +28,17 @@ var (
 	colSep    = strings.Repeat(" ", colSepWidth)
 )
 
-// Set registers the styled help function on cmd, writing output to printer.Out().
+// Set registers the styled help function on cmd, writing output to printer.Out(),
+// and replaces cobra's default help command with one that rejects an unknown
+// help topic instead of silently falling back to cmd's own help.
 func Set(cmd *cobra.Command, printer *ui.Printer) {
 	cmd.SetHelpFunc(func(c *cobra.Command, _ []string) {
 		fmt.Fprint(printer.Out(), render(c, printer))
+	})
+	cmd.SetHelpCommand(&cobra.Command{
+		Use:   "help [command]",
+		Short: "Help about any command",
+		RunE:  cli.ShowHelp,
 	})
 }
 
