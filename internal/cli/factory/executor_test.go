@@ -37,6 +37,19 @@ func TestExecute_builds_command_with_correct_metadata(t *testing.T) {
 	}
 }
 
+func TestExecute_propagates_disableSuggestions_to_command(t *testing.T) {
+	plan := assembledPlan("mycmd", "", "")
+	plan.def.Meta.DisableSuggestions = true
+
+	cmd, err := (&Factory{}).execute(plan, nil)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if !cmd.DisableSuggestions {
+		t.Error("DisableSuggestions = false, want true to be propagated from Meta")
+	}
+}
+
 func TestExecute_registers_flags_on_command(t *testing.T) {
 	plan := assembledPlan("mycmd", "", "")
 	plan.flags = append(plan.flags, mustPlanFlag(
@@ -179,7 +192,7 @@ func TestExecute_RunE_passes_the_running_command_to_handler(t *testing.T) {
 	}
 }
 
-func TestExecute_RunE_is_nil_when_handler_is_nil(t *testing.T) {
+func TestExecute_RunE_renders_help_when_handler_is_nil(t *testing.T) {
 	plan := assembledPlan("parent", "", "")
 	plan.def.Handler = nil
 	plan.def.Children = []cli.Command{&stubCommand{use: "child"}}
@@ -189,12 +202,31 @@ func TestExecute_RunE_is_nil_when_handler_is_nil(t *testing.T) {
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-	if cmd.RunE != nil {
-		t.Error("RunE must be nil when Handler is nil — cobra's own non-Runnable fallback shows help; " +
-			"system flag effects still fire at parse time regardless")
+	if cmd.RunE == nil {
+		t.Fatal("RunE must be set when Handler is nil, so cobra's ValidateArgs runs for this command too, " +
+			"instead of being skipped by cobra's non-Runnable fallback")
 	}
-	if cmd.Runnable() {
-		t.Error("command must not be Runnable when Handler is nil")
+	if !cmd.Runnable() {
+		t.Error("command must be Runnable when Handler is nil")
+	}
+	if err := cmd.RunE(cmd, nil); err != nil {
+		t.Errorf("RunE must render help and return nil when called with no args: %v", err)
+	}
+}
+
+func TestExecute_RunE_rejects_unknown_subcommand_when_handler_is_nil(t *testing.T) {
+	plan := assembledPlan("parent", "", "")
+	plan.def.Handler = nil
+	plan.def.Meta.Args = cli.NewMeta("parent", "", "").Args
+	plan.def.Children = []cli.Command{&stubCommand{use: "child"}}
+	plan.hasChildren = true
+
+	cmd, err := (&Factory{}).execute(plan, nil)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if err := cmd.ValidateArgs([]string{"bogus"}); err == nil {
+		t.Error("ValidateArgs must reject an unrecognized subcommand name now that the command is Runnable")
 	}
 }
 

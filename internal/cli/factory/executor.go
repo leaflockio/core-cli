@@ -20,19 +20,18 @@ func (f *Factory) execute(plan *assembled, a *app.App) (*cobra.Command, error) {
 	meta := def.Meta
 
 	cmd := &cobra.Command{
-		Use:     meta.Use,
-		Short:   meta.Short,
-		Long:    meta.Long,
-		GroupID: string(def.Group),
-		Args:    meta.Args,
+		Use:                meta.Use,
+		Short:              meta.Short,
+		Long:               meta.Long,
+		GroupID:            string(def.Group),
+		Args:               meta.Args,
+		DisableSuggestions: meta.DisableSuggestions,
 	}
 
 	for _, fp := range plan.flags {
 		fp.register(cmd.Flags(), a)
 	}
 
-	// Nil Handler means this command only holds children — leave RunE nil so
-	// cobra's own non-Runnable fallback shows help.
 	if def.Handler != nil {
 		cmd.RunE = func(cobraCmd *cobra.Command, args []string) error {
 			fs := cobraCmd.Flags()
@@ -46,6 +45,14 @@ func (f *Factory) execute(plan *assembled, a *app.App) (*cobra.Command, error) {
 			}
 
 			return def.Handler(a, cobraCmd, args)
+		}
+	} else {
+		// A nil Handler means this command only holds children. Giving it a
+		// RunE makes it Runnable, so cobra's ValidateArgs — using this
+		// command's own Meta.Args — actually runs and rejects an
+		// unrecognized subcommand name, at any depth in the tree.
+		cmd.RunE = func(cobraCmd *cobra.Command, _ []string) error {
+			return cobraCmd.Help()
 		}
 	}
 
