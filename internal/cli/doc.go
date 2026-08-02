@@ -15,13 +15,6 @@
 // unit before anything is wired, such as checking for duplicate flag names
 // or requiring a [Definition.Handler] unless the command declares children.
 //
-// # Group defaults and display order live together
-//
-// [GroupID]'s values and the [Groups] slice that orders them for display are
-// declared side by side, so adding or reordering a group is a single edit.
-// [NewDefinition] defaults every command to [GroupCLI], so only commands
-// that need a different placement have to opt in.
-//
 // # Every command package exposes New(...) Command
 //
 // A package implementing [Command] exposes a constructor named New,

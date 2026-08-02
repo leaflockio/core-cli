@@ -14,8 +14,16 @@ type GroupID string
 const (
 	GroupProject GroupID = "project"
 	GroupAccount GroupID = "account"
-	GroupCLI     GroupID = "cli"
 )
 
-// Groups defines the display order of command groups in the help output.
-var Groups = []GroupID{GroupProject, GroupAccount, GroupCLI}
+// Group pairs a GroupID with its display title.
+type Group struct {
+	ID    GroupID
+	Title string
+}
+
+// Groups is the reusable group set, in display order.
+var Groups = []Group{
+	{ID: GroupProject, Title: "project"},
+	{ID: GroupAccount, Title: "account"},
+}
