@@ -120,7 +120,7 @@ func renderGrouped(printer *ui.Printer, visible []*cobra.Command, groups []*cobr
 			continue
 		}
 		b.WriteString("\n")
-		b.WriteString(printer.Header(strings.ToUpper(g.Title)))
+		b.WriteString(printer.Header(g.Title))
 		b.WriteString("\n")
 		b.WriteString(renderUngrouped(printer, cmds, width, indentCmd))
 	}

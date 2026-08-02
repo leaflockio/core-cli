@@ -171,7 +171,7 @@ func TestRenderCommands_ungrouped(t *testing.T) {
 func TestRenderCommands_grouped(t *testing.T) {
 	printer, _ := newTestPrinter(t)
 	parent := newCmd("leaf", "")
-	parent.AddGroup(&cobra.Group{ID: "tools", Title: "Tools"})
+	parent.AddGroup(&cobra.Group{ID: "tools", Title: "TOOLS"})
 	sub := newCmd("license", "Manage licenses")
 	sub.GroupID = "tools"
 	parent.AddCommand(sub)
