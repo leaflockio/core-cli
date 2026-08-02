@@ -11,7 +11,6 @@ import (
 
 	"github.com/leaflockio/core-cli/cmd/help"
 	"github.com/leaflockio/core-cli/internal/app"
-	"github.com/leaflockio/core-cli/internal/cli"
 	"github.com/leaflockio/core-cli/internal/cli/commands/root"
 	"github.com/leaflockio/core-cli/internal/cli/factory"
 	"github.com/leaflockio/core-cli/internal/config"
@@ -64,9 +63,6 @@ func buildCommandTree(a *app.App) (*cobra.Command, error) {
 	cmd.SilenceUsage = true
 	cmd.SilenceErrors = true
 	cmd.CompletionOptions.DisableDefaultCmd = true
-	for _, g := range cli.Groups {
-		cmd.AddGroup(&cobra.Group{ID: string(g), Title: string(g)})
-	}
 	help.Set(cmd, a.Printer)
 	return cmd, nil
 }
