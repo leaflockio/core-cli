@@ -138,6 +138,8 @@
     "handlerless",
     "effectvalue",
     "Validatable",
-    "unencodable"
+    "unencodable",
+
+    "toplevel"
   ]
 }
