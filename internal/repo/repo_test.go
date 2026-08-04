@@ -26,8 +26,8 @@ var (
 func TestDetect_gitRepoWithRemote(t *testing.T) {
 	dir := t.TempDir()
 	origDetect := detectGit
-	origWalk := walkFiles
-	defer func() { detectGit = origDetect; walkFiles = origWalk }()
+	origList := listGitFiles
+	defer func() { detectGit = origDetect; listGitFiles = origList }()
 
 	detectGit = func(_ string) (*git.Snapshot, []error) {
 		return &git.Snapshot{
@@ -36,7 +36,7 @@ func TestDetect_gitRepoWithRemote(t *testing.T) {
 			RemoteURL: "https://github.com/leaflockio/core-cli.git",
 		}, nil
 	}
-	walkFiles = func(_ string, _ bool) ([]string, error) { return nil, nil }
+	listGitFiles = func(_ string) ([]string, error) { return nil, nil }
 
 	info := Detect()
 
@@ -66,13 +66,13 @@ func TestDetect_gitRepoWithRemote(t *testing.T) {
 func TestDetect_gitRepoRemoteFails(t *testing.T) {
 	dir := t.TempDir()
 	origDetect := detectGit
-	origWalk := walkFiles
-	defer func() { detectGit = origDetect; walkFiles = origWalk }()
+	origList := listGitFiles
+	defer func() { detectGit = origDetect; listGitFiles = origList }()
 
 	detectGit = func(_ string) (*git.Snapshot, []error) {
 		return &git.Snapshot{IsRepo: true, RootDir: dir}, nil
 	}
-	walkFiles = func(_ string, _ bool) ([]string, error) { return nil, nil }
+	listGitFiles = func(_ string) ([]string, error) { return nil, nil }
 
 	info := Detect()
 
@@ -93,7 +93,7 @@ func TestDetect_notGitRepo(t *testing.T) {
 	defer func() { detectGit = origDetect; walkFiles = origWalk }()
 
 	detectGit = func(_ string) (*git.Snapshot, []error) { return &git.Snapshot{}, nil }
-	walkFiles = func(_ string, _ bool) ([]string, error) { return nil, nil }
+	walkFiles = func(_ string) ([]string, error) { return nil, nil }
 
 	info := Detect()
 
@@ -112,7 +112,7 @@ func TestDetect_getwdFails(t *testing.T) {
 	defer func() { detectGit = origDetect; walkFiles = origWalk; osGetwd = origGetwd }()
 
 	detectGit = func(_ string) (*git.Snapshot, []error) { return &git.Snapshot{}, nil }
-	walkFiles = func(_ string, _ bool) ([]string, error) { return nil, nil }
+	walkFiles = func(_ string) ([]string, error) { return nil, nil }
 	osGetwd = func() (string, error) { return "", errGetwdFailed }
 
 	info := Detect()
@@ -153,13 +153,13 @@ SOFTWARE.
 		t.Fatal(err)
 	}
 	origDetect := detectGit
-	origWalk := walkFiles
-	defer func() { detectGit = origDetect; walkFiles = origWalk }()
+	origList := listGitFiles
+	defer func() { detectGit = origDetect; listGitFiles = origList }()
 
 	detectGit = func(_ string) (*git.Snapshot, []error) {
 		return &git.Snapshot{IsRepo: true, RootDir: dir}, nil
 	}
-	walkFiles = func(_ string, _ bool) ([]string, error) { return nil, nil }
+	listGitFiles = func(_ string) ([]string, error) { return nil, nil }
 
 	info := Detect()
 
@@ -174,13 +174,13 @@ SOFTWARE.
 func TestDetect_withLanguages(t *testing.T) {
 	dir := t.TempDir()
 	origDetect := detectGit
-	origWalk := walkFiles
-	defer func() { detectGit = origDetect; walkFiles = origWalk }()
+	origList := listGitFiles
+	defer func() { detectGit = origDetect; listGitFiles = origList }()
 
 	detectGit = func(_ string) (*git.Snapshot, []error) {
 		return &git.Snapshot{IsRepo: true, RootDir: dir}, nil
 	}
-	walkFiles = func(_ string, _ bool) ([]string, error) {
+	listGitFiles = func(_ string) ([]string, error) {
 		return []string{
 			filepath.Join("repo", "main.go"),
 			filepath.Join("repo", "util.go"),
@@ -192,6 +192,28 @@ func TestDetect_withLanguages(t *testing.T) {
 
 	if info.Languages.Primary != "Go" {
 		t.Errorf("expected Primary=Go, got %v", info.Languages.Primary)
+	}
+}
+
+func TestDetect_gitListFilesFailsFallsBackToWalkFiles(t *testing.T) {
+	dir := t.TempDir()
+	origDetect := detectGit
+	origList := listGitFiles
+	origWalk := walkFiles
+	defer func() { detectGit = origDetect; listGitFiles = origList; walkFiles = origWalk }()
+
+	detectGit = func(_ string) (*git.Snapshot, []error) {
+		return &git.Snapshot{IsRepo: true, RootDir: dir}, nil
+	}
+	listGitFiles = func(_ string) ([]string, error) { return nil, errWalkFailed }
+	walkFiles = func(_ string) ([]string, error) {
+		return []string{filepath.Join("repo", "main.go")}, nil
+	}
+
+	info := Detect()
+
+	if info.Languages.Primary != "Go" {
+		t.Errorf("expected Primary=Go from walkFiles fallback, got %v", info.Languages.Primary)
 	}
 }
 
@@ -312,13 +334,15 @@ func TestDetectLicense_preferLicenseOverMd(t *testing.T) {
 func TestDetect_walkError(t *testing.T) {
 	dir := t.TempDir()
 	origDetect := detectGit
+	origList := listGitFiles
 	origWalk := walkFiles
-	defer func() { detectGit = origDetect; walkFiles = origWalk }()
+	defer func() { detectGit = origDetect; listGitFiles = origList; walkFiles = origWalk }()
 
 	detectGit = func(_ string) (*git.Snapshot, []error) {
 		return &git.Snapshot{IsRepo: true, RootDir: dir}, nil
 	}
-	walkFiles = func(_ string, _ bool) ([]string, error) { return nil, errWalkFailed }
+	listGitFiles = func(_ string) ([]string, error) { return nil, errWalkFailed }
+	walkFiles = func(_ string) ([]string, error) { return nil, errWalkFailed }
 
 	info := Detect()
 

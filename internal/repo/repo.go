@@ -24,7 +24,10 @@ import (
 // detectGit resolves the git details for dir.
 var detectGit = git.Detect
 
-// walkFiles walks the repository file tree.
+// listGitFiles lists tracked and untracked-but-not-ignored files via git.
+var listGitFiles = git.ListFiles
+
+// walkFiles walks the repository file tree without git.
 var walkFiles = fstree.Walk
 
 // osGetwd resolves the current working directory.
@@ -89,7 +92,13 @@ func Detect() *Info {
 	}
 
 	info.License = detectLicense(info.RootDir)
-	files, err := walkFiles(info.RootDir, true)
+	var files []string
+	if info.IsGit {
+		files, err = listGitFiles(info.RootDir)
+	}
+	if !info.IsGit || err != nil {
+		files, err = walkFiles(info.RootDir)
+	}
 	if err != nil {
 		files = nil
 	}
