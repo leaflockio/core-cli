@@ -40,40 +40,6 @@ const (
 	CFG003 Code = "CFG003"
 )
 
-// LIC domain covers errors from the leaf license command.
-const (
-	// LIC001 is used when license-template.lock cannot be read, parsed, or written.
-	LIC001 Code = "LIC001"
-
-	// LIC002 is used when the template cannot be loaded from the configured source
-	// (built-in name not found, local file missing, remote fetch failed).
-	LIC002 Code = "LIC002"
-
-	// LIC003 is used when a {VARIABLE} placeholder in the template is not resolved
-	// by any source (built-ins, config vars, env vars, or --var flags).
-	LIC003 Code = "LIC003"
-
-	// LIC004 is used when a source file cannot be read or written during
-	// add, update, or migrate operations.
-	LIC004 Code = "LIC004"
-
-	// LIC005 is used when --staged or --pr is requested but the working directory
-	// is not inside a git repository.
-	LIC005 Code = "LIC005"
-
-	// LIC006 is used when the --pr base ref cannot be resolved or fetched from
-	// the remote. Includes instructions for the caller to fix the issue.
-	LIC006 Code = "LIC006"
-
-	// LIC007 is used when leaf.yaml exists but its license section cannot be
-	// parsed or contains invalid values.
-	LIC007 Code = "LIC007"
-
-	// LIC008 is used when one or more files fail the license header check.
-	// This is a validation error (exit 3), not a configuration error.
-	LIC008 Code = "LIC008"
-)
-
 // FLR domain covers errors caused by invalid combinations of a command's
 // flags — not specific to any one flag or command.
 const (
@@ -84,6 +50,23 @@ const (
 	// FLR002 is used when a flag is set without another flag it depends on
 	// also being set.
 	FLR002 Code = "FLR002"
+)
+
+// GIT domain covers errors from the internal/git package — invalid or
+// unavailable git state that an operation depends on, independent of which
+// higher-level command triggered it.
+const (
+	// GIT001 is used when an operation requires being inside a git
+	// repository, but the working directory isn't one.
+	GIT001 Code = "GIT001"
+
+	// GIT002 is used when a base ref is known but not resolvable in the
+	// local git history.
+	GIT002 Code = "GIT002"
+
+	// GIT003 is used when there's no base ref to diff against at all — none
+	// was given, and no remote/branch to build one from either.
+	GIT003 Code = "GIT003"
 )
 
 // WSP domain covers errors from the workspace package.
