@@ -12,26 +12,17 @@ package repo
 
 import (
 	"os"
-	"os/exec"
 	"path/filepath"
 	"strings"
 
 	"github.com/google/licenseclassifier/v2/assets"
 	"github.com/leaflockio/core-cli/internal/fstree"
+	"github.com/leaflockio/core-cli/internal/git"
 	"github.com/leaflockio/core-cli/internal/repo/lang"
 )
 
-const defaultRemote = "origin"
-
-// execGitRoot resolves the repository root via git.
-var execGitRoot = func() ([]byte, error) {
-	return exec.Command("git", "rev-parse", "--show-toplevel").Output()
-}
-
-// execGitRemoteURL resolves the remote URL for the default remote via git.
-var execGitRemoteURL = func() ([]byte, error) {
-	return exec.Command("git", "remote", "get-url", defaultRemote).Output()
-}
+// detectGit resolves the git details for dir.
+var detectGit = git.Detect
 
 // walkFiles walks the repository file tree.
 var walkFiles = fstree.Walk
@@ -57,8 +48,9 @@ type Info struct {
 	IsGit bool
 	// RootDir is the absolute path to the repository or working directory root.
 	RootDir string
-	// RemoteURL is the URL of the git remote named "origin". Empty if not a git
-	// repo or no remote named "origin" exists.
+	// RemoteURL is the URL of the repository's default remote — the only
+	// remote configured, or "origin" when there are several and it's one of
+	// them. Empty if not a git repo or no default remote could be resolved.
 	RemoteURL string
 	// Host is the git hosting provider parsed from RemoteURL (e.g. "github.com").
 	// Empty when RemoteURL is empty.
@@ -81,18 +73,18 @@ type Info struct {
 func Detect() *Info {
 	info := &Info{}
 
-	if out, err := execGitRoot(); err == nil {
+	wd, err := osGetwd()
+	if err != nil {
+		wd = ""
+	}
+
+	snap, _ := detectGit(wd)
+	if snap.IsRepo {
 		info.IsGit = true
-		info.RootDir = strings.TrimSpace(string(out))
-		if out2, err := execGitRemoteURL(); err == nil {
-			info.RemoteURL = strings.TrimSpace(string(out2))
-		}
+		info.RootDir = snap.RootDir
+		info.RemoteURL = snap.RemoteURL
 		info.Host, info.Owner, info.RepoName = parseRemoteURL(info.RemoteURL)
 	} else {
-		wd, err := osGetwd()
-		if err != nil {
-			wd = ""
-		}
 		info.RootDir = wd
 	}
 

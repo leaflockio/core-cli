@@ -12,10 +12,11 @@ import (
 	"os"
 	"path/filepath"
 	"testing"
+
+	"github.com/leaflockio/core-cli/internal/git"
 )
 
 var (
-	errGitFailed   = errors.New("git failed")
 	errWalkFailed  = errors.New("walk failed")
 	errGetwdFailed = errors.New("getwd failed")
 )
@@ -24,14 +25,16 @@ var (
 
 func TestDetect_gitRepoWithRemote(t *testing.T) {
 	dir := t.TempDir()
-	origRoot := execGitRoot
-	origRemote := execGitRemoteURL
+	origDetect := detectGit
 	origWalk := walkFiles
-	defer func() { execGitRoot = origRoot; execGitRemoteURL = origRemote; walkFiles = origWalk }()
+	defer func() { detectGit = origDetect; walkFiles = origWalk }()
 
-	execGitRoot = func() ([]byte, error) { return []byte(dir), nil }
-	execGitRemoteURL = func() ([]byte, error) {
-		return []byte("https://github.com/leaflockio/core-cli.git"), nil
+	detectGit = func(_ string) (*git.Snapshot, []error) {
+		return &git.Snapshot{
+			IsRepo:    true,
+			RootDir:   dir,
+			RemoteURL: "https://github.com/leaflockio/core-cli.git",
+		}, nil
 	}
 	walkFiles = func(_ string, _ bool) ([]string, error) { return nil, nil }
 
@@ -62,13 +65,13 @@ func TestDetect_gitRepoWithRemote(t *testing.T) {
 
 func TestDetect_gitRepoRemoteFails(t *testing.T) {
 	dir := t.TempDir()
-	origRoot := execGitRoot
-	origRemote := execGitRemoteURL
+	origDetect := detectGit
 	origWalk := walkFiles
-	defer func() { execGitRoot = origRoot; execGitRemoteURL = origRemote; walkFiles = origWalk }()
+	defer func() { detectGit = origDetect; walkFiles = origWalk }()
 
-	execGitRoot = func() ([]byte, error) { return []byte(dir), nil }
-	execGitRemoteURL = func() ([]byte, error) { return nil, errGitFailed }
+	detectGit = func(_ string) (*git.Snapshot, []error) {
+		return &git.Snapshot{IsRepo: true, RootDir: dir}, nil
+	}
 	walkFiles = func(_ string, _ bool) ([]string, error) { return nil, nil }
 
 	info := Detect()
@@ -85,12 +88,11 @@ func TestDetect_gitRepoRemoteFails(t *testing.T) {
 }
 
 func TestDetect_notGitRepo(t *testing.T) {
-	origRoot := execGitRoot
+	origDetect := detectGit
 	origWalk := walkFiles
-	origGetwd := osGetwd
-	defer func() { execGitRoot = origRoot; walkFiles = origWalk; osGetwd = origGetwd }()
+	defer func() { detectGit = origDetect; walkFiles = origWalk }()
 
-	execGitRoot = func() ([]byte, error) { return nil, errGitFailed }
+	detectGit = func(_ string) (*git.Snapshot, []error) { return &git.Snapshot{}, nil }
 	walkFiles = func(_ string, _ bool) ([]string, error) { return nil, nil }
 
 	info := Detect()
@@ -104,12 +106,12 @@ func TestDetect_notGitRepo(t *testing.T) {
 }
 
 func TestDetect_getwdFails(t *testing.T) {
-	origRoot := execGitRoot
+	origDetect := detectGit
 	origWalk := walkFiles
 	origGetwd := osGetwd
-	defer func() { execGitRoot = origRoot; walkFiles = origWalk; osGetwd = origGetwd }()
+	defer func() { detectGit = origDetect; walkFiles = origWalk; osGetwd = origGetwd }()
 
-	execGitRoot = func() ([]byte, error) { return nil, errGitFailed }
+	detectGit = func(_ string) (*git.Snapshot, []error) { return &git.Snapshot{}, nil }
 	walkFiles = func(_ string, _ bool) ([]string, error) { return nil, nil }
 	osGetwd = func() (string, error) { return "", errGetwdFailed }
 
@@ -150,13 +152,13 @@ SOFTWARE.
 	if err := os.WriteFile(filepath.Join(dir, "LICENSE"), []byte(mitText), 0o600); err != nil {
 		t.Fatal(err)
 	}
-	origRoot := execGitRoot
-	origRemote := execGitRemoteURL
+	origDetect := detectGit
 	origWalk := walkFiles
-	defer func() { execGitRoot = origRoot; execGitRemoteURL = origRemote; walkFiles = origWalk }()
+	defer func() { detectGit = origDetect; walkFiles = origWalk }()
 
-	execGitRoot = func() ([]byte, error) { return []byte(dir), nil }
-	execGitRemoteURL = func() ([]byte, error) { return nil, errGitFailed }
+	detectGit = func(_ string) (*git.Snapshot, []error) {
+		return &git.Snapshot{IsRepo: true, RootDir: dir}, nil
+	}
 	walkFiles = func(_ string, _ bool) ([]string, error) { return nil, nil }
 
 	info := Detect()
@@ -171,13 +173,13 @@ SOFTWARE.
 
 func TestDetect_withLanguages(t *testing.T) {
 	dir := t.TempDir()
-	origRoot := execGitRoot
-	origRemote := execGitRemoteURL
+	origDetect := detectGit
 	origWalk := walkFiles
-	defer func() { execGitRoot = origRoot; execGitRemoteURL = origRemote; walkFiles = origWalk }()
+	defer func() { detectGit = origDetect; walkFiles = origWalk }()
 
-	execGitRoot = func() ([]byte, error) { return []byte(dir), nil }
-	execGitRemoteURL = func() ([]byte, error) { return nil, errGitFailed }
+	detectGit = func(_ string) (*git.Snapshot, []error) {
+		return &git.Snapshot{IsRepo: true, RootDir: dir}, nil
+	}
 	walkFiles = func(_ string, _ bool) ([]string, error) {
 		return []string{
 			filepath.Join("repo", "main.go"),
@@ -309,34 +311,18 @@ func TestDetectLicense_preferLicenseOverMd(t *testing.T) {
 
 func TestDetect_walkError(t *testing.T) {
 	dir := t.TempDir()
-	origRoot := execGitRoot
-	origRemote := execGitRemoteURL
+	origDetect := detectGit
 	origWalk := walkFiles
-	defer func() { execGitRoot = origRoot; execGitRemoteURL = origRemote; walkFiles = origWalk }()
+	defer func() { detectGit = origDetect; walkFiles = origWalk }()
 
-	execGitRoot = func() ([]byte, error) { return []byte(dir), nil }
-	execGitRemoteURL = func() ([]byte, error) { return nil, errGitFailed }
+	detectGit = func(_ string) (*git.Snapshot, []error) {
+		return &git.Snapshot{IsRepo: true, RootDir: dir}, nil
+	}
 	walkFiles = func(_ string, _ bool) ([]string, error) { return nil, errWalkFailed }
 
 	info := Detect()
 
 	if info.Languages.Primary != "" {
 		t.Errorf("expected empty Primary on walk error, got %q", info.Languages.Primary)
-	}
-}
-
-// --- execGitRoot / execGitRemoteURL real implementations ---
-
-func TestExecGitRoot_realImpl(t *testing.T) {
-	_, err := execGitRoot()
-	if err != nil {
-		t.Skipf("git not available: %v", err)
-	}
-}
-
-func TestExecGitRemoteURL_realImpl(t *testing.T) {
-	_, err := execGitRemoteURL()
-	if err != nil {
-		t.Skipf("git remote get-url origin not available: %v", err)
 	}
 }

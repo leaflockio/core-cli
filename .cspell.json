@@ -140,6 +140,10 @@
     "Validatable",
     "unencodable",
 
-    "toplevel"
+    "toplevel",
+
+    "SPDXID",
+    "licenseclassifier",
+    "fstree"
   ]
 }
