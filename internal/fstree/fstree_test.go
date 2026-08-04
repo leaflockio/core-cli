@@ -19,7 +19,6 @@ import (
 )
 
 var (
-	errLsFiles            = errors.New("ls-files failed")
 	errWalkPerm           = errors.New("permission denied")
 	errInfoNotImplemented = errors.New("not implemented")
 )
@@ -34,69 +33,6 @@ func (s stubDirEntry) Name() string               { return s.name }
 func (s stubDirEntry) IsDir() bool                { return s.isDir }
 func (s stubDirEntry) Type() fs.FileMode          { return 0 }
 func (s stubDirEntry) Info() (fs.FileInfo, error) { return nil, errInfoNotImplemented }
-
-// --- gitWalk ---
-
-func TestGitWalk_returnsFiles(t *testing.T) {
-	orig := gitLsFilesCmd
-	defer func() { gitLsFilesCmd = orig }()
-	gitLsFilesCmd = func(_ string) ([]byte, error) {
-		return []byte("main.go\ninternal/foo.go\n"), nil
-	}
-
-	files, err := gitWalk("repo")
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
-	if len(files) != 2 {
-		t.Errorf("expected 2 files, got %v", files)
-	}
-}
-
-func TestGitWalk_commandError(t *testing.T) {
-	orig := gitLsFilesCmd
-	defer func() { gitLsFilesCmd = orig }()
-	gitLsFilesCmd = func(_ string) ([]byte, error) {
-		return nil, errLsFiles
-	}
-
-	_, err := gitWalk("repo")
-	if err == nil {
-		t.Fatal("expected error, got nil")
-	}
-}
-
-// --- parseGitLines ---
-
-func TestParseGitLines_basic(t *testing.T) {
-	got := parseGitLines([]byte("main.go\ninternal/foo.go\n"), "repo")
-	if len(got) != 2 {
-		t.Fatalf("expected 2 files, got %d: %v", len(got), got)
-	}
-}
-
-func TestParseGitLines_empty(t *testing.T) {
-	got := parseGitLines([]byte(""), "repo")
-	if len(got) != 0 {
-		t.Errorf("expected no files, got %v", got)
-	}
-}
-
-func TestParseGitLines_blankLinesSkipped(t *testing.T) {
-	got := parseGitLines([]byte("a.go\n\n  \nb.go\n"), "repo")
-	if len(got) != 2 {
-		t.Errorf("expected 2 files, got %v", got)
-	}
-}
-
-func TestParseGitLines_joinsRoot(t *testing.T) {
-	root := t.TempDir()
-	got := parseGitLines([]byte("pkg/foo.go\n"), root)
-	want := filepath.Join(root, "pkg", "foo.go")
-	if len(got) != 1 || got[0] != want {
-		t.Errorf("expected %q, got %v", want, got)
-	}
-}
 
 // --- shouldSkipDir ---
 
@@ -180,68 +116,21 @@ func TestFsWalk_entryErrorIsSkipped(t *testing.T) {
 
 // --- Walk ---
 
-func TestWalk_gitignoreSucceeds(t *testing.T) {
-	orig := gitLsFilesCmd
-	defer func() { gitLsFilesCmd = orig }()
-	gitLsFilesCmd = func(_ string) ([]byte, error) {
-		return []byte("tracked.go\n"), nil
-	}
-
-	files, err := Walk("repo", true)
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
-	if len(files) != 1 {
-		t.Errorf("expected 1 file from gitWalk, got %v", files)
-	}
-}
-
-func TestWalk_gitignoreFallsBackToFsWalk(t *testing.T) {
-	origGit := gitLsFilesCmd
+func TestWalk_delegatesToFsWalk(t *testing.T) {
 	origWalk := walkDir
-	defer func() { gitLsFilesCmd = origGit; walkDir = origWalk }()
+	defer func() { walkDir = origWalk }()
 
-	gitLsFilesCmd = func(_ string) ([]byte, error) {
-		return nil, errLsFiles // git unavailable
-	}
 	walkDir = func(_ string, fn fs.WalkDirFunc) error {
 		_ = fn(filepath.Join("repo", "file.go"), stubDirEntry{name: "file.go", isDir: false}, nil)
 		return nil
 	}
 
-	files, err := Walk("repo", true)
+	files, err := Walk("repo")
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
 	if len(files) != 1 {
-		t.Errorf("expected 1 file from fsWalk fallback, got %v", files)
-	}
-}
-
-func TestWalk_noGitignoreUsesFsWalk(t *testing.T) {
-	origGit := gitLsFilesCmd
-	origWalk := walkDir
-	defer func() { gitLsFilesCmd = origGit; walkDir = origWalk }()
-
-	called := false
-	gitLsFilesCmd = func(_ string) ([]byte, error) {
-		called = true
-		return nil, errLsFiles
-	}
-	walkDir = func(_ string, fn fs.WalkDirFunc) error {
-		_ = fn(filepath.Join("repo", "file.go"), stubDirEntry{name: "file.go", isDir: false}, nil)
-		return nil
-	}
-
-	files, err := Walk("repo", false)
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
-	if called {
-		t.Error("expected gitLsFilesCmd to not be called when useGitignore=false")
-	}
-	if len(files) != 1 {
-		t.Errorf("expected 1 file from fsWalk, got %v", files)
+		t.Errorf("expected 1 file, got %v", files)
 	}
 }
 
@@ -444,18 +333,6 @@ func TestDoublestarRegexp_invalidPatternMatchesNothing(t *testing.T) {
 	if re.MatchString("anything") {
 		t.Error("expected invalid pattern to match nothing")
 	}
-}
-
-// --- gitLsFilesCmd real implementation ---
-
-func TestGitLsFilesCmd_realImpl(t *testing.T) {
-	// Exercise the real function body; working dir is inside a git repo so the
-	// command succeeds. Any error is treated as git being unavailable.
-	out, err := gitLsFilesCmd(".")
-	if err != nil {
-		t.Skipf("git ls-files not available: %v", err)
-	}
-	_ = out
 }
 
 // --- Flags.AddTo ---

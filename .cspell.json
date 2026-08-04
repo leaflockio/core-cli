@@ -144,6 +144,8 @@
 
     "SPDXID",
     "licenseclassifier",
-    "fstree"
+    "fstree",
+    "doublestar",
+    "foobaz"
   ]
 }

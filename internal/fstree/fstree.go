@@ -5,25 +5,15 @@
 // software, via any medium, is strictly prohibited without prior
 // written permission from LeafLock.
 
-// Package fstree provides gitignore-aware filesystem tree walking and
-// glob-based file filtering. Walk enumerates candidate source files under a
-// repository root; Filter narrows that list by include/exclude glob patterns.
-// Both functions are scope-agnostic and are shared across commands.
+// Package fstree provides plain filesystem tree walking and glob-based file
+// filtering, shared across commands.
 package fstree
 
 import (
 	"os"
-	"os/exec"
 	"path/filepath"
 	"regexp"
 	"strings"
-)
-
-// git ls-files arguments.
-const (
-	gitArgCached          = "--cached"
-	gitArgOthers          = "--others"
-	gitArgExcludeStandard = "--exclude-standard"
 )
 
 // Glob and regexp building constants.
@@ -36,65 +26,14 @@ const (
 	reMatchNothing = `^\x00$` // fallback pattern that matches nothing
 )
 
-// Mockable runner for git ls-files enumeration.
-var gitLsFilesCmd = func(dir string) ([]byte, error) {
-	cmd := exec.Command("git", "ls-files",
-		gitArgCached,          // tracked files
-		gitArgOthers,          // untracked files
-		gitArgExcludeStandard, // honor .gitignore
-	)
-	cmd.Dir = dir
-	return cmd.Output()
-}
-
-// Mockable runner for directory tree walking.
 var walkDir = filepath.WalkDir
 
-// Directory name patterns always skipped during the fallback filesystem walk.
-// Only the git internals directory is unconditionally excluded here; all other
-// filtering (vendor, node_modules, dist, etc.) is handled by Filter using the
-// config exclude patterns, keeping the user in full control.
+// Directory name patterns always skipped during the walk.
 var fsSkipPatterns = []string{".git"}
 
-// Walk returns all candidate source files under repoRoot.
-//
-// When useGitignore is true and the directory is a git repository, git ls-files
-// is used so that .gitignore rules are honored and untracked-but-ignored files
-// are excluded. When useGitignore is false, or when git is unavailable, a plain
-// filesystem walk is used instead.
-//
-// Walk does not apply include/exclude filtering; use Filter for that.
-func Walk(repoRoot string, useGitignore bool) ([]string, error) {
-	if useGitignore {
-		if files, err := gitWalk(repoRoot); err == nil {
-			return files, nil
-		}
-	}
-	return fsWalk(repoRoot)
-}
-
-// gitWalk enumerates files via git ls-files. Returns absolute OS paths.
-func gitWalk(repoRoot string) ([]string, error) {
-	out, err := gitLsFilesCmd(repoRoot)
-	if err != nil {
-		return nil, err
-	}
-	return parseGitLines(out, repoRoot), nil
-}
-
-// parseGitLines converts raw git ls-files output into absolute OS paths rooted
-// at repoRoot. Blank and whitespace-only lines are skipped.
-func parseGitLines(out []byte, repoRoot string) []string {
-	lines := strings.Split(strings.TrimSpace(string(out)), "\n")
-	files := make([]string, 0, len(lines))
-	for _, line := range lines {
-		line = strings.TrimSpace(line)
-		if line == "" {
-			continue
-		}
-		files = append(files, filepath.Join(repoRoot, filepath.FromSlash(line)))
-	}
-	return files
+// Walk returns all candidate source files under root via a plain filesystem walk.
+func Walk(root string) ([]string, error) {
+	return fsWalk(root)
 }
 
 // shouldSkipDir reports whether a directory name matches any fsSkipPattern.
