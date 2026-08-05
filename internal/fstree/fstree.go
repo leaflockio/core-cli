@@ -7,36 +7,43 @@
 
 // Package fstree provides plain filesystem tree walking and glob-based file
 // filtering, shared across commands.
+//
+// Example tree used below, with cwd /repo:
+//
+//	/repo
+//	├── main.go
+//	├── config
+//	│   ├── settings.json
+//	│   └── settings.yaml
+//	└── src
+//	    ├── index.js
+//	    └── App.jsx
 package fstree
 
 import (
 	"os"
 	"path/filepath"
-	"regexp"
-	"strings"
+
+	"github.com/bmatcuk/doublestar/v4"
 )
 
-// Glob and regexp building constants.
-const (
-	globDoubleStar = "**"
-	reAny          = ".*"     // regexp expansion for **
-	reNonSep       = "[^/]*"  // regexp expansion for *
-	reNonSepSingle = "[^/]"   // regexp expansion for ?
-	reLiteralDot   = `\.`     // regexp expansion for .
-	reMatchNothing = `^\x00$` // fallback pattern that matches nothing
-)
+// MatchAll is the pattern that matches every file, at any depth.
+const MatchAll = "**/*"
 
 var walkDir = filepath.WalkDir
 
-// Directory name patterns always skipped during the walk.
+// fsSkipPatterns are directory names never descended into during a walk.
 var fsSkipPatterns = []string{".git"}
 
-// Walk returns all candidate source files under root via a plain filesystem walk.
+// Walk lists every file under root, recursively, skipping fsSkipPatterns.
+//
+//	Walk("config") → ["config/settings.json", "config/settings.yaml"]
+//	Walk(".")       → every file in the tree
 func Walk(root string) ([]string, error) {
 	return fsWalk(root)
 }
 
-// shouldSkipDir reports whether a directory name matches any fsSkipPattern.
+// shouldSkipDir reports whether a directory name is in fsSkipPatterns.
 func shouldSkipDir(name string) bool {
 	for _, pattern := range fsSkipPatterns {
 		if globMatch(pattern, name) {
@@ -46,10 +53,10 @@ func shouldSkipDir(name string) bool {
 	return false
 }
 
-// fsWalk is a plain filesystem walk that skips directories matching fsSkipPatterns.
-func fsWalk(repoRoot string) ([]string, error) {
+// fsWalk is Walk's implementation.
+func fsWalk(dir string) ([]string, error) {
 	var files []string
-	err := walkDir(repoRoot, func(path string, d os.DirEntry, entryErr error) error {
+	err := walkDir(dir, func(path string, d os.DirEntry, entryErr error) error {
 		if entryErr == nil {
 			if d.IsDir() {
 				if shouldSkipDir(d.Name()) {
@@ -64,9 +71,33 @@ func fsWalk(repoRoot string) ([]string, error) {
 	return files, err
 }
 
-// Filter applies include and exclude glob patterns, returning only files that
-// match at least one include pattern and no exclude pattern.
-// Exclude always wins when both patterns match the same file.
+// Filter keeps only the files that match at least one include pattern and no
+// exclude pattern. Exclude always wins when a file matches both.
+//
+//	Filter(all, ["**/*.go"], nil)      → ["main.go"]
+//	Filter(all, ["**/*"], ["*.json"])  → everything except config/settings.json
+//	Filter(all, nil, nil)              → [] (no include patterns means nothing matches)
+//
+// If a caller wants "everything" as the default instead of "nothing," pass
+// MatchAll rather than an empty include list.
+//
+//	no "/" in the pattern   matches at any depth, by file name alone
+//	                            "*.json"            → config/settings.json, a/config/settings.json, ...
+//	has a "/" in the pattern   anchored — must match the full path exactly
+//	                            "config/*.json"     → config/settings.json, not a/config/settings.json
+//	*                       any characters except "/"
+//	**                      any characters, including "/" — the only way to cross directories
+//	                            "**/config/*.json"  → config/settings.json and a/config/settings.json
+//	?                       exactly one character except "/"
+//	[abc] [a-z]             one character from a set or range
+//	[^abc] or [!abc]        one character NOT in the set
+//	{a,b,c}                 matches if any comma-separated alternative matches (nestable)
+//	                            "config/*.{json,yaml}" → config/settings.json, config/settings.yaml
+//	\                       escapes the next character to match it literally
+//	                            `main\.go` matches "main.go" but not "mainXgo"
+//
+// Matching is always case-sensitive, and an invalid pattern matches nothing
+// rather than erroring.
 func Filter(files, include, exclude []string) []string {
 	out := make([]string, 0, len(files))
 	for _, f := range files {
@@ -81,7 +112,10 @@ func Filter(files, include, exclude []string) []string {
 	return out
 }
 
-// matchesAny reports whether path (or its base name) matches any pattern.
+// matchesAny(path, patterns) reports whether path matches by its full path
+// or its base name:
+//
+//	matchesAny("config/settings.json", ["*.json"]) → true (matched by base name)
 func matchesAny(path string, patterns []string) bool {
 	base := filepath.Base(path)
 	norm := filepath.ToSlash(path)
@@ -93,63 +127,13 @@ func matchesAny(path string, patterns []string) bool {
 	return false
 }
 
-// globMatch reports whether path matches pattern with ** support.
-func globMatch(pattern, path string) bool {
-	pattern = filepath.ToSlash(pattern)
-	if !strings.Contains(pattern, globDoubleStar) {
-		matched, err := filepath.Match(pattern, path)
-		return err == nil && matched
-	}
-	return doublestarRegexp(pattern).MatchString(path)
-}
-
-// buildDoublestarPattern converts a glob pattern containing ** into a regexp
-// source string. Rules:
+// globMatch(pattern, path) reports whether path matches pattern
 //
-//	**  → .*      (any characters including path separators)
-//	*   → [^/]*   (any characters except path separator)
-//	?   → [^/]    (any single character except path separator)
-//	.   → \.      (literal dot)
-//	other → literal character
-func buildDoublestarPattern(pattern string) string {
-	var sb strings.Builder
-	sb.WriteByte('^')
-
-	i := 0
-	for i < len(pattern) {
-		switch {
-		case i+1 < len(pattern) && pattern[i] == '*' && pattern[i+1] == '*':
-			sb.WriteString(reAny)
-			i += 2
-			// Consume an optional trailing slash so "**/foo" works.
-			if i < len(pattern) && pattern[i] == '/' {
-				i++
-			}
-		case pattern[i] == '*':
-			sb.WriteString(reNonSep)
-			i++
-		case pattern[i] == '?':
-			sb.WriteString(reNonSepSingle)
-			i++
-		case pattern[i] == '.':
-			sb.WriteString(reLiteralDot)
-			i++
-		default:
-			sb.WriteByte(pattern[i])
-			i++
-		}
-	}
-
-	sb.WriteByte('$')
-	return sb.String()
-}
-
-// doublestarRegexp compiles a glob pattern containing ** into a *regexp.Regexp.
-// If the compiled pattern is invalid, it returns a regexp that matches nothing.
-func doublestarRegexp(pattern string) *regexp.Regexp {
-	re, err := regexp.Compile(buildDoublestarPattern(pattern))
-	if err != nil {
-		re = regexp.MustCompile(reMatchNothing)
-	}
-	return re
+//	globMatch("*.{js,jsx}", "index.js")    → true
+//	globMatch("*.{js,jsx}", "settings.json") → false
+//
+// An invalid pattern matches nothing rather than erroring.
+func globMatch(pattern, path string) bool {
+	matched, err := doublestar.Match(filepath.ToSlash(pattern), path)
+	return err == nil && matched
 }

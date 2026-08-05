@@ -12,7 +12,6 @@ import (
 	"io/fs"
 	"os"
 	"path/filepath"
-	"strings"
 	"testing"
 
 	"github.com/spf13/cobra"
@@ -175,6 +174,14 @@ func TestFilter_emptyFiles(t *testing.T) {
 	}
 }
 
+func TestFilter_matchAllIncludesEverything(t *testing.T) {
+	files := []string{"main.go", "config/settings.json", "a/b/c/deep.txt"}
+	got := Filter(files, []string{MatchAll}, nil)
+	if len(got) != len(files) {
+		t.Errorf("expected MatchAll to include every file, got %v", got)
+	}
+}
+
 // --- matchesAny ---
 
 func TestMatchesAny_noPatterns(t *testing.T) {
@@ -227,110 +234,35 @@ func TestGlobMatch_doubleStarNoMatch(t *testing.T) {
 	}
 }
 
-// --- buildDoublestarPattern ---
-
-func TestBuildDoublestarPattern_isAnchored(t *testing.T) {
-	p := buildDoublestarPattern("*.go")
-	if !strings.HasPrefix(p, "^") || !strings.HasSuffix(p, "$") {
-		t.Errorf("expected anchored pattern, got %q", p)
+func TestGlobMatch_singleStarDoesNotCrossSeparator(t *testing.T) {
+	if globMatch("*.go", "a/main.go") {
+		t.Error("expected *.go to not match across a path separator")
 	}
 }
 
-func TestBuildDoublestarPattern_doubleStarBecomesAny(t *testing.T) {
-	p := buildDoublestarPattern("**/foo.go")
-	if !strings.Contains(p, reAny) {
-		t.Errorf("expected %q for **, got %q", reAny, p)
-	}
-}
-
-func TestBuildDoublestarPattern_singleStarBecomesNonSep(t *testing.T) {
-	p := buildDoublestarPattern("*.go")
-	if !strings.Contains(p, reNonSep) {
-		t.Errorf("expected %q for *, got %q", reNonSep, p)
-	}
-}
-
-func TestBuildDoublestarPattern_questionBecomesNonSepSingle(t *testing.T) {
-	p := buildDoublestarPattern("file?.go")
-	if !strings.Contains(p, reNonSepSingle) {
-		t.Errorf("expected %q for ?, got %q", reNonSepSingle, p)
-	}
-}
-
-func TestBuildDoublestarPattern_dotEscaped(t *testing.T) {
-	p := buildDoublestarPattern("file.go")
-	if !strings.Contains(p, reLiteralDot) {
-		t.Errorf("expected %q for literal dot, got %q", reLiteralDot, p)
-	}
-}
-
-// --- doublestarRegexp ---
-
-func TestDoublestarRegexp_doubleStarWithTrailingSlash(t *testing.T) {
-	re := doublestarRegexp("**/foo.go")
-	if !re.MatchString("internal/pkg/foo.go") {
-		t.Error("expected **/foo.go to match internal/pkg/foo.go")
-	}
-}
-
-func TestDoublestarRegexp_doubleStarWithoutTrailingSlash(t *testing.T) {
-	re := doublestarRegexp("**foo.go")
-	if !re.MatchString("foo.go") {
-		t.Error("expected **foo.go to match foo.go")
-	}
-}
-
-func TestDoublestarRegexp_doubleStarAtEnd(t *testing.T) {
-	re := doublestarRegexp("vendor/**")
-	if !re.MatchString("vendor/some/pkg/file.go") {
-		t.Error("expected vendor/** to match vendor/some/pkg/file.go")
-	}
-}
-
-func TestDoublestarRegexp_singleStar(t *testing.T) {
-	re := doublestarRegexp("*.go")
-	if !re.MatchString("main.go") {
-		t.Error("expected *.go to match main.go")
-	}
-	if re.MatchString("a/main.go") {
-		t.Error("expected *.go to not match across path separators")
-	}
-}
-
-func TestDoublestarRegexp_questionMark(t *testing.T) {
-	re := doublestarRegexp("file?.go")
-	if !re.MatchString("fileA.go") {
+func TestGlobMatch_questionMark(t *testing.T) {
+	if !globMatch("file?.go", "fileA.go") {
 		t.Error("expected file?.go to match fileA.go")
 	}
-	if re.MatchString("fileAB.go") {
+	if globMatch("file?.go", "fileAB.go") {
 		t.Error("expected file?.go to not match fileAB.go")
 	}
 }
 
-func TestDoublestarRegexp_dot(t *testing.T) {
-	re := doublestarRegexp("file.go")
-	if !re.MatchString("file.go") {
-		t.Error("expected file.go to match file.go")
+func TestGlobMatch_braceAlternation(t *testing.T) {
+	if !globMatch("*.{go,ts}", "main.go") {
+		t.Error("expected *.{go,ts} to match main.go")
 	}
-	if re.MatchString("fileXgo") {
-		t.Error("expected dot to be treated as literal, not wildcard")
+	if !globMatch("*.{go,ts}", "main.ts") {
+		t.Error("expected *.{go,ts} to match main.ts")
 	}
-}
-
-func TestDoublestarRegexp_literal(t *testing.T) {
-	re := doublestarRegexp("foobar")
-	if !re.MatchString("foobar") {
-		t.Error("expected foobar to match foobar")
-	}
-	if re.MatchString("foobaz") {
-		t.Error("expected foobar to not match foobaz")
+	if globMatch("*.{go,ts}", "main.py") {
+		t.Error("expected *.{go,ts} to not match main.py")
 	}
 }
 
-func TestDoublestarRegexp_invalidPatternMatchesNothing(t *testing.T) {
-	// "(**" produces an unclosed group in the regexp, triggering the fallback.
-	re := doublestarRegexp("(**")
-	if re.MatchString("anything") {
+func TestGlobMatch_invalidPatternMatchesNothing(t *testing.T) {
+	if globMatch("[", "anything") {
 		t.Error("expected invalid pattern to match nothing")
 	}
 }
