@@ -151,6 +151,40 @@ func TestFilter_excludeWinsOverInclude(t *testing.T) {
 	}
 }
 
+func TestFilter_negationCancelsEarlierExclude(t *testing.T) {
+	files := []string{"vendor/pkg1/a.go", "vendor/utils/patched.go"}
+	got := Filter(files, []string{MatchAll}, []string{"vendor/**", "!vendor/utils/patched.go"})
+	if len(got) != 1 || got[0] != "vendor/utils/patched.go" {
+		t.Errorf("expected only the un-excluded file, got %v", got)
+	}
+}
+
+func TestFilter_negationBeforeExcludeHasNoEffect(t *testing.T) {
+	files := []string{"vendor/utils/patched.go"}
+	got := Filter(files, []string{MatchAll}, []string{"!vendor/utils/patched.go", "vendor/**"})
+	if len(got) != 0 {
+		t.Errorf("expected the later plain exclude to win, got %v", got)
+	}
+}
+
+func TestIsExcluded_noPatterns(t *testing.T) {
+	if isExcluded("main.go", nil) {
+		t.Error("expected not excluded when exclude is empty")
+	}
+}
+
+func TestIsExcluded_negationWithNoPriorMatchIsNoOp(t *testing.T) {
+	if isExcluded("main.go", []string{"!main.go"}) {
+		t.Error("expected negation with nothing excluded yet to be a no-op")
+	}
+}
+
+func TestIsExcluded_plainPatternExcludes(t *testing.T) {
+	if !isExcluded("main.go", []string{"*.go"}) {
+		t.Error("expected a plain matching pattern to exclude")
+	}
+}
+
 func TestFilter_noIncludeMatch(t *testing.T) {
 	files := []string{"a.ts"}
 	got := Filter(files, []string{"*.go"}, nil)

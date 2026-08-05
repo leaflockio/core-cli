@@ -23,6 +23,7 @@ package fstree
 import (
 	"os"
 	"path/filepath"
+	"strings"
 
 	"github.com/bmatcuk/doublestar/v4"
 )
@@ -71,8 +72,8 @@ func fsWalk(dir string) ([]string, error) {
 	return files, err
 }
 
-// Filter keeps only the files that match at least one include pattern and no
-// exclude pattern. Exclude always wins when a file matches both.
+// Filter keeps only the files that match at least one include pattern and
+// aren't excluded.
 //
 //	Filter(all, ["**/*.go"], nil)      → ["main.go"]
 //	Filter(all, ["**/*"], ["*.json"])  → everything except config/settings.json
@@ -96,6 +97,17 @@ func fsWalk(dir string) ([]string, error) {
 //	\                       escapes the next character to match it literally
 //	                            `main\.go` matches "main.go" but not "mainXgo"
 //
+// exclude is order-sensitive: a "!pattern" entry un-excludes a file matched
+// by an earlier entry, so the entry that appears *last* in exclude wins,
+// This lets you exclude a whole directory and carve out one exception:
+//
+//	Filter(all, ["**/*"], ["vendor/**", "!vendor/utils/patched.go"])
+//	    → everything except vendor, but vendor/utils/patched.go is kept
+//
+// include has no such order-sensitivity or negation — a file either matches
+// one of its patterns or it doesn't; there's nothing to un-include that
+// exclude doesn't already cover.
+//
 // Matching is always case-sensitive, and an invalid pattern matches nothing
 // rather than erroring.
 func Filter(files, include, exclude []string) []string {
@@ -104,7 +116,7 @@ func Filter(files, include, exclude []string) []string {
 		if !matchesAny(f, include) {
 			continue
 		}
-		if matchesAny(f, exclude) {
+		if isExcluded(f, exclude) {
 			continue
 		}
 		out = append(out, f)
@@ -117,14 +129,45 @@ func Filter(files, include, exclude []string) []string {
 //
 //	matchesAny("config/settings.json", ["*.json"]) → true (matched by base name)
 func matchesAny(path string, patterns []string) bool {
-	base := filepath.Base(path)
-	norm := filepath.ToSlash(path)
 	for _, pattern := range patterns {
-		if globMatch(pattern, norm) || globMatch(pattern, base) {
+		if matchesOne(path, pattern) {
 			return true
 		}
 	}
 	return false
+}
+
+// isExcluded(path, exclude) evaluates exclude in order, letting a "!pattern"
+// entry cancel a match from an earlier entry — the last entry in exclude
+// that matches path decides the outcome:
+//
+//	isExcluded("vendor/patched.go", ["vendor/**"])                          → true
+//	isExcluded("vendor/patched.go", ["vendor/**", "!vendor/patched.go"])    → false
+//	isExcluded("vendor/patched.go", ["!vendor/patched.go", "vendor/**"])    → true (later entry wins)
+func isExcluded(path string, exclude []string) bool {
+	excluded := false
+	for _, pattern := range exclude {
+		if negated, ok := strings.CutPrefix(pattern, "!"); ok {
+			if matchesOne(path, negated) {
+				excluded = false
+			}
+			continue
+		}
+		if matchesOne(path, pattern) {
+			excluded = true
+		}
+	}
+	return excluded
+}
+
+// matchesOne(path, pattern) reports whether path matches pattern by its full
+// path or its base name:
+//
+//	matchesOne("config/settings.json", "*.json") → true (matched by base name)
+func matchesOne(path, pattern string) bool {
+	base := filepath.Base(path)
+	norm := filepath.ToSlash(path)
+	return globMatch(pattern, norm) || globMatch(pattern, base)
 }
 
 // globMatch(pattern, path) reports whether path matches pattern
