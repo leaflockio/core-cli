@@ -5,19 +5,6 @@
 // software, via any medium, is strictly prohibited without prior
 // written permission from LeafLock.
 
-// Package fstree provides plain filesystem tree walking and glob-based file
-// filtering, shared across commands.
-//
-// Example tree used below, with cwd /repo:
-//
-//	/repo
-//	├── main.go
-//	├── config
-//	│   ├── settings.json
-//	│   └── settings.yaml
-//	└── src
-//	    ├── index.js
-//	    └── App.jsx
 package fstree
 
 import (
