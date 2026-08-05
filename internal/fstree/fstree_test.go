@@ -167,6 +167,47 @@ func TestFilter_negationBeforeExcludeHasNoEffect(t *testing.T) {
 	}
 }
 
+func TestFilter_trailingSlashExcludesDirNotFile(t *testing.T) {
+	files := []string{"main.go", "build", "src/build/output.js", "src/App.jsx"}
+	got := sorted(Filter(files, []string{MatchAll}, []string{"build/"}))
+	want := sorted([]string{"main.go", "build", "src/App.jsx"})
+	if len(got) != len(want) {
+		t.Fatalf("expected %v, got %v", want, got)
+	}
+	for i := range want {
+		if got[i] != want[i] {
+			t.Errorf("expected %v, got %v", want, got)
+			break
+		}
+	}
+}
+
+func TestFilter_anchoredTrailingSlashOnlyMatchesThatDir(t *testing.T) {
+	files := []string{"src/build/output.js", "other/build/output.js"}
+	got := Filter(files, []string{MatchAll}, []string{"src/build/"})
+	if len(got) != 1 || got[0] != "other/build/output.js" {
+		t.Errorf("expected only other/build/output.js to survive, got %v", got)
+	}
+}
+
+func TestMatchesOne_trailingSlashMatchesAncestorDir(t *testing.T) {
+	if !matchesOne(filepath.Join("src", "build", "output.js"), "build/") {
+		t.Error("expected build/ to match a file under an ancestor dir named build")
+	}
+}
+
+func TestMatchesOne_trailingSlashDoesNotMatchFileOfSameName(t *testing.T) {
+	if matchesOne("build", "build/") {
+		t.Error("expected build/ to not match a file literally named build")
+	}
+}
+
+func TestMatchesAncestorDir_noAncestors(t *testing.T) {
+	if matchesAncestorDir("main.go", "build") {
+		t.Error("expected a root-level file to have no ancestor directories")
+	}
+}
+
 func TestIsExcluded_noPatterns(t *testing.T) {
 	if isExcluded("main.go", nil) {
 		t.Error("expected not excluded when exclude is empty")

@@ -96,6 +96,8 @@ func fsWalk(dir string) ([]string, error) {
 //	                            "config/*.{json,yaml}" → config/settings.json, config/settings.yaml
 //	\                       escapes the next character to match it literally
 //	                            `main\.go` matches "main.go" but not "mainXgo"
+//	trailing "/"            matches only a directory, never a file of the same name
+//	                            "build/" excludes src/build/output.js, not a file named build
 //
 // exclude is order-sensitive: a "!pattern" entry un-excludes a file matched
 // by an earlier entry, so the entry that appears *last* in exclude wins,
@@ -161,13 +163,34 @@ func isExcluded(path string, exclude []string) bool {
 }
 
 // matchesOne(path, pattern) reports whether path matches pattern by its full
-// path or its base name:
+// path or its base name. A trailing "/" on pattern means "directory only" —
+// path itself is never a directory , so that case matches against path's
+// ancestor directories instead:
 //
-//	matchesOne("config/settings.json", "*.json") → true (matched by base name)
+//	matchesOne("config/settings.json", "*.json")   → true (matched by base name)
+//	matchesOne("src/build/output.js", "build/")    → true (build is an ancestor dir)
+//	matchesOne("build", "build/")                  → false (build here is a file, not a dir)
 func matchesOne(path, pattern string) bool {
+	if dirPattern, ok := strings.CutSuffix(pattern, "/"); ok {
+		return matchesAncestorDir(path, dirPattern)
+	}
 	base := filepath.Base(path)
 	norm := filepath.ToSlash(path)
 	return globMatch(pattern, norm) || globMatch(pattern, base)
+}
+
+// matchesAncestorDir(path, dirPattern) reports whether any ancestor
+// directory of path matches dirPattern — e.g. for "src/build/output.js",
+// the ancestors checked are "src" and "src/build".
+func matchesAncestorDir(path, dirPattern string) bool {
+	segments := strings.Split(filepath.ToSlash(path), "/")
+	for i := 1; i < len(segments); i++ {
+		ancestor := strings.Join(segments[:i], "/")
+		if matchesOne(ancestor, dirPattern) {
+			return true
+		}
+	}
+	return false
 }
 
 // globMatch(pattern, path) reports whether path matches pattern
