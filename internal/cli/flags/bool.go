@@ -44,10 +44,14 @@ func (f *BoolValue) WithDefault(val bool) *BoolValue {
 	return f
 }
 
-// WithDest binds the destination pointer and returns the receiver.
+// WithDest returns a copy of f with dest bound as its destination pointer.
+// Copying rather than mutating f in place means any two callers sharing the
+// same underlying Value never have one caller's binding silently
+// overwritten by another's.
 func (f *BoolValue) WithDest(dest *bool) *BoolValue {
-	f.dest = dest
-	return f
+	c := *f
+	c.dest = dest
+	return &c
 }
 
 // BoolResolver is implemented by flags whose underlying type is bool

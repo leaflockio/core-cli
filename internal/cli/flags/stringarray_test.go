@@ -8,6 +8,7 @@
 package flags_test
 
 import (
+	"sync"
 	"testing"
 
 	"github.com/leaflockio/core-cli/internal/cli/flags"
@@ -75,6 +76,57 @@ func TestStringSliceValue_WithDest(t *testing.T) {
 	f := flags.StringSlice("tags", "").WithDest(&dest)
 	if f.Dest() != &dest {
 		t.Error("Dest() should point to the bound variable")
+	}
+}
+
+// TestStringSliceValue_WithDest_independentAcrossCalls guards against a
+// shared package-level flag var (e.g. one command flag reused across
+// several commands) having one command's WithDest binding silently
+// overwritten by another's — WithDest must return an independent copy, not
+// mutate the shared receiver in place.
+func TestStringSliceValue_WithDest_independentAcrossCalls(t *testing.T) {
+	base := flags.StringSlice("tags", "")
+	var destA, destB []string
+	a := base.WithDest(&destA)
+	b := base.WithDest(&destB)
+
+	if a.Dest() != &destA {
+		t.Errorf("a.Dest() = %p, want %p", a.Dest(), &destA)
+	}
+	if b.Dest() != &destB {
+		t.Errorf("b.Dest() = %p, want %p", b.Dest(), &destB)
+	}
+	if a.Dest() == b.Dest() {
+		t.Error("a and b should have independent Dest pointers")
+	}
+	if base.Dest() != nil {
+		t.Error("the original base value should be unaffected by either call")
+	}
+}
+
+// TestStringSliceValue_WithDest_concurrentCallsAreRaceFree calls WithDest
+// on the same shared base from many goroutines at once — the scenario the
+// sequential independence test above can't exercise. Run with -race: this
+// would fail on the old mutate-in-place implementation and passes on the
+// copy-on-write one.
+func TestStringSliceValue_WithDest_concurrentCallsAreRaceFree(t *testing.T) {
+	base := flags.StringSlice("tags", "")
+	const n = 50
+	destinations := make([][]string, n)
+	results := make([]*flags.StringSliceValue, n)
+
+	var wg sync.WaitGroup
+	for i := range n {
+		wg.Go(func() {
+			results[i] = base.WithDest(&destinations[i])
+		})
+	}
+	wg.Wait()
+
+	for i := range n {
+		if results[i].Dest() != &destinations[i] {
+			t.Errorf("results[%d].Dest() = %p, want %p", i, results[i].Dest(), &destinations[i])
+		}
 	}
 }
 
