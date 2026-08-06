@@ -45,6 +45,24 @@ func TestResolvePRFiles_emptyBaseReturnsGIT003(t *testing.T) {
 	}
 }
 
+func TestResolvePRFiles_dashPrefixedBaseReturnsGIT005(t *testing.T) {
+	orig := runOutput
+	defer func() { runOutput = orig }()
+	runOutput = func(_ string, _ ...string) ([]byte, error) {
+		t.Fatal("runOutput should not be called for an unsafe base")
+		return nil, nil
+	}
+
+	_, err := ResolvePRFiles("/repo", "-o=evil", "ACM")
+	if err == nil {
+		t.Fatal("expected error, got nil")
+	}
+	var e *errs.Error
+	if !errors.As(err, &e) || e.Code != errs.GIT005 {
+		t.Errorf("expected GIT005 error, got %v", err)
+	}
+}
+
 func TestResolvePRFiles_diffFailureReturnsGIT002(t *testing.T) {
 	orig := runOutput
 	defer func() { runOutput = orig }()
@@ -100,6 +118,15 @@ func TestNoBaseError_returnsGIT003(t *testing.T) {
 	var e *errs.Error
 	if !errors.As(noBaseError(), &e) || e.Code != errs.GIT003 {
 		t.Error("expected GIT003 error")
+	}
+}
+
+// --- unsafeBaseError ---
+
+func TestUnsafeBaseError_returnsGIT005(t *testing.T) {
+	var e *errs.Error
+	if !errors.As(unsafeBaseError("-o=evil"), &e) || e.Code != errs.GIT005 {
+		t.Error("expected GIT005 error")
 	}
 }
 

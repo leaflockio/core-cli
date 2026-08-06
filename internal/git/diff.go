@@ -20,6 +20,9 @@ func ResolvePRFiles(dir, base, diffFilter string) ([]string, error) {
 	if base == "" {
 		return nil, noBaseError()
 	}
+	if strings.HasPrefix(base, "-") {
+		return nil, unsafeBaseError(base)
+	}
 
 	files, err := gitDiffFiles(dir, base, diffFilter)
 	if err != nil {
@@ -50,6 +53,19 @@ func noBaseError() error {
 		errs.Context{
 			Cause:      "no base ref, and no remote/branch to build one from, was given",
 			Resolution: "provide an explicit base ref, or a remote and branch to build one from",
+		},
+	)
+}
+
+// unsafeBaseError explains that base can't be used as given because git
+// would parse it as an option rather than a revision.
+func unsafeBaseError(base string) error {
+	return errs.Caller(errs.GIT005,
+		fmt.Sprintf("base ref %q is not a safe revision", base),
+		nil,
+		errs.Context{
+			Cause:      `the value begins with "-", which git would parse as an option rather than a revision`,
+			Resolution: `provide a base ref that does not begin with "-"`,
 		},
 	)
 }

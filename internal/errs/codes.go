@@ -67,6 +67,14 @@ const (
 	// GIT003 is used when there's no base ref to diff against at all — none
 	// was given, and no remote/branch to build one from either.
 	GIT003 Code = "GIT003"
+
+	// GIT004 is used when a diff-filter string contains a character git's
+	// own --diff-filter doesn't recognize.
+	GIT004 Code = "GIT004"
+
+	// GIT005 is used when a base ref begins with "-", which would let git
+	// parse it as an option rather than a revision.
+	GIT005 Code = "GIT005"
 )
 
 // WSP domain covers errors from the workspace package.
