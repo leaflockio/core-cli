@@ -13,9 +13,9 @@ type Code string
 // Exit code constants.
 const (
 	ExitSuccess    = 0 // clean exit
-	ExitUser       = 1 // caller error — bad input, missing configuration, missing tool
-	ExitInternal   = 2 // unexpected failure — indicates a bug
-	ExitValidation = 3 // check ran successfully but found issues (e.g. missing license headers)
+	ExitValidation = 1 // check ran successfully but found issues
+	ExitUser       = 2 // caller error — bad input, missing configuration, missing tool
+	ExitInternal   = 3 // unexpected failure — indicates a bug
 )
 
 // Context pairs a cause with its resolution. Use multiple contexts when an
@@ -43,7 +43,7 @@ func (e *Error) Error() string { return e.Message }
 // the chain.
 func (e *Error) Unwrap() error { return e.Err }
 
-// Caller returns an Error for failures that are the caller's fault (exit 1).
+// Caller returns an Error for failures that are the caller's fault (exit 2).
 // Use this when the caller provided bad input, a required tool is missing,
 // or a config file is malformed.
 func Caller(code Code, message string, err error, contexts ...Context) *Error {
@@ -56,10 +56,10 @@ func Caller(code Code, message string, err error, contexts ...Context) *Error {
 	}
 }
 
-// Validation returns an Error for check commands that ran successfully but
-// found issues (exit 3). This distinguishes "check ran, found problems" from
-// a caller error (exit 1) or internal bug (exit 2). CI can key on exit 3 to
-// identify failed validations without treating them as infrastructure errors.
+// Validation returns an Error for a command that ran successfully but found
+// real problems in what it inspected (exit 1). This distinguishes "ran
+// correctly, found issues" from a caller error (exit 2) or an internal bug
+// (exit 3).
 func Validation(code Code, message string, err error, contexts ...Context) *Error {
 	return &Error{
 		Code:     code,
@@ -71,7 +71,7 @@ func Validation(code Code, message string, err error, contexts ...Context) *Erro
 }
 
 // Unexpected returns an Error for failures that should not have happened
-// (exit 2). The message shown to the caller is generic; the underlying err
+// (exit 3). The message shown to the caller is generic; the underlying err
 // is preserved for logging and support.
 func Unexpected(err error, contexts ...Context) *Error {
 	return &Error{
