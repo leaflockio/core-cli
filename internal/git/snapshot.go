@@ -7,7 +7,11 @@
 
 package git
 
-import "slices"
+import (
+	"slices"
+
+	"github.com/leaflockio/core-cli/internal/util/concurrent"
+)
 
 // conventionalRemote is the remote name checked for among several,
 // only used as a tiebreaker when it's confirmed to actually be one
@@ -64,35 +68,36 @@ func Detect(dir string) (*Snapshot, []error) {
 	s.IsRepo = true
 	s.RootDir = root
 
-	var errs []error
-	collect := func(err error) {
-		if err != nil {
-			errs = append(errs, err)
-		}
-	}
+	var remotes []string
 
-	remotes, err := ListRemotes(root)
-	collect(err)
+	// Independent facts, resolved concurrently — none of these depend on
+	// each other.
+	errs := concurrent.Run(
+		func() error { var err error; remotes, err = ListRemotes(root); return err },
+		func() error { var err error; s.Branch, err = CurrentBranch(root); return err },
+		func() error { var err error; s.CommitSHA, err = CurrentCommit(root); return err },
+		func() error { var err error; s.Shallow, err = IsShallow(root); return err },
+		func() error { var err error; s.Dirty, err = IsDirty(root); return err },
+		func() error { var err error; s.Version, err = Version(); return err },
+	)
+
 	s.DefaultRemote = resolveDefaultRemote(remotes)
-
 	if s.DefaultRemote != "" {
-		s.RemoteURL, err = RemoteURL(root, s.DefaultRemote)
-		collect(err)
+		// Both depend on DefaultRemote, resolved above, but are independent
+		// of each other.
+		errs = append(errs, concurrent.Run(
+			func() error {
+				var err error
+				s.RemoteURL, err = RemoteURL(root, s.DefaultRemote)
+				return err
+			},
+			func() error {
+				var err error
+				s.DefaultBranch, err = RemoteDefaultBranch(root, s.DefaultRemote)
+				return err
+			},
+		)...)
 	}
-	s.Branch, err = CurrentBranch(root)
-	collect(err)
-	s.CommitSHA, err = CurrentCommit(root)
-	collect(err)
-	s.Shallow, err = IsShallow(root)
-	collect(err)
-	if s.DefaultRemote != "" {
-		s.DefaultBranch, err = RemoteDefaultBranch(root, s.DefaultRemote)
-		collect(err)
-	}
-	s.Dirty, err = IsDirty(root)
-	collect(err)
-	s.Version, err = Version()
-	collect(err)
 
 	return s, errs
 }
