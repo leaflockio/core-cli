@@ -152,6 +152,7 @@
     "cerr",
     "gitflags",
     "ACDMRTUXB",
-    "dryrun"
+    "dryrun",
+    "gpgsign"
   ]
 }

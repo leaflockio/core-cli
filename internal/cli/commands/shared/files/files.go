@@ -89,14 +89,14 @@ func (f *Files) Resolve(root string, args []string) ([]string, Stats, error) {
 
 	query := discovered
 	if len(args) > 0 {
-		query = fstree.Include(discovered, argPatterns(args))
+		query = fstree.Include(discovered, fstree.RebasePatterns(root, argPatterns(args)))
 	}
 	stats.Query = len(query)
 
-	included := fstree.Include(query, f.includePatterns())
+	included := fstree.Include(query, fstree.RebasePatterns(root, f.includePatterns()))
 	stats.Included = len(included)
 
-	final := fstree.Exclude(included, f.exclude)
+	final := fstree.Exclude(included, fstree.RebasePatterns(root, f.exclude))
 	stats.Final = len(final)
 	stats.Excluded = stats.Included - stats.Final
 

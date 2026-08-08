@@ -56,6 +56,47 @@ func canonicalize(root string) (string, error) {
 	return absPath(root)
 }
 
+// rel makes an absolute path relative to root, in slash form.
+//
+//	rel("/repo", "/repo/config/settings.json") → "config/settings.json"
+func rel(root, path string) (string, error) {
+	r, err := filepath.Rel(root, path)
+	if err != nil {
+		return "", err
+	}
+	return filepath.ToSlash(r), nil
+}
+
+// RebasePatterns rewrites every absolute pattern in patterns to be relative
+// to root, leaving a relative pattern or glob untouched. A leading "!" is
+// preserved around the rebase, so an exclude negation entry keeps working:
+//
+//	RebasePatterns("/repo", ["/repo/main.go", "*.md", "!/repo/vendor/**"])
+//	    → ["main.go", "*.md", "!vendor/**"]
+func RebasePatterns(root string, patterns []string) []string {
+	out := make([]string, len(patterns))
+	for i, p := range patterns {
+		negated, isNegated := strings.CutPrefix(p, "!")
+		target := p
+		if isNegated {
+			target = negated
+		}
+
+		rebased := target
+		if filepath.IsAbs(target) {
+			if r, err := rel(root, target); err == nil {
+				rebased = r
+			}
+		}
+
+		if isNegated {
+			rebased = "!" + rebased
+		}
+		out[i] = rebased
+	}
+	return out
+}
+
 // rebase(root, files) joins files — already relative to root, per fsWalk's
 // contract — onto root's canonical form:
 //

@@ -423,6 +423,76 @@ func TestRebase_emptyFilesSkipsCanonicalize(t *testing.T) {
 	}
 }
 
+// --- rel ---
+
+func TestRel_makesAbsolutePathRelative(t *testing.T) {
+	got, err := rel("/repo", "/repo/config/settings.json")
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if got != "config/settings.json" {
+		t.Errorf("expected config/settings.json, got %q", got)
+	}
+}
+
+func TestRel_errorsOnMismatchedAbsoluteness(t *testing.T) {
+	if _, err := rel("repo", "/repo/config/settings.json"); err == nil {
+		t.Fatal("expected an error mixing a relative root with an absolute path")
+	}
+}
+
+// --- RebasePatterns ---
+
+func TestRebasePatterns_rewritesAbsolutePattern(t *testing.T) {
+	got := RebasePatterns("/repo", []string{"/repo/main.go"})
+	want := []string{"main.go"}
+	if len(got) != 1 || got[0] != want[0] {
+		t.Errorf("expected %v, got %v", want, got)
+	}
+}
+
+func TestRebasePatterns_leavesRelativePatternUntouched(t *testing.T) {
+	got := RebasePatterns("/repo", []string{"*.go"})
+	if len(got) != 1 || got[0] != "*.go" {
+		t.Errorf("expected [*.go] untouched, got %v", got)
+	}
+}
+
+func TestRebasePatterns_rewritesAbsoluteGlobPattern(t *testing.T) {
+	got := RebasePatterns("/repo", []string{"/repo/cmd/*.go"})
+	if len(got) != 1 || got[0] != "cmd/*.go" {
+		t.Errorf("expected [cmd/*.go], got %v", got)
+	}
+}
+
+func TestRebasePatterns_preservesNegationAroundRebase(t *testing.T) {
+	got := RebasePatterns("/repo", []string{"!/repo/vendor/**"})
+	if len(got) != 1 || got[0] != "!vendor/**" {
+		t.Errorf("expected [!vendor/**], got %v", got)
+	}
+}
+
+func TestRebasePatterns_negatedRelativePatternUntouched(t *testing.T) {
+	got := RebasePatterns("/repo", []string{"!vendor/**"})
+	if len(got) != 1 || got[0] != "!vendor/**" {
+		t.Errorf("expected [!vendor/**] untouched, got %v", got)
+	}
+}
+
+func TestRebasePatterns_leavesPatternUnchangedOnRelError(t *testing.T) {
+	got := RebasePatterns("repo", []string{"/repo/main.go"})
+	if len(got) != 1 || got[0] != "/repo/main.go" {
+		t.Errorf("expected the absolute pattern left unchanged, got %v", got)
+	}
+}
+
+func TestRebasePatterns_outsideRootStillRebases(t *testing.T) {
+	got := RebasePatterns("/repo/sub", []string{"/repo/other/main.go"})
+	if len(got) != 1 || got[0] != "../other/main.go" {
+		t.Errorf("expected [../other/main.go], got %v", got)
+	}
+}
+
 // --- resolveOne: stat error that isn't "not found", but path has glob meta ---
 
 func TestResolveOne_statErrorWithGlobMetaIsTreatedAsPattern(t *testing.T) {

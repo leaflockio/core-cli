@@ -257,6 +257,7 @@ func initGitRepo(t *testing.T) string {
 	run("init", "-q")
 	run("config", "user.email", "test@example.com")
 	run("config", "user.name", "test")
+	run("config", "commit.gpgsign", "false") // isolate from the host's global signing config
 	return dir
 }
 
