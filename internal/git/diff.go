@@ -89,7 +89,7 @@ func ResolveStaged(dir, diffFilter string) ([]string, error) {
 			err,
 			errs.Context{
 				Cause:      "the working directory may not be a git repository",
-				Resolution: "run from inside a git repository or use --all instead",
+				Resolution: "run from inside a git repository, or pass file paths directly",
 			},
 		)
 	}

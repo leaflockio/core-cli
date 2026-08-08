@@ -10,6 +10,8 @@ package git
 import (
 	"path/filepath"
 	"strings"
+
+	"github.com/leaflockio/core-cli/internal/errs"
 )
 
 // git ls-files arguments, for gitignore-aware file enumeration.
@@ -52,22 +54,24 @@ func ListRemotes(dir string) ([]string, error) {
 }
 
 // ListFiles enumerates every tracked and untracked-but-not-ignored file in
-// the repository at dir, via git ls-files. Returns absolute OS paths rooted
-// at dir.
+// the repository at dir, via git ls-files. Returns paths relative to dir.
 func ListFiles(dir string) ([]string, error) {
 	out, err := runOutput(dir, "ls-files", argLsCached, argLsOthers, argLsExcludeStandard)
 	if err != nil {
-		return nil, err
+		return nil, errs.Caller(errs.GIT001,
+			"could not list files",
+			err,
+			errs.Context{
+				Cause:      "the working directory may not be a git repository",
+				Resolution: "run from inside a git repository, or use --no-gitignore",
+			},
+		)
 	}
-	return parseLsFiles(out, dir), nil
+	return parseLsFiles(out), nil
 }
 
-// parseLsFiles converts raw git ls-files output into absolute OS paths
-// rooted at dir. Git always emits "/"-separated paths regardless of
-// platform, so each line is converted with filepath.FromSlash before
-// joining — this is what makes the result correct on Windows as well as
-// Unix. Blank and whitespace-only lines are skipped.
-func parseLsFiles(out []byte, dir string) []string {
+// parseLsFiles converts raw git ls-files output into OS-separator paths.
+func parseLsFiles(out []byte) []string {
 	lines := strings.Split(strings.TrimSpace(string(out)), "\n")
 	files := make([]string, 0, len(lines))
 	for _, line := range lines {
@@ -75,7 +79,7 @@ func parseLsFiles(out []byte, dir string) []string {
 		if line == "" {
 			continue
 		}
-		files = append(files, filepath.Join(dir, filepath.FromSlash(line)))
+		files = append(files, filepath.FromSlash(line))
 	}
 	return files
 }

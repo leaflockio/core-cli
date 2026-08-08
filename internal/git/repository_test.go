@@ -10,6 +10,8 @@ package git
 import (
 	"errors"
 	"testing"
+
+	"github.com/leaflockio/core-cli/internal/errs"
 )
 
 var errCmdFailed = errors.New("git command failed")
@@ -124,7 +126,7 @@ func TestListRemotes_returnsError(t *testing.T) {
 
 // --- ListFiles ---
 
-func TestListFiles_returnsAbsolutePaths(t *testing.T) {
+func TestListFiles_returnsPathsRelativeToDir(t *testing.T) {
 	orig := runOutput
 	defer func() { runOutput = orig }()
 	runOutput = func(_ string, _ ...string) ([]byte, error) {
@@ -135,7 +137,7 @@ func TestListFiles_returnsAbsolutePaths(t *testing.T) {
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-	want := []string{"/repo/a.go", "/repo/sub/b.go"}
+	want := []string{"a.go", "sub/b.go"}
 	if len(got) != len(want) {
 		t.Fatalf("ListFiles = %v, want %v", got, want)
 	}
@@ -162,15 +164,20 @@ func TestListFiles_skipsBlankLines(t *testing.T) {
 	}
 }
 
-func TestListFiles_returnsError(t *testing.T) {
+func TestListFiles_returnsGIT001OnFailure(t *testing.T) {
 	orig := runOutput
 	defer func() { runOutput = orig }()
 	runOutput = func(_ string, _ ...string) ([]byte, error) {
 		return nil, errCmdFailed
 	}
 
-	if _, err := ListFiles("/repo"); err == nil {
-		t.Error("expected error, got nil")
+	_, err := ListFiles("/repo")
+	if err == nil {
+		t.Fatal("expected error, got nil")
+	}
+	var e *errs.Error
+	if !errors.As(err, &e) || e.Code != errs.GIT001 {
+		t.Errorf("expected GIT001 error, got %v", err)
 	}
 }
 
