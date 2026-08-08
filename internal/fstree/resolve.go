@@ -19,9 +19,6 @@ var statFile = os.Stat
 // absPath makes a path absolute.
 var absPath = filepath.Abs
 
-// evalSymlinks resolves any symlinks in a path.
-var evalSymlinks = filepath.EvalSymlinks
-
 // Resolve turns positional path arguments into absolute file paths. Using
 // the package doc's example tree:
 //
@@ -52,20 +49,17 @@ func Resolve(paths []string) ([]string, error) {
 	return out, nil
 }
 
-// canonicalize(root) → absolute, symlink-free path
+// canonicalize(root) → absolute path.
 //
 //	canonicalize("main.go") → "/repo/main.go"
 func canonicalize(root string) (string, error) {
-	abs, err := absPath(root)
-	if err != nil {
-		return "", err
-	}
-	return evalSymlinks(abs)
+	return absPath(root)
 }
 
-// rebase(root, files) swaps files' root prefix for root's canonical form:
+// rebase(root, files) joins files — already relative to root, per fsWalk's
+// contract — onto root's canonical form:
 //
-//	rebase("config", ["config/settings.json", "config/settings.yaml"])
+//	rebase("config", ["settings.json", "settings.yaml"])
 //	    → ["/repo/config/settings.json", "/repo/config/settings.yaml"]
 //
 // root is only canonicalized once here, however many files there are.
@@ -79,11 +73,7 @@ func rebase(root string, files []string) ([]string, error) {
 	}
 	out := make([]string, len(files))
 	for i, f := range files {
-		rel, err := filepath.Rel(root, f)
-		if err != nil {
-			return nil, err
-		}
-		out[i] = filepath.Join(canonicalRoot, rel)
+		out[i] = filepath.Join(canonicalRoot, f)
 	}
 	return out, nil
 }
@@ -115,7 +105,8 @@ func resolveOne(path string) ([]string, error) {
 	}
 	var matches []string
 	for _, f := range candidates {
-		if globMatch(path, filepath.ToSlash(f)) {
+		full := filepath.ToSlash(filepath.Join(root, f))
+		if globMatch(path, full) {
 			matches = append(matches, f)
 		}
 	}

@@ -90,8 +90,28 @@ func TestFsWalk_skipsGitDir(t *testing.T) {
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-	if len(files) != 1 || filepath.Base(files[0]) != "main.go" {
-		t.Errorf("expected only main.go, got %v", files)
+	if len(files) != 1 || files[0] != "main.go" {
+		t.Errorf("expected only [main.go], got %v", files)
+	}
+}
+
+func TestFsWalk_returnsPathsRelativeToDir(t *testing.T) {
+	dir := t.TempDir()
+	nested := filepath.Join(dir, "sub", "nested.go")
+	if err := os.MkdirAll(filepath.Dir(nested), 0o700); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(nested, []byte(""), 0o600); err != nil {
+		t.Fatal(err)
+	}
+
+	files, err := fsWalk(dir)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	want := filepath.Join("sub", "nested.go")
+	if len(files) != 1 || files[0] != want {
+		t.Errorf("expected [%s] (relative to dir, not prefixed with it), got %v", want, files)
 	}
 }
 
@@ -128,8 +148,8 @@ func TestWalk_delegatesToFsWalk(t *testing.T) {
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-	if len(files) != 1 {
-		t.Errorf("expected 1 file, got %v", files)
+	if len(files) != 1 || files[0] != "file.go" {
+		t.Errorf("expected [file.go] (relative to root), got %v", files)
 	}
 }
 

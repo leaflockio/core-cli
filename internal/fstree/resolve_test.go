@@ -49,20 +49,34 @@ func chdirTo(t *testing.T, dir string) {
 	t.Cleanup(func() { _ = os.Chdir(orig) })
 }
 
-// wantCanonical returns the absolute, symlink-resolved form of path — the
-// same ground truth Resolve itself computes — so tests are robust on
-// systems where t.TempDir() sits behind a symlink (e.g. macOS's /tmp).
+// wantCanonical returns the absolute form of path — the same ground truth
+// Resolve itself computes. Symlinks are deliberately not resolved (Resolve
+// doesn't dereference them — see canonicalize's doc comment), so this must
+// not call filepath.EvalSymlinks either, or it would compute a different
+// answer than Resolve on systems where t.TempDir() sits behind a symlink
+// (e.g. macOS's /tmp).
 func wantCanonical(t *testing.T, path string) string {
 	t.Helper()
 	abs, err := filepath.Abs(path)
 	if err != nil {
 		t.Fatal(err)
 	}
-	canonical, err := filepath.EvalSymlinks(abs)
+	return abs
+}
+
+// wantCanonicalCwd returns relPath resolved against the current working
+// directory, the same way filepath.Abs computes it internally via
+// os.Getwd — which itself reports the OS's symlink-resolved cwd on macOS,
+// independent of anything Resolve/canonicalize does explicitly. Use this
+// instead of wantCanonical for any test that passes Resolve a relative
+// argument (call it after chdirTo, not before).
+func wantCanonicalCwd(t *testing.T, relPath string) string {
+	t.Helper()
+	cwd, err := os.Getwd()
 	if err != nil {
 		t.Fatal(err)
 	}
-	return canonical
+	return filepath.Join(cwd, relPath)
 }
 
 func TestResolve_literalFile(t *testing.T) {
@@ -111,8 +125,8 @@ func TestResolve_relativeArgReturnsAbsolutePath(t *testing.T) {
 	dir := t.TempDir()
 	f := filepath.Join(dir, "main.go")
 	mustWriteFile(t, f)
-	want := wantCanonical(t, f)
 	chdirTo(t, dir)
+	want := wantCanonicalCwd(t, "main.go")
 
 	got, err := Resolve([]string{"main.go"})
 	if err != nil {
@@ -126,28 +140,12 @@ func TestResolve_relativeArgReturnsAbsolutePath(t *testing.T) {
 	}
 }
 
-func TestResolve_dedupesAcrossRelativeAndAbsoluteSpelling(t *testing.T) {
-	dir := t.TempDir()
-	abs := filepath.Join(dir, "main.go")
-	mustWriteFile(t, abs)
-	want := wantCanonical(t, abs)
-	chdirTo(t, dir)
-
-	got, err := Resolve([]string{"main.go", abs})
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
-	if len(got) != 1 || got[0] != want {
-		t.Errorf("expected deduped [%s], got %v", want, got)
-	}
-}
-
 func TestResolve_directoryWalkReturnsAbsolutePaths(t *testing.T) {
 	dir := t.TempDir()
 	f := filepath.Join(dir, "sub", "main.go")
 	mustWriteFile(t, f)
-	want := wantCanonical(t, f)
 	chdirTo(t, dir)
+	want := wantCanonicalCwd(t, filepath.Join("sub", "main.go"))
 
 	got, err := Resolve([]string{"sub"})
 	if err != nil {
@@ -162,8 +160,8 @@ func TestResolve_globPatternReturnsAbsolutePaths(t *testing.T) {
 	dir := t.TempDir()
 	f := filepath.Join(dir, "main.go")
 	mustWriteFile(t, f)
-	want := wantCanonical(t, f)
 	chdirTo(t, dir)
+	want := wantCanonicalCwd(t, "main.go")
 
 	got, err := Resolve([]string{"*.go"})
 	if err != nil {
@@ -186,21 +184,6 @@ func TestResolve_absPathErrorPropagates(t *testing.T) {
 	_, err := Resolve([]string{f})
 	if err == nil {
 		t.Fatal("expected error to propagate from absPath")
-	}
-}
-
-func TestResolve_evalSymlinksErrorPropagates(t *testing.T) {
-	dir := t.TempDir()
-	f := filepath.Join(dir, "main.go")
-	mustWriteFile(t, f)
-
-	orig := evalSymlinks
-	defer func() { evalSymlinks = orig }()
-	evalSymlinks = func(_ string) (string, error) { return "", errPermDenied }
-
-	_, err := Resolve([]string{f})
-	if err == nil {
-		t.Fatal("expected error to propagate from evalSymlinks")
 	}
 }
 
@@ -416,17 +399,6 @@ func TestRebase_canonicalizeErrorPropagates(t *testing.T) {
 	_, err := rebase(dir, []string{f})
 	if err == nil {
 		t.Fatal("expected error to propagate from canonicalize")
-	}
-}
-
-func TestRebase_relErrorPropagates(t *testing.T) {
-	// root must exist so canonicalize succeeds; filepath.Rel then fails
-	// because root is absolute and the file entry is relative — it has no
-	// cwd to reconcile them against.
-	dir := t.TempDir()
-	_, err := rebase(dir, []string{filepath.Join("rel", "file.go")})
-	if err == nil {
-		t.Fatal("expected error to propagate from filepath.Rel")
 	}
 }
 

@@ -24,9 +24,11 @@ var walkDir = filepath.WalkDir
 var fsSkipPatterns = []string{".git"}
 
 // Walk lists every file under root, recursively, skipping fsSkipPatterns.
+// Returned paths are relative to root, regardless of whether root itself
+// was given as relative or absolute.
 //
-//	Walk("config") → ["config/settings.json", "config/settings.yaml"]
-//	Walk(".")       → every file in the tree
+//	Walk("config") → ["settings.json", "settings.yaml"]
+//	Walk(".")       → every file in the tree, relative to cwd
 func Walk(root string) ([]string, error) {
 	return fsWalk(root)
 }
@@ -41,7 +43,8 @@ func shouldSkipDir(name string) bool {
 	return false
 }
 
-// fsWalk is Walk's implementation.
+// fsWalk walks dir recursively, skipping fsSkipPatterns, and returns every
+// file found as a path relative to dir.
 func fsWalk(dir string) ([]string, error) {
 	var files []string
 	err := walkDir(dir, func(path string, d os.DirEntry, entryErr error) error {
@@ -51,7 +54,11 @@ func fsWalk(dir string) ([]string, error) {
 					return filepath.SkipDir
 				}
 			} else {
-				files = append(files, path)
+				rel, relErr := filepath.Rel(dir, path)
+				if relErr != nil {
+					return relErr
+				}
+				files = append(files, filepath.ToSlash(rel))
 			}
 		}
 		return nil
