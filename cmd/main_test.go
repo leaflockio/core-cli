@@ -8,6 +8,7 @@ package main
 
 import (
 	"errors"
+	"strings"
 	"testing"
 
 	"github.com/leaflockio/core-cli/internal/errs"
@@ -23,10 +24,13 @@ func TestMain_noError(t *testing.T) {
 	exitCalled := false
 	osExit = func(int) { exitCalled = true }
 
-	main()
+	out := captureStderr(t, main)
 
 	if exitCalled {
 		t.Error("expected osExit not to be called when run succeeds")
+	}
+	if !strings.Contains(out, "done in") {
+		t.Errorf("expected duration to be printed even on success, got %q", out)
 	}
 }
 
@@ -40,11 +44,12 @@ func TestMain_callerError(t *testing.T) {
 	var got int
 	osExit = func(code int) { got = code }
 
-	main()
+	out := captureStderr(t, main)
 
 	if got != errs.ExitUser {
 		t.Errorf("expected ExitUser (%d), got %d", errs.ExitUser, got)
 	}
+	assertErrorBeforeDuration(t, out)
 }
 
 func TestMain_internalError(t *testing.T) {
@@ -56,9 +61,24 @@ func TestMain_internalError(t *testing.T) {
 	var got int
 	osExit = func(code int) { got = code }
 
-	main()
+	out := captureStderr(t, main)
 
 	if got != errs.ExitInternal {
 		t.Errorf("expected ExitInternal (%d), got %d", errs.ExitInternal, got)
+	}
+	assertErrorBeforeDuration(t, out)
+}
+
+// assertErrorBeforeDuration checks that the error message errs.Print writes
+// appears before the trailing duration line, not after.
+func assertErrorBeforeDuration(t *testing.T, out string) {
+	t.Helper()
+	errIdx := strings.Index(out, "error")
+	durIdx := strings.Index(out, "done in")
+	if errIdx == -1 || durIdx == -1 {
+		t.Fatalf("expected both an error message and a duration line, got %q", out)
+	}
+	if errIdx > durIdx {
+		t.Errorf("expected error message before duration line, got %q", out)
 	}
 }

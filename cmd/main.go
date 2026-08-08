@@ -9,6 +9,7 @@ package main
 import (
 	"errors"
 	"os"
+	"time"
 
 	"github.com/leaflockio/core-cli/internal/errs"
 )
@@ -30,8 +31,13 @@ var (
 )
 
 func main() {
-	if err := runFn(); err != nil {
+	start := time.Now()
+	err := runFn()
+	if err != nil {
 		errs.Print(err)
+	}
+	printDuration(time.Since(start))
+	if err != nil {
 		var e *errs.Error
 		if errors.As(err, &e) {
 			osExit(e.ExitCode)
