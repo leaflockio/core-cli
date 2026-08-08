@@ -133,6 +133,21 @@ func TestFsWalk_entryErrorIsSkipped(t *testing.T) {
 	}
 }
 
+func TestFsWalk_relErrorPropagates(t *testing.T) {
+	orig := walkDir
+	defer func() { walkDir = orig }()
+	walkDir = func(_ string, fn fs.WalkDirFunc) error {
+		// An absolute path can't be made relative to a relative root,
+		// forcing filepath.Rel to fail.
+		return fn("/absolute/bad.go", stubDirEntry{name: "bad.go", isDir: false}, nil)
+	}
+
+	_, err := fsWalk("relative-dir")
+	if err == nil {
+		t.Fatal("expected an error when filepath.Rel fails")
+	}
+}
+
 // --- Walk ---
 
 func TestWalk_delegatesToFsWalk(t *testing.T) {
