@@ -7,6 +7,7 @@
 package main
 
 import (
+	"log/slog"
 	"os"
 
 	"github.com/leaflockio/core-cli/cmd/help"
@@ -21,6 +22,7 @@ import (
 	"github.com/leaflockio/core-cli/internal/repo"
 	"github.com/leaflockio/core-cli/internal/terminal"
 	"github.com/leaflockio/core-cli/internal/ui"
+	"github.com/leaflockio/core-cli/internal/util/concurrent"
 	"github.com/leaflockio/core-cli/internal/version"
 	"github.com/leaflockio/core-cli/internal/workspace"
 	"github.com/spf13/cobra"
@@ -88,15 +90,27 @@ func initConfig(envStr string) (*config.Config, error) {
 
 // buildApp constructs all infrastructure from cfg and returns the assembled App.
 func buildApp(cfg *config.Config) (*app.App, error) {
-	log, err := logger.Build(&cfg.Log)
-	if err != nil {
-		return nil, err
-	}
 	term := terminal.New(os.Stdout, os.Stderr, os.Stdin)
 	printer := ui.NewPrinter(term)
-	plat := platform.Detect()
 	inv := invocation.FromArgs()
-	repoInfo := repo.Detect()
+
+	var (
+		log      *slog.Logger
+		plat     *platform.Platform
+		repoInfo *repo.Info
+	)
+	errs := concurrent.Run(
+		func() error {
+			var err error
+			log, err = logger.Build(&cfg.Log)
+			return err
+		},
+		func() error { plat = platform.Detect(); return nil },
+		func() error { repoInfo = repo.Detect(); return nil },
+	)
+	if len(errs) > 0 {
+		return nil, errs[0]
+	}
 
 	ws, err := workspace.New("", repoInfo.RootDir)
 	if err != nil {
