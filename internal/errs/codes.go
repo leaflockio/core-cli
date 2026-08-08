@@ -52,6 +52,19 @@ const (
 	FLR002 Code = "FLR002"
 )
 
+// SRC domain covers errors resolving which files a command should operate
+// on.
+const (
+	// SRC001 is used when positional file arguments are combined with
+	// --staged or --pr — each already defines a complete file source on its
+	// own, so combining them is ambiguous.
+	SRC001 Code = "SRC001"
+
+	// SRC002 is used when no source was given at all: no --staged, --pr, or
+	// positional file arguments.
+	SRC002 Code = "SRC002"
+)
+
 // GIT domain covers errors from the internal/git package — invalid or
 // unavailable git state that an operation depends on, independent of which
 // higher-level command triggered it.
