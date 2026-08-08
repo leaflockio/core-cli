@@ -12,6 +12,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"strings"
 	"testing"
 
 	"github.com/leaflockio/core-cli/internal/errs"
@@ -83,7 +84,7 @@ func TestResolve_noGitignoreReturnsEverythingByDefault(t *testing.T) {
 	writeFile(t, filepath.Join(dir, "a.go"))
 	writeFile(t, filepath.Join(dir, "b.md"))
 
-	got, err := (&Files{NoGitignore: true}).Resolve(dir, nil)
+	got, _, err := (&Files{NoGitignore: true}).Resolve(dir, nil)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -97,7 +98,7 @@ func TestResolve_argNarrowsToMatchingFiles(t *testing.T) {
 	writeFile(t, filepath.Join(dir, "a.go"))
 	writeFile(t, filepath.Join(dir, "b.md"))
 
-	got, err := (&Files{NoGitignore: true}).Resolve(dir, []string{"*.go"})
+	got, _, err := (&Files{NoGitignore: true}).Resolve(dir, []string{"*.go"})
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -111,7 +112,7 @@ func TestResolve_dotArgTranslatesToMatchAll(t *testing.T) {
 	writeFile(t, filepath.Join(dir, "a.go"))
 	writeFile(t, filepath.Join(dir, "sub", "b.go"))
 
-	got, err := (&Files{NoGitignore: true}).Resolve(dir, []string{"."})
+	got, _, err := (&Files{NoGitignore: true}).Resolve(dir, []string{"."})
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -126,7 +127,7 @@ func TestResolve_withIncludeNarrows(t *testing.T) {
 	writeFile(t, filepath.Join(dir, "b.md"))
 
 	f := (&Files{NoGitignore: true}).WithInclude([]string{"*.go"})
-	got, err := f.Resolve(dir, nil)
+	got, _, err := f.Resolve(dir, nil)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -141,7 +142,7 @@ func TestResolve_withExcludeNarrows(t *testing.T) {
 	writeFile(t, filepath.Join(dir, "a_test.go"))
 
 	f := (&Files{NoGitignore: true}).WithExclude([]string{"*_test.go"})
-	got, err := f.Resolve(dir, nil)
+	got, _, err := f.Resolve(dir, nil)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -156,7 +157,7 @@ func TestWithInclude_accumulatesMultipleSources(t *testing.T) {
 	writeFile(t, filepath.Join(dir, "b.md"))
 
 	f := (&Files{NoGitignore: true}).WithInclude([]string{"*.go"}, []string{"*.md"})
-	got, err := f.Resolve(dir, nil)
+	got, _, err := f.Resolve(dir, nil)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -174,12 +175,70 @@ func TestResolve_argsAndIncludeNarrowIndependently(t *testing.T) {
 	writeFile(t, filepath.Join(dir, "b.md"))
 
 	f := (&Files{NoGitignore: true}).WithInclude([]string{"*.go"})
-	got, err := f.Resolve(dir, []string{"."})
+	got, _, err := f.Resolve(dir, []string{"."})
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
 	if len(got) != 1 || got[0] != "a.go" {
 		t.Errorf("expected [a.go], got %v", got)
+	}
+}
+
+// --- Resolve: Stats ---
+
+func TestResolve_statsReflectEachStage(t *testing.T) {
+	dir := t.TempDir()
+	writeFile(t, filepath.Join(dir, "a.go"))
+	writeFile(t, filepath.Join(dir, "b.go"))
+	writeFile(t, filepath.Join(dir, "c.md"))
+	writeFile(t, filepath.Join(dir, "vendor", "d.go"))
+
+	f := (&Files{NoGitignore: true}).
+		WithInclude([]string{"*.go"}).
+		WithExclude([]string{"vendor/**"})
+	got, stats, err := f.Resolve(dir, nil)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	want := Stats{Discovered: 4, Query: 4, Included: 3, Excluded: 1, Final: 2}
+	if stats != want {
+		t.Errorf("expected %+v, got %+v", want, stats)
+	}
+	if len(got) != stats.Final {
+		t.Errorf("expected len(got) to match stats.Final (%d), got %d files", stats.Final, len(got))
+	}
+}
+
+func TestResolve_statsQueryNarrowsFromArgs(t *testing.T) {
+	dir := t.TempDir()
+	writeFile(t, filepath.Join(dir, "a.go"))
+	writeFile(t, filepath.Join(dir, "b.go"))
+	writeFile(t, filepath.Join(dir, "c.md"))
+
+	_, stats, err := (&Files{NoGitignore: true}).Resolve(dir, []string{"*.go"})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	want := Stats{Discovered: 3, Query: 2, Included: 2, Excluded: 0, Final: 2}
+	if stats != want {
+		t.Errorf("expected %+v, got %+v", want, stats)
+	}
+}
+
+func TestResolve_statsQueryEqualsDiscoveredWithNoArgs(t *testing.T) {
+	dir := t.TempDir()
+	writeFile(t, filepath.Join(dir, "a.go"))
+	writeFile(t, filepath.Join(dir, "b.md"))
+
+	_, stats, err := (&Files{NoGitignore: true}).Resolve(dir, nil)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	if stats.Query != stats.Discovered {
+		t.Errorf("expected Query (%d) to equal Discovered (%d) with no args", stats.Query, stats.Discovered)
 	}
 }
 
@@ -210,12 +269,32 @@ func gitAdd(t *testing.T, dir string, paths ...string) {
 	}
 }
 
+func gitCommit(t *testing.T, dir, msg string) {
+	t.Helper()
+	cmd := exec.Command("git", "commit", "-q", "-m", msg)
+	cmd.Dir = dir
+	if out, err := cmd.CombinedOutput(); err != nil {
+		t.Fatalf("git commit: %v\n%s", err, out)
+	}
+}
+
+func currentCommit(t *testing.T, dir string) string {
+	t.Helper()
+	cmd := exec.Command("git", "rev-parse", "HEAD")
+	cmd.Dir = dir
+	out, err := cmd.CombinedOutput()
+	if err != nil {
+		t.Fatalf("git rev-parse: %v\n%s", err, out)
+	}
+	return strings.TrimSpace(string(out))
+}
+
 func TestResolve_defaultRoutesToGitListFiles(t *testing.T) {
 	dir := initGitRepo(t)
 	writeFile(t, filepath.Join(dir, "a.go"))
 	gitAdd(t, dir, "a.go")
 
-	got, err := (&Files{}).Resolve(dir, nil)
+	got, _, err := (&Files{}).Resolve(dir, nil)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -230,11 +309,46 @@ func TestResolve_stagedRoutesToGitResolveStaged(t *testing.T) {
 	writeFile(t, filepath.Join(dir, "b.go"))
 	gitAdd(t, dir, "a.go")
 
-	got, err := (&Files{Staged: true}).Resolve(dir, nil)
+	got, _, err := (&Files{Staged: true}).Resolve(dir, nil)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
 	if len(got) != 1 || got[0] != "a.go" {
 		t.Errorf("expected only the staged file [a.go], got %v", got)
+	}
+}
+
+func TestResolve_prRoutesToGitResolvePRFiles(t *testing.T) {
+	dir := initGitRepo(t)
+	writeFile(t, filepath.Join(dir, "a.go"))
+	gitAdd(t, dir, "a.go")
+	gitCommit(t, dir, "initial")
+	base := currentCommit(t, dir)
+
+	writeFile(t, filepath.Join(dir, "b.go"))
+	gitAdd(t, dir, "b.go")
+	gitCommit(t, dir, "second")
+
+	got, _, err := (&Files{PR: true, Base: base}).Resolve(dir, nil)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if len(got) != 1 || got[0] != "b.go" {
+		t.Errorf("expected only the changed file [b.go], got %v", got)
+	}
+}
+
+func TestResolve_errorPropagatesFromDiscoverWithZeroStats(t *testing.T) {
+	dir := t.TempDir() // not a git repo, so the default git.ListFiles route fails
+
+	got, stats, err := (&Files{}).Resolve(dir, nil)
+	if err == nil {
+		t.Fatal("expected an error when discover fails")
+	}
+	if got != nil {
+		t.Errorf("expected nil files on error, got %v", got)
+	}
+	if stats != (Stats{}) {
+		t.Errorf("expected zero-value Stats on error, got %+v", stats)
 	}
 }

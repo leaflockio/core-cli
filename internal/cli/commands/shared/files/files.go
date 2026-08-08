@@ -78,39 +78,65 @@ func (f *Files) WithExclude(patterns ...[]string) *Files {
 
 // Resolve returns the files this invocation targets, using root as the
 // repository root and args as positional file/glob arguments — "." is
-// special-cased to match all in the current working directory.
-func (f *Files) Resolve(root string, args []string) ([]string, error) {
-	var universe []string
-	var err error
+// special-cased to match all in the current working directory. The
+// accompanying Stats reports how many files survived each narrowing stage.
+func (f *Files) Resolve(root string, args []string) ([]string, Stats, error) {
+	discovered, err := f.discover(root)
+	if err != nil {
+		return nil, Stats{}, err
+	}
+	stats := Stats{Discovered: len(discovered)}
 
+	query := discovered
+	if len(args) > 0 {
+		query = fstree.Include(discovered, argPatterns(args))
+	}
+	stats.Query = len(query)
+
+	included := fstree.Include(query, f.includePatterns())
+	stats.Included = len(included)
+
+	final := fstree.Exclude(included, f.exclude)
+	stats.Final = len(final)
+	stats.Excluded = stats.Included - stats.Final
+
+	return final, stats, nil
+}
+
+// discover selects the source mechanism — a PR diff, staged changes, a
+// gitignore-blind filesystem walk, or a plain git listing — and returns its
+// raw file list, before any narrowing.
+func (f *Files) discover(root string) ([]string, error) {
 	switch {
 	case f.PR:
-		universe, err = git.ResolvePRFiles(root, f.Base, f.DiffFilter)
+		return git.ResolvePRFiles(root, f.Base, f.DiffFilter)
 	case f.Staged:
-		universe, err = git.ResolveStaged(root, f.DiffFilter)
+		return git.ResolveStaged(root, f.DiffFilter)
 	case f.NoGitignore:
-		universe, err = fstree.Walk(root)
+		return fstree.Walk(root)
 	default:
-		universe, err = git.ListFiles(root)
+		return git.ListFiles(root)
 	}
-	if err != nil {
-		return nil, err
-	}
+}
 
-	if len(args) > 0 {
-		argPatterns := make([]string, len(args))
-		for i, a := range args {
-			if a == "." {
-				a = fstree.MatchAll
-			}
-			argPatterns[i] = a
+// argPatterns translates positional file/glob arguments into fstree glob
+// patterns, special-casing "." to match everything.
+func argPatterns(args []string) []string {
+	patterns := make([]string, len(args))
+	for i, a := range args {
+		if a == "." {
+			a = fstree.MatchAll
 		}
-		universe = fstree.Filter(universe, argPatterns, nil)
+		patterns[i] = a
 	}
+	return patterns
+}
 
-	include := f.include
-	if len(include) == 0 {
-		include = []string{fstree.MatchAll}
+// includePatterns returns f's include patterns, defaulting to everything
+// when none were given.
+func (f *Files) includePatterns() []string {
+	if len(f.include) == 0 {
+		return []string{fstree.MatchAll}
 	}
-	return fstree.Filter(universe, include, f.exclude), nil
+	return f.include
 }
