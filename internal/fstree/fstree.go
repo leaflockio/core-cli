@@ -66,58 +66,50 @@ func fsWalk(dir string) ([]string, error) {
 	return files, err
 }
 
-// Filter keeps only the files that match at least one include pattern and
-// aren't excluded.
+// Include keeps only the files that match at least one pattern.
+//
+//	Include(all, ["**/*.go"]) → ["main.go"]
+//	Include(all, nil)         → [] (no patterns means nothing matches; pass
+//	                               []string{MatchAll} for "everything" instead)
+//
+// A bare pattern with no "/" matches by file name alone, at any depth; a
+// pattern containing "/" is anchored to that exact path. Matching is always
+// case-sensitive, and an invalid pattern matches nothing rather than
+// erroring.
+func Include(files, patterns []string) []string {
+	out := make([]string, 0, len(files))
+	for _, f := range files {
+		if matchesAny(f, patterns) {
+			out = append(out, f)
+		}
+	}
+	return out
+}
+
+// Exclude drops the files that match patterns, which is order-sensitive — a
+// "!pattern" entry un-excludes a file matched by an earlier entry, so the
+// entry that appears *last* in patterns wins. This lets you exclude a whole
+// directory and carve out one exception:
+//
+//	Exclude(all, ["vendor/**"])                             → drops everything under vendor
+//	Exclude(all, ["vendor/**", "!vendor/utils/patched.go"])  → same, but that one file survives
+func Exclude(files, patterns []string) []string {
+	out := make([]string, 0, len(files))
+	for _, f := range files {
+		if !isExcluded(f, patterns) {
+			out = append(out, f)
+		}
+	}
+	return out
+}
+
+// Filter keeps the files that match at least one include pattern and aren't
+// excluded.
 //
 //	Filter(all, ["**/*.go"], nil)      → ["main.go"]
 //	Filter(all, ["**/*"], ["*.json"])  → everything except config/settings.json
-//	Filter(all, nil, nil)              → [] (no include patterns means nothing matches)
-//
-// If a caller wants "everything" as the default instead of "nothing," pass
-// MatchAll rather than an empty include list.
-//
-//	no "/" in the pattern   matches at any depth, by file name alone
-//	                            "*.json"            → config/settings.json, a/config/settings.json, ...
-//	has a "/" in the pattern   anchored — must match the full path exactly
-//	                            "config/*.json"     → config/settings.json, not a/config/settings.json
-//	*                       any characters except "/"
-//	**                      any characters, including "/" — the only way to cross directories
-//	                            "**/config/*.json"  → config/settings.json and a/config/settings.json
-//	?                       exactly one character except "/"
-//	[abc] [a-z]             one character from a set or range
-//	[^abc] or [!abc]        one character NOT in the set
-//	{a,b,c}                 matches if any comma-separated alternative matches (nestable)
-//	                            "config/*.{json,yaml}" → config/settings.json, config/settings.yaml
-//	\                       escapes the next character to match it literally
-//	                            `main\.go` matches "main.go" but not "mainXgo"
-//	trailing "/"            matches only a directory, never a file of the same name
-//	                            "build/" excludes src/build/output.js, not a file named build
-//
-// exclude is order-sensitive: a "!pattern" entry un-excludes a file matched
-// by an earlier entry, so the entry that appears *last* in exclude wins,
-// This lets you exclude a whole directory and carve out one exception:
-//
-//	Filter(all, ["**/*"], ["vendor/**", "!vendor/utils/patched.go"])
-//	    → everything except vendor, but vendor/utils/patched.go is kept
-//
-// include has no such order-sensitivity or negation — a file either matches
-// one of its patterns or it doesn't; there's nothing to un-include that
-// exclude doesn't already cover.
-//
-// Matching is always case-sensitive, and an invalid pattern matches nothing
-// rather than erroring.
 func Filter(files, include, exclude []string) []string {
-	out := make([]string, 0, len(files))
-	for _, f := range files {
-		if !matchesAny(f, include) {
-			continue
-		}
-		if isExcluded(f, exclude) {
-			continue
-		}
-		out = append(out, f)
-	}
-	return out
+	return Exclude(Include(files, include), exclude)
 }
 
 // matchesAny(path, patterns) reports whether path matches by its full path

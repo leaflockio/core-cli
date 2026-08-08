@@ -277,6 +277,88 @@ func TestFilter_matchAllIncludesEverything(t *testing.T) {
 	}
 }
 
+// --- Include ---
+
+func TestInclude_matchesPattern(t *testing.T) {
+	files := []string{"a.go", "b.ts"}
+	got := Include(files, []string{"*.go"})
+	if len(got) != 1 || got[0] != "a.go" {
+		t.Errorf("expected [a.go], got %v", got)
+	}
+}
+
+func TestInclude_noMatch(t *testing.T) {
+	files := []string{"a.ts"}
+	got := Include(files, []string{"*.go"})
+	if len(got) != 0 {
+		t.Errorf("expected empty when no pattern matches, got %v", got)
+	}
+}
+
+func TestInclude_emptyPatternsMatchesNothing(t *testing.T) {
+	files := []string{"a.go", "b.go"}
+	got := Include(files, nil)
+	if len(got) != 0 {
+		t.Errorf("expected empty when patterns is empty, got %v", got)
+	}
+}
+
+func TestInclude_matchAllMatchesEverything(t *testing.T) {
+	files := []string{"main.go", "config/settings.json", "a/b/c/deep.txt"}
+	got := Include(files, []string{MatchAll})
+	if len(got) != len(files) {
+		t.Errorf("expected MatchAll to include every file, got %v", got)
+	}
+}
+
+func TestInclude_emptyFiles(t *testing.T) {
+	got := Include(nil, []string{"*.go"})
+	if len(got) != 0 {
+		t.Errorf("expected empty result for nil files, got %v", got)
+	}
+}
+
+// --- Exclude ---
+
+func TestExclude_dropsMatchingFiles(t *testing.T) {
+	files := []string{"a.go", "b.go"}
+	got := Exclude(files, []string{"a.go"})
+	if len(got) != 1 || got[0] != "b.go" {
+		t.Errorf("expected [b.go], got %v", got)
+	}
+}
+
+func TestExclude_negationCancelsEarlierExclude(t *testing.T) {
+	files := []string{"vendor/pkg1/a.go", "vendor/utils/patched.go"}
+	got := Exclude(files, []string{"vendor/**", "!vendor/utils/patched.go"})
+	if len(got) != 1 || got[0] != "vendor/utils/patched.go" {
+		t.Errorf("expected only the un-excluded file, got %v", got)
+	}
+}
+
+func TestExclude_negationBeforeExcludeHasNoEffect(t *testing.T) {
+	files := []string{"vendor/utils/patched.go"}
+	got := Exclude(files, []string{"!vendor/utils/patched.go", "vendor/**"})
+	if len(got) != 0 {
+		t.Errorf("expected the later plain exclude to win, got %v", got)
+	}
+}
+
+func TestExclude_noPatternsKeepsEverything(t *testing.T) {
+	files := []string{"a.go", "b.go"}
+	got := Exclude(files, nil)
+	if len(got) != len(files) {
+		t.Errorf("expected everything kept when patterns is empty, got %v", got)
+	}
+}
+
+func TestExclude_emptyFiles(t *testing.T) {
+	got := Exclude(nil, []string{"*.go"})
+	if len(got) != 0 {
+		t.Errorf("expected empty result for nil files, got %v", got)
+	}
+}
+
 // --- matchesAny ---
 
 func TestMatchesAny_noPatterns(t *testing.T) {
