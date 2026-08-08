@@ -48,12 +48,6 @@ const (
 	valTrueC = "True" // Azure uses TitleCase
 )
 
-// Default git values for PR base resolution.
-const (
-	DefaultRemote = "origin"
-	DefaultBranch = "main"
-)
-
 // Package manager binary names used for PATH detection.
 const (
 	binBrew = "brew"

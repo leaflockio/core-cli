@@ -153,6 +153,8 @@
     "gitflags",
     "ACDMRTUXB",
     "dryrun",
-    "gpgsign"
+    "gpgsign",
+    "PULLREQUEST",
+    "TARGETBRANCH"
   ]
 }

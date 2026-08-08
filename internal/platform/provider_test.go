@@ -71,6 +71,19 @@ func TestProvider_BaseRef_azure(t *testing.T) {
 	}
 }
 
+// TestProvider_BaseRef_azureStripsRefsHeadsPrefix is a regression test:
+// Azure Pipelines' SYSTEM_PULLREQUEST_TARGETBRANCH is a full ref
+// ("refs/heads/main"), unlike every other provider's bare branch name.
+// Without stripping the prefix, ResolveBase would build "origin/refs/heads/main",
+// not a valid git ref.
+func TestProvider_BaseRef_azureStripsRefsHeadsPrefix(t *testing.T) {
+	t.Setenv(envAzureTargetBranch, "refs/heads/main")
+	ref, _ := ProviderAzure.BaseRef()
+	if ref != "main" {
+		t.Errorf("ref = %q, want %q", ref, "main")
+	}
+}
+
 func TestProvider_BaseRef_bitbucket(t *testing.T) {
 	t.Setenv(envBitbucketTargetBranch, "main")
 	ref, sha := ProviderBitbucket.BaseRef()
@@ -86,41 +99,5 @@ func TestProvider_BaseRef_default(t *testing.T) {
 	ref, sha := ProviderNone.BaseRef()
 	if ref != "" || sha != "" {
 		t.Errorf("BaseRef() = (%q, %q), want empty strings", ref, sha)
-	}
-}
-
-// --- Provider.ResolveBase ---
-
-func TestProvider_ResolveBase_flagTakesPrecedence(t *testing.T) {
-	t.Setenv(envGitHubBaseRef, "main")
-	t.Setenv(envGitHubBaseSHA, "abc123")
-	got := ProviderGitHub.ResolveBase("my-branch")
-	if got != "my-branch" {
-		t.Errorf("ResolveBase with flag = %q, want %q", got, "my-branch")
-	}
-}
-
-func TestProvider_ResolveBase_shaTakesPrecedenceOverRef(t *testing.T) {
-	t.Setenv(envGitHubBaseRef, "main")
-	t.Setenv(envGitHubBaseSHA, "abc123")
-	got := ProviderGitHub.ResolveBase("")
-	if got != "abc123" {
-		t.Errorf("ResolveBase with sha = %q, want %q", got, "abc123")
-	}
-}
-
-func TestProvider_ResolveBase_refFallback(t *testing.T) {
-	t.Setenv(envGitHubBaseRef, "main")
-	t.Setenv(envGitHubBaseSHA, "")
-	got := ProviderGitHub.ResolveBase("")
-	if got != DefaultRemote+"/main" {
-		t.Errorf("ResolveBase with ref = %q, want %q", got, DefaultRemote+"/main")
-	}
-}
-
-func TestProvider_ResolveBase_originMainFallback(t *testing.T) {
-	got := ProviderNone.ResolveBase("")
-	if got != DefaultRemote+"/"+DefaultBranch {
-		t.Errorf("ResolveBase fallback = %q, want %q", got, DefaultRemote+"/"+DefaultBranch)
 	}
 }

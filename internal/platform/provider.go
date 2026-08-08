@@ -7,7 +7,10 @@
 
 package platform
 
-import "os"
+import (
+	"os"
+	"strings"
+)
 
 // Provider identifies the CI/CD platform the process is running on.
 type Provider int
@@ -72,7 +75,7 @@ func (p Provider) BaseRef() (string, string) {
 	case ProviderGitLab:
 		return os.Getenv(envGitLabTargetBranch), os.Getenv(envGitLabBaseSHA)
 	case ProviderAzure:
-		return os.Getenv(envAzureTargetBranch), ""
+		return strings.TrimPrefix(os.Getenv(envAzureTargetBranch), "refs/heads/"), ""
 	case ProviderBitbucket:
 		return os.Getenv(envBitbucketTargetBranch), ""
 	case ProviderNone, ProviderCircle, ProviderJenkins, ProviderGeneric:
@@ -80,20 +83,4 @@ func (p Provider) BaseRef() (string, string) {
 	default:
 		return "", ""
 	}
-}
-
-// ResolveBase returns the git ref to use as the PR base. Precedence:
-// --base flag > CI merge-base SHA > CI target branch ref > origin/main fallback.
-func (p Provider) ResolveBase(flagBase string) string {
-	if flagBase != "" {
-		return flagBase
-	}
-	ref, sha := p.BaseRef()
-	if sha != "" {
-		return sha
-	}
-	if ref != "" {
-		return DefaultRemote + "/" + ref
-	}
-	return DefaultRemote + "/" + DefaultBranch
 }
