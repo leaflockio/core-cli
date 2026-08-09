@@ -5,12 +5,15 @@
 // software, via any medium, is strictly prohibited without prior
 // written permission from LeafLock.
 
+// Package help implements the "help" command and the styled rendering used
+// for every command's help output.
 package help
 
 import (
 	"fmt"
 	"strings"
 
+	"github.com/leaflockio/core-cli/internal/app"
 	"github.com/leaflockio/core-cli/internal/cli"
 	"github.com/leaflockio/core-cli/internal/ui"
 	"github.com/spf13/cobra"
@@ -28,18 +31,49 @@ var (
 	colSep    = strings.Repeat(" ", colSepWidth)
 )
 
-// Set registers the styled help function on cmd, writing output to printer.Out(),
-// and replaces cobra's default help command with one that rejects an unknown
-// help topic instead of silently falling back to cmd's own help.
-func Set(cmd *cobra.Command, printer *ui.Printer) {
+// commandName is this command's own name — used both to declare it and,
+// once the tree is built, to find it again by name in setHelp.
+const commandName = "help"
+
+// New returns the "help" command.
+func New() cli.Command {
+	return &command{}
+}
+
+type command struct {
+	printer *ui.Printer
+}
+
+func (c *command) Define(a *app.App) *cli.Definition {
+	if a != nil {
+		c.printer = a.Printer
+	}
+	meta := cli.NewMeta(commandName, "Help about any command", "").
+		WithArgsUsage("[command]").
+		WithArgs(cobra.ArbitraryArgs)
+	return cli.NewDefinition(meta).WithHandler(c.run)
+}
+
+func (c *command) run(_ *app.App, cmd *cobra.Command, args []string) error {
+	return cli.ShowHelp(cmd, args)
+}
+
+func (c *command) OnTreeReady(root *cobra.Command) {
+	setHelp(root, c.printer)
+}
+
+// setHelp registers the styled help function on cmd.
+func setHelp(cmd *cobra.Command, printer *ui.Printer) {
 	cmd.SetHelpFunc(func(c *cobra.Command, _ []string) {
 		fmt.Fprint(printer.Out(), render(c, printer))
 	})
-	cmd.SetHelpCommand(&cobra.Command{
-		Use:   "help [command]",
-		Short: "Help about any command",
-		RunE:  cli.ShowHelp,
-	})
+
+	for _, c := range cmd.Commands() {
+		if c.Name() == commandName {
+			cmd.SetHelpCommand(c)
+			return
+		}
+	}
 }
 
 func render(cmd *cobra.Command, printer *ui.Printer) string {
@@ -102,9 +136,6 @@ func renderCommands(cmd *cobra.Command, printer *ui.Printer) string {
 	return renderGrouped(printer, visible, groups, width)
 }
 
-// renderUngroupedSection renders a "GENERAL" header followed by cmds — the
-// same shape used both when a command declares no Groups at all, and for
-// commands left ungrouped within a tree that does declare some.
 func renderUngroupedSection(printer *ui.Printer, cmds []*cobra.Command, width int) string {
 	var b strings.Builder
 	b.WriteString("\n")

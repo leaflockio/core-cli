@@ -8,6 +8,7 @@ package main
 
 import (
 	"github.com/leaflockio/core-cli/internal/cli"
+	"github.com/leaflockio/core-cli/internal/cli/commands/help"
 	"github.com/leaflockio/core-cli/internal/cli/commands/license"
 	"github.com/leaflockio/core-cli/internal/cli/commands/version"
 )
@@ -16,4 +17,5 @@ import (
 var commands = []cli.Command{
 	version.New(),
 	license.New(),
+	help.New(),
 }

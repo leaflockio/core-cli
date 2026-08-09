@@ -203,3 +203,30 @@ func TestBuildApp_propagatesWorkspaceError(t *testing.T) {
 		t.Error("expected error when workspace.New fails")
 	}
 }
+
+// TestBuildCommandTree_helpTopicValidation is an end-to-end regression guard
+// for help.New's OnTreeReady wiring: buildCommandTree no longer calls
+// help.Set itself (that moved behind Factory.Build's TreeReady hook), so
+// this proves the built tree still designates "help" as cobra's official
+// help command — a known command's help topic succeeds, and an unknown one
+// is rejected rather than silently falling back to generic help.
+func TestBuildCommandTree_helpTopicValidation(t *testing.T) {
+	a, err := buildApp(minimalCfg())
+	if err != nil {
+		t.Fatalf("buildApp: %v", err)
+	}
+	cmd, err := buildCommandTree(a)
+	if err != nil {
+		t.Fatalf("buildCommandTree: %v", err)
+	}
+
+	cmd.SetArgs([]string{"help", "version"})
+	if err := cmd.Execute(); err != nil {
+		t.Errorf("expected help for a known command to succeed, got %v", err)
+	}
+
+	cmd.SetArgs([]string{"help", "not-a-real-command"})
+	if err := cmd.Execute(); err == nil {
+		t.Error("expected an error for an unrecognized help topic")
+	}
+}
