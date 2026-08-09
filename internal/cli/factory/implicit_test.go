@@ -62,3 +62,12 @@ func TestImplicitSystemFlags_contains_noconfig(t *testing.T) {
 	}
 	t.Error("implicitSystemFlags must contain the no-config flag")
 }
+
+func TestImplicitSystemFlags_contains_help(t *testing.T) {
+	for _, f := range implicitSystemFlags {
+		if f.Definition().Meta.Name == "help" {
+			return
+		}
+	}
+	t.Error("implicitSystemFlags must contain the help flag")
+}

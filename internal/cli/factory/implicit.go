@@ -9,6 +9,7 @@ package factory
 
 import (
 	"github.com/leaflockio/core-cli/internal/cli/flags"
+	"github.com/leaflockio/core-cli/internal/cli/flags/system/help"
 	"github.com/leaflockio/core-cli/internal/cli/flags/system/nocolor"
 	"github.com/leaflockio/core-cli/internal/cli/flags/system/noconfig"
 )
@@ -18,4 +19,5 @@ import (
 var implicitSystemFlags = []flags.Flag{
 	nocolor.NoColor,
 	noconfig.NoConfig,
+	help.Help,
 }
