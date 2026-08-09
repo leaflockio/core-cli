@@ -99,7 +99,7 @@ func noConfigRequested(a *app.App) bool {
 }
 
 // buildNode assembles and wires cmd, recursing into children via itself.
-func (f *Factory) buildNode(cmd cli.Command, a *app.App, lvl level.Level) (*assembled, *cobra.Command, error) {
+func (f *Factory) buildNode(cmd cli.Command, a *app.App, lvl level.Level) (*blueprint, *cobra.Command, error) {
 	def := cmd.Define(a)
 
 	plan, err := assemble(def, lvl, a)
@@ -116,7 +116,7 @@ func (f *Factory) buildNode(cmd cli.Command, a *app.App, lvl level.Level) (*asse
 }
 
 // registerPersistent registers persistentFlags on cmd's PersistentFlags.
-func registerPersistent(cmd *cobra.Command, persistentFlags []assembledFlag, a *app.App) {
+func registerPersistent(cmd *cobra.Command, persistentFlags []flagSpec, a *app.App) {
 	for _, fp := range persistentFlags {
 		fp.register(cmd.PersistentFlags(), a)
 	}

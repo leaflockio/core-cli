@@ -25,8 +25,8 @@ func cobraUse(meta *cli.Meta) string {
 	return meta.Use + " " + meta.ArgsUsage
 }
 
-// execute wires a cobra.Command from an assembled plan, including its children.
-func (f *Factory) execute(plan *assembled, a *app.App) (*cobra.Command, error) {
+// execute wires a cobra.Command from plan, including its children.
+func (f *Factory) execute(plan *blueprint, a *app.App) (*cobra.Command, error) {
 	def := plan.def
 	meta := def.Meta
 
@@ -39,8 +39,6 @@ func (f *Factory) execute(plan *assembled, a *app.App) (*cobra.Command, error) {
 		DisableSuggestions: meta.DisableSuggestions,
 	}
 
-	// A command declares the group taxonomy for its own children via
-	// Groups.
 	for _, g := range def.Groups {
 		cmd.AddGroup(&cobra.Group{ID: string(g.ID), Title: strings.ToUpper(g.Title)})
 	}
@@ -49,35 +47,7 @@ func (f *Factory) execute(plan *assembled, a *app.App) (*cobra.Command, error) {
 		fp.register(cmd.Flags(), a)
 	}
 
-	if def.Handler != nil {
-		cmd.RunE = func(cobraCmd *cobra.Command, args []string) error {
-			fs := cobraCmd.Flags()
-
-			for _, rule := range def.FlagRules {
-				if err := rule.Check(fs.Changed); err != nil {
-					return err
-				}
-			}
-
-			for _, fp := range plan.flags {
-				if fp.hasResolver {
-					if err := fp.resolve(fs); err != nil {
-						return fmt.Errorf("factory[execute]: command %q: flag %q: %w", def.Meta.Use, fp.name, err)
-					}
-				}
-			}
-
-			return def.Handler(a, cobraCmd, args)
-		}
-	} else {
-		// A nil Handler means this command only holds children. Giving it a
-		// RunE makes it Runnable, so cobra's ValidateArgs — using this
-		// command's own Meta.Args — actually runs and rejects an
-		// unrecognized subcommand name, at any depth in the tree.
-		cmd.RunE = func(cobraCmd *cobra.Command, _ []string) error {
-			return cobraCmd.Help()
-		}
-	}
+	cmd.RunE = buildRunE(&def, plan, a)
 
 	for _, child := range def.Children {
 		_, childCmd, err := f.buildNode(child, a, plan.level.Next())
@@ -88,4 +58,32 @@ func (f *Factory) execute(plan *assembled, a *app.App) (*cobra.Command, error) {
 	}
 
 	return cmd, nil
+}
+
+func buildRunE(def *cli.Definition, plan *blueprint, a *app.App) func(*cobra.Command, []string) error {
+	if def.Handler == nil {
+		return func(cobraCmd *cobra.Command, _ []string) error {
+			return cobraCmd.Help()
+		}
+	}
+
+	return func(cobraCmd *cobra.Command, args []string) error {
+		fs := cobraCmd.Flags()
+
+		for _, rule := range def.FlagRules {
+			if err := rule.Check(fs.Changed); err != nil {
+				return err
+			}
+		}
+
+		for _, fp := range plan.flags {
+			if fp.hasResolver {
+				if err := fp.resolve(fs); err != nil {
+					return fmt.Errorf("factory[execute]: command %q: flag %q: %w", def.Meta.Use, fp.name, err)
+				}
+			}
+		}
+
+		return def.Handler(a, cobraCmd, args)
+	}
 }

@@ -13,8 +13,8 @@ import (
 	"github.com/leaflockio/core-cli/internal/level"
 )
 
-func TestAssembled_zero_value(t *testing.T) {
-	var a assembled
+func TestBlueprint_zero_value(t *testing.T) {
+	var a blueprint
 	if a.level != level.LevelRoot {
 		t.Errorf("level must be LevelRoot in zero value, got %v", a.level)
 	}
@@ -32,8 +32,8 @@ func TestAssembled_zero_value(t *testing.T) {
 	}
 }
 
-func TestAssembledFlag_zero_value(t *testing.T) {
-	var f assembledFlag
+func TestFlagSpec_zero_value(t *testing.T) {
+	var f flagSpec
 	if f.name != "" {
 		t.Errorf("name must be empty in zero value, got %q", f.name)
 	}

@@ -15,8 +15,9 @@ import (
 	"github.com/spf13/pflag"
 )
 
-// assembled is the validated plan for a command, ready for the executor.
-type assembled struct {
+// blueprint is a command, fully validated and resolved. The
+// executor builds the actual *cobra.Command by following it.
+type blueprint struct {
 	def cli.Definition
 
 	// level is this command's position in the tree.
@@ -28,18 +29,17 @@ type assembled struct {
 	// hasChildren is true when the command declared subcommands.
 	hasChildren bool
 
-	// flags holds the plans for this command's own Definition.Flags. The
-	// executor registers these on the built command's local Flags(), so they
-	// apply only to this command, not its children.
-	flags []assembledFlag
+	// flags holds the resolved specs for this command's own Definition.Flags.
+	// The executor registers these on the built command's local flags.
+	flags []flagSpec
 
-	// persistentFlags holds the plans for implicitSystemFlags. Only
+	// persistentFlags holds the resolved specs for implicitSystemFlags. Only
 	// Factory.Build registers these, on the root's PersistentFlags.
-	persistentFlags []assembledFlag
+	persistentFlags []flagSpec
 }
 
-// assembledFlag is the execution record for a single flag.
-type assembledFlag struct {
+// flagSpec is the resolved spec for a single flag.
+type flagSpec struct {
 	name string
 	kind flags.FlagKind
 	sub  flags.FlagSubcategory

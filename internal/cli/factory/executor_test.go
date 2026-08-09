@@ -21,7 +21,7 @@ import (
 var errResolve = errors.New("resolve failed")
 
 func TestExecute_builds_command_with_correct_metadata(t *testing.T) {
-	plan := assembledPlan("mycmd", "short desc", "long desc")
+	plan := minBlueprint("mycmd", "short desc", "long desc")
 	cmd, err := (&Factory{}).execute(plan, nil)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
@@ -42,7 +42,7 @@ func TestExecute_builds_command_with_correct_metadata(t *testing.T) {
 // Meta.Use itself (read everywhere else in the framework for command
 // identity) stays just the bare name.
 func TestExecute_appendsArgsUsageToCommandUse(t *testing.T) {
-	plan := &assembled{
+	plan := &blueprint{
 		def: cli.Definition{
 			Meta:    &cli.Meta{Use: "check", ArgsUsage: "[file...]"},
 			Handler: func(_ *app.App, _ *cobra.Command, _ []string) error { return nil },
@@ -73,10 +73,42 @@ func TestCobraUse_appendsArgsUsage(t *testing.T) {
 	}
 }
 
+// — buildRunE —
+
+func TestBuildRunE_rendersHelp_whenHandlerNil(t *testing.T) {
+	def := &cli.Definition{Meta: &cli.Meta{Use: "parent"}}
+	runE := buildRunE(def, &blueprint{}, nil)
+
+	cmd := &cobra.Command{Use: "parent"}
+	if err := runE(cmd, nil); err != nil {
+		t.Errorf("unexpected error: %v", err)
+	}
+}
+
+func TestBuildRunE_callsHandler_whenHandlerSet(t *testing.T) {
+	var handlerCalled bool
+	def := &cli.Definition{
+		Meta: &cli.Meta{Use: "mycmd"},
+		Handler: func(_ *app.App, _ *cobra.Command, _ []string) error {
+			handlerCalled = true
+			return nil
+		},
+	}
+	runE := buildRunE(def, &blueprint{}, nil)
+
+	cmd := &cobra.Command{Use: "mycmd"}
+	if err := runE(cmd, nil); err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if !handlerCalled {
+		t.Error("handler must be called when Handler is set")
+	}
+}
+
 func TestExecute_RunE_rejects_exclusive_flags_set_together(t *testing.T) {
-	plan := assembledPlan("mycmd", "", "")
+	plan := minBlueprint("mycmd", "", "")
 	plan.def.FlagRules = []flags.Rule{flags.Exclusive{Flags: boolFlags("all", "staged")}}
-	plan.flags = []assembledFlag{
+	plan.flags = []flagSpec{
 		mustPlanFlag(flags.CommandFlag[*flags.BoolValue]{Value: flags.Bool("all", "")}),
 		mustPlanFlag(flags.CommandFlag[*flags.BoolValue]{Value: flags.Bool("staged", "")}),
 	}
@@ -95,13 +127,13 @@ func TestExecute_RunE_rejects_exclusive_flags_set_together(t *testing.T) {
 
 func TestExecute_RunE_does_not_call_handler_when_exclusive_flags_conflict(t *testing.T) {
 	var handlerCalled bool
-	plan := assembledPlan("mycmd", "", "")
+	plan := minBlueprint("mycmd", "", "")
 	plan.def.Handler = func(_ *app.App, _ *cobra.Command, _ []string) error {
 		handlerCalled = true
 		return nil
 	}
 	plan.def.FlagRules = []flags.Rule{flags.Exclusive{Flags: boolFlags("all", "staged")}}
-	plan.flags = []assembledFlag{
+	plan.flags = []flagSpec{
 		mustPlanFlag(flags.CommandFlag[*flags.BoolValue]{Value: flags.Bool("all", "")}),
 		mustPlanFlag(flags.CommandFlag[*flags.BoolValue]{Value: flags.Bool("staged", "")}),
 	}
@@ -120,9 +152,9 @@ func TestExecute_RunE_does_not_call_handler_when_exclusive_flags_conflict(t *tes
 }
 
 func TestExecute_RunE_allows_single_exclusive_flag(t *testing.T) {
-	plan := assembledPlan("mycmd", "", "")
+	plan := minBlueprint("mycmd", "", "")
 	plan.def.FlagRules = []flags.Rule{flags.Exclusive{Flags: boolFlags("all", "staged")}}
-	plan.flags = []assembledFlag{
+	plan.flags = []flagSpec{
 		mustPlanFlag(flags.CommandFlag[*flags.BoolValue]{Value: flags.Bool("all", "")}),
 		mustPlanFlag(flags.CommandFlag[*flags.BoolValue]{Value: flags.Bool("staged", "")}),
 	}
@@ -140,7 +172,7 @@ func TestExecute_RunE_allows_single_exclusive_flag(t *testing.T) {
 }
 
 func TestExecute_registers_declared_groups_on_command(t *testing.T) {
-	plan := assembledPlan("mycmd", "", "")
+	plan := minBlueprint("mycmd", "", "")
 	plan.def.Groups = []cli.Group{{ID: "read", Title: "read"}, {ID: "write", Title: "write"}}
 
 	cmd, err := (&Factory{}).execute(plan, nil)
@@ -156,7 +188,7 @@ func TestExecute_registers_declared_groups_on_command(t *testing.T) {
 }
 
 func TestExecute_normalizes_group_title_to_upper_case(t *testing.T) {
-	plan := assembledPlan("mycmd", "", "")
+	plan := minBlueprint("mycmd", "", "")
 	plan.def.Groups = []cli.Group{{ID: "read", Title: "read ops"}}
 
 	cmd, err := (&Factory{}).execute(plan, nil)
@@ -171,7 +203,7 @@ func TestExecute_normalizes_group_title_to_upper_case(t *testing.T) {
 }
 
 func TestExecute_registers_no_groups_when_none_declared(t *testing.T) {
-	plan := assembledPlan("mycmd", "", "")
+	plan := minBlueprint("mycmd", "", "")
 
 	cmd, err := (&Factory{}).execute(plan, nil)
 	if err != nil {
@@ -183,7 +215,7 @@ func TestExecute_registers_no_groups_when_none_declared(t *testing.T) {
 }
 
 func TestExecute_sets_groupID_from_def_group(t *testing.T) {
-	plan := assembledPlan("mycmd", "", "")
+	plan := minBlueprint("mycmd", "", "")
 	plan.def.Group = "read"
 
 	cmd, err := (&Factory{}).execute(plan, nil)
@@ -196,7 +228,7 @@ func TestExecute_sets_groupID_from_def_group(t *testing.T) {
 }
 
 func TestExecute_propagates_disableSuggestions_to_command(t *testing.T) {
-	plan := assembledPlan("mycmd", "", "")
+	plan := minBlueprint("mycmd", "", "")
 	plan.def.Meta.DisableSuggestions = true
 
 	cmd, err := (&Factory{}).execute(plan, nil)
@@ -209,7 +241,7 @@ func TestExecute_propagates_disableSuggestions_to_command(t *testing.T) {
 }
 
 func TestExecute_registers_flags_on_command(t *testing.T) {
-	plan := assembledPlan("mycmd", "", "")
+	plan := minBlueprint("mycmd", "", "")
 	plan.flags = append(plan.flags, mustPlanFlag(
 		flags.CommandFlag[*flags.BoolValue]{Value: flags.Bool("verbose", "enable verbose")},
 	))
@@ -230,8 +262,8 @@ func TestExecute_registers_system_flag_that_fires_effect_on_parse(t *testing.T) 
 		Value:  flags.Bool("test-sys", ""),
 		Effect: func(_ *app.App) { effectCalled = true },
 	}
-	plan := assembledPlan("mycmd", "", "")
-	plan.flags = []assembledFlag{mustPlanFlag(f)}
+	plan := minBlueprint("mycmd", "", "")
+	plan.flags = []flagSpec{mustPlanFlag(f)}
 
 	cmd, err := (&Factory{}).execute(plan, nil)
 	if err != nil {
@@ -253,8 +285,8 @@ func TestExecute_registered_system_flag_does_not_fire_effect_when_not_set(t *tes
 		Value:  flags.Bool("test-sys", ""),
 		Effect: func(_ *app.App) { effectCalled = true },
 	}
-	plan := assembledPlan("mycmd", "", "")
-	plan.flags = []assembledFlag{mustPlanFlag(f)}
+	plan := minBlueprint("mycmd", "", "")
+	plan.flags = []flagSpec{mustPlanFlag(f)}
 
 	cmd, err := (&Factory{}).execute(plan, nil)
 	if err != nil {
@@ -274,8 +306,8 @@ func TestExecute_RunE_runs_resolver(t *testing.T) {
 		Value:    flags.StringSlice("tags", ""),
 		Resolver: r,
 	}
-	plan := assembledPlan("mycmd", "", "")
-	plan.flags = []assembledFlag{mustPlanFlag(f)}
+	plan := minBlueprint("mycmd", "", "")
+	plan.flags = []flagSpec{mustPlanFlag(f)}
 
 	cmd, err := (&Factory{}).execute(plan, nil)
 	if err != nil {
@@ -298,8 +330,8 @@ func TestExecute_RunE_returns_resolver_error(t *testing.T) {
 		Value:    flags.StringSlice("tags", ""),
 		Resolver: r,
 	}
-	plan := assembledPlan("mycmd", "", "")
-	plan.flags = []assembledFlag{mustPlanFlag(f)}
+	plan := minBlueprint("mycmd", "", "")
+	plan.flags = []flagSpec{mustPlanFlag(f)}
 
 	cmd, err := (&Factory{}).execute(plan, nil)
 	if err != nil {
@@ -312,7 +344,7 @@ func TestExecute_RunE_returns_resolver_error(t *testing.T) {
 
 func TestExecute_RunE_calls_handler(t *testing.T) {
 	var handlerCalled bool
-	plan := assembledPlan("mycmd", "", "")
+	plan := minBlueprint("mycmd", "", "")
 	plan.def.Handler = func(_ *app.App, _ *cobra.Command, _ []string) error {
 		handlerCalled = true
 		return nil
@@ -332,7 +364,7 @@ func TestExecute_RunE_calls_handler(t *testing.T) {
 
 func TestExecute_RunE_passes_the_running_command_to_handler(t *testing.T) {
 	var gotCmd *cobra.Command
-	plan := assembledPlan("mycmd", "", "")
+	plan := minBlueprint("mycmd", "", "")
 	plan.def.Handler = func(_ *app.App, cmd *cobra.Command, _ []string) error {
 		gotCmd = cmd
 		return nil
@@ -351,7 +383,7 @@ func TestExecute_RunE_passes_the_running_command_to_handler(t *testing.T) {
 }
 
 func TestExecute_RunE_renders_help_when_handler_is_nil(t *testing.T) {
-	plan := assembledPlan("parent", "", "")
+	plan := minBlueprint("parent", "", "")
 	plan.def.Handler = nil
 	plan.def.Children = []cli.Command{&stubCommand{use: "child"}}
 	plan.hasChildren = true
@@ -373,7 +405,7 @@ func TestExecute_RunE_renders_help_when_handler_is_nil(t *testing.T) {
 }
 
 func TestExecute_RunE_rejects_unknown_subcommand_when_handler_is_nil(t *testing.T) {
-	plan := assembledPlan("parent", "", "")
+	plan := minBlueprint("parent", "", "")
 	plan.def.Handler = nil
 	plan.def.Meta.Args = cli.NewMeta("parent", "", "").Args
 	plan.def.Children = []cli.Command{&stubCommand{use: "child"}}
@@ -390,7 +422,7 @@ func TestExecute_RunE_rejects_unknown_subcommand_when_handler_is_nil(t *testing.
 
 func TestExecute_adds_children_as_subcommands(t *testing.T) {
 	child := &stubCommand{use: "child"}
-	plan := assembledPlan("parent", "", "")
+	plan := minBlueprint("parent", "", "")
 	plan.def.Children = []cli.Command{child}
 	plan.hasChildren = true
 
@@ -407,7 +439,7 @@ func TestExecute_adds_children_as_subcommands(t *testing.T) {
 }
 
 func TestExecute_returns_error_when_child_build_fails(t *testing.T) {
-	plan := assembledPlan("parent", "", "")
+	plan := minBlueprint("parent", "", "")
 	plan.def.Children = []cli.Command{&nilHandlerCommand{}}
 	plan.hasChildren = true
 
@@ -418,7 +450,7 @@ func TestExecute_returns_error_when_child_build_fails(t *testing.T) {
 }
 
 func TestExecute_non_root_plan_children_are_levelNested(t *testing.T) {
-	plan := assembledPlan("license", "", "")
+	plan := minBlueprint("license", "", "")
 	plan.level = level.LevelTop
 	plan.def.Children = []cli.Command{&nilHandlerCommand{}}
 	plan.hasChildren = true
@@ -436,8 +468,8 @@ func TestExecute_does_not_register_persistentFlags_on_flagset(t *testing.T) {
 		Value:  flags.Bool("no-color", ""),
 		Effect: func(_ *app.App) {},
 	}
-	plan := assembledPlan("mycmd", "", "")
-	plan.persistentFlags = []assembledFlag{mustPlanFlag(f)}
+	plan := minBlueprint("mycmd", "", "")
+	plan.persistentFlags = []flagSpec{mustPlanFlag(f)}
 
 	cmd, err := (&Factory{}).execute(plan, nil)
 	if err != nil {

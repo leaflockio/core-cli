@@ -50,9 +50,9 @@ func minDef(use string) *cli.Definition {
 	}
 }
 
-// assembledPlan builds a minimal assembled struct for testing.
-func assembledPlan(use, short, long string) *assembled {
-	return &assembled{
+// minBlueprint builds a minimal blueprint struct for testing.
+func minBlueprint(use, short, long string) *blueprint {
+	return &blueprint{
 		def: cli.Definition{
 			Meta:    &cli.Meta{Use: use, Short: short, Long: long},
 			Handler: func(_ *app.App, _ *cobra.Command, _ []string) error { return nil },
@@ -71,7 +71,7 @@ func boolFlags(names ...string) []flags.Flag {
 }
 
 // mustPlanFlag calls planFlag and panics on error — only for test setup.
-func mustPlanFlag(f flags.Flag) assembledFlag {
+func mustPlanFlag(f flags.Flag) flagSpec {
 	p, err := planFlag(f)
 	if err != nil {
 		panic(err)

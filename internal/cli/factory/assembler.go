@@ -31,10 +31,10 @@ var (
 	errUseHasWhitespace  = errors.New("use must be a bare command name, with no whitespace")
 )
 
-// assemble validates def and produces an assembled plan, using a only to
-// resolve each child's own Definition (via Define) for group validation —
-// children are not built here, only peeked at.
-func assemble(def *cli.Definition, lvl level.Level, a *app.App) (*assembled, error) {
+// assemble validates def and produces a blueprint, using a only to resolve
+// each child's own Definition (via Define) for group validation — children
+// are not built here, only peeked at.
+func assemble(def *cli.Definition, lvl level.Level, a *app.App) (*blueprint, error) {
 	if err := validateMeta(def.Meta); err != nil {
 		return nil, err
 	}
@@ -67,7 +67,7 @@ func assemble(def *cli.Definition, lvl level.Level, a *app.App) (*assembled, err
 		return nil, err
 	}
 
-	implicitFlagPlans := make([]assembledFlag, 0, len(implicitSystemFlags))
+	implicitFlagPlans := make([]flagSpec, 0, len(implicitSystemFlags))
 	for _, f := range implicitSystemFlags {
 		p, err := planFlag(f)
 		if err != nil {
@@ -77,7 +77,7 @@ func assemble(def *cli.Definition, lvl level.Level, a *app.App) (*assembled, err
 	}
 
 	all := allFlags(def)
-	definedFlagPlans := make([]assembledFlag, 0, len(all))
+	definedFlagPlans := make([]flagSpec, 0, len(all))
 	for _, f := range all {
 		d := f.Definition()
 		if d.Meta.Sub == flags.SubImplicit {
@@ -102,7 +102,7 @@ func assemble(def *cli.Definition, lvl level.Level, a *app.App) (*assembled, err
 		definedFlagPlans = append(definedFlagPlans, p)
 	}
 
-	return &assembled{
+	return &blueprint{
 		def:             *def,
 		level:           lvl,
 		hasFlags:        len(all) > 0,
@@ -226,7 +226,7 @@ func validateNoDuplicateFlags(def *cli.Definition) error {
 }
 
 // planFlag dispatches to the correct plan function based on the concrete flag type.
-func planFlag(f flags.Flag) (assembledFlag, error) {
+func planFlag(f flags.Flag) (flagSpec, error) {
 	switch v := f.(type) {
 	case flags.SystemFlag[*flags.BoolValue]:
 		return planBoolSystemFlag(v)
@@ -251,7 +251,7 @@ func planFlag(f flags.Flag) (assembledFlag, error) {
 		return planStringSliceLiteralFlag(v)
 	}
 	meta := f.Definition().Meta
-	return assembledFlag{}, errs.Unexpected(
+	return flagSpec{}, errs.Unexpected(
 		fmt.Errorf("flag %q: unrecognized type %T: %w", meta.Name, f, errInvalidFlagType),
 		errs.Context{
 			Cause:      fmt.Sprintf("flag %q has type %T, which is not a CommandFlag or SystemFlag", meta.Name, f),
@@ -262,11 +262,11 @@ func planFlag(f flags.Flag) (assembledFlag, error) {
 
 // — System flags —
 
-func planBoolSystemFlag(f flags.SystemFlag[*flags.BoolValue]) (assembledFlag, error) {
+func planBoolSystemFlag(f flags.SystemFlag[*flags.BoolValue]) (flagSpec, error) {
 	meta := f.Definition().Meta
 	name, effect := meta.Name, f.Effect
 	baseRegister := boolRegistrar(meta.Name, meta.Shorthand, meta.Usage, f.Value.Default(), f.Value.Dest())
-	return assembledFlag{
+	return flagSpec{
 		name:         name,
 		kind:         meta.Kind,
 		sub:          meta.Sub,
@@ -278,11 +278,11 @@ func planBoolSystemFlag(f flags.SystemFlag[*flags.BoolValue]) (assembledFlag, er
 	}, nil
 }
 
-func planStringSystemFlag(f flags.SystemFlag[*flags.StringValue]) (assembledFlag, error) {
+func planStringSystemFlag(f flags.SystemFlag[*flags.StringValue]) (flagSpec, error) {
 	meta := f.Definition().Meta
 	name, effect := meta.Name, f.Effect
 	baseRegister := stringRegistrar(meta.Name, meta.Shorthand, meta.Usage, f.Value.Default(), f.Value.Dest())
-	return assembledFlag{
+	return flagSpec{
 		name:         name,
 		kind:         meta.Kind,
 		sub:          meta.Sub,
@@ -294,11 +294,11 @@ func planStringSystemFlag(f flags.SystemFlag[*flags.StringValue]) (assembledFlag
 	}, nil
 }
 
-func planStringSliceSystemFlag(f flags.SystemFlag[*flags.StringSliceValue]) (assembledFlag, error) {
+func planStringSliceSystemFlag(f flags.SystemFlag[*flags.StringSliceValue]) (flagSpec, error) {
 	meta := f.Definition().Meta
 	name, effect := meta.Name, f.Effect
 	baseRegister := stringArrayRegistrar(meta.Name, meta.Shorthand, meta.Usage, f.Value.Default(), f.Value.Dest())
-	return assembledFlag{
+	return flagSpec{
 		name:         name,
 		kind:         meta.Kind,
 		sub:          meta.Sub,
@@ -312,10 +312,10 @@ func planStringSliceSystemFlag(f flags.SystemFlag[*flags.StringSliceValue]) (ass
 
 // — Literal command flags —
 
-func planBoolLiteralFlag(f flags.CommandFlag[*flags.BoolValue]) (assembledFlag, error) {
+func planBoolLiteralFlag(f flags.CommandFlag[*flags.BoolValue]) (flagSpec, error) {
 	meta := f.Definition().Meta
 	baseRegister := boolRegistrar(meta.Name, meta.Shorthand, meta.Usage, f.Value.Default(), f.Value.Dest())
-	return assembledFlag{
+	return flagSpec{
 		name:         meta.Name,
 		kind:         meta.Kind,
 		hasShorthand: meta.Shorthand != "",
@@ -323,10 +323,10 @@ func planBoolLiteralFlag(f flags.CommandFlag[*flags.BoolValue]) (assembledFlag, 
 	}, nil
 }
 
-func planStringLiteralFlag(f flags.CommandFlag[*flags.StringValue]) (assembledFlag, error) {
+func planStringLiteralFlag(f flags.CommandFlag[*flags.StringValue]) (flagSpec, error) {
 	meta := f.Definition().Meta
 	baseRegister := stringRegistrar(meta.Name, meta.Shorthand, meta.Usage, f.Value.Default(), f.Value.Dest())
-	return assembledFlag{
+	return flagSpec{
 		name:         meta.Name,
 		kind:         meta.Kind,
 		hasShorthand: meta.Shorthand != "",
@@ -334,10 +334,10 @@ func planStringLiteralFlag(f flags.CommandFlag[*flags.StringValue]) (assembledFl
 	}, nil
 }
 
-func planStringSliceLiteralFlag(f flags.CommandFlag[*flags.StringSliceValue]) (assembledFlag, error) {
+func planStringSliceLiteralFlag(f flags.CommandFlag[*flags.StringSliceValue]) (flagSpec, error) {
 	meta := f.Definition().Meta
 	baseRegister := stringArrayRegistrar(meta.Name, meta.Shorthand, meta.Usage, f.Value.Default(), f.Value.Dest())
-	return assembledFlag{
+	return flagSpec{
 		name:         meta.Name,
 		kind:         meta.Kind,
 		hasShorthand: meta.Shorthand != "",
@@ -347,11 +347,11 @@ func planStringSliceLiteralFlag(f flags.CommandFlag[*flags.StringSliceValue]) (a
 
 // — Resolver flags —
 
-func planBoolResolverFlag(f flags.Flag, r flags.BoolResolver) (assembledFlag, error) {
+func planBoolResolverFlag(f flags.Flag, r flags.BoolResolver) (flagSpec, error) {
 	meta := f.Definition().Meta
 	name := meta.Name
 	baseRegister := boolRegistrar(meta.Name, meta.Shorthand, meta.Usage, false, nil)
-	return assembledFlag{
+	return flagSpec{
 		name:         name,
 		kind:         meta.Kind,
 		hasShorthand: meta.Shorthand != "",
@@ -367,13 +367,13 @@ func planBoolResolverFlag(f flags.Flag, r flags.BoolResolver) (assembledFlag, er
 	}, nil
 }
 
-// planStringResolverFlag builds an assembledFlag for a string CommandFlag that
+// planStringResolverFlag builds an flagSpec for a string CommandFlag that
 // carries a StringResolver.
-func planStringResolverFlag(f flags.Flag, r flags.StringResolver) (assembledFlag, error) {
+func planStringResolverFlag(f flags.Flag, r flags.StringResolver) (flagSpec, error) {
 	meta := f.Definition().Meta
 	name := meta.Name
 	baseRegister := stringRegistrar(meta.Name, meta.Shorthand, meta.Usage, "", nil)
-	return assembledFlag{
+	return flagSpec{
 		name:         name,
 		kind:         meta.Kind,
 		hasShorthand: meta.Shorthand != "",
@@ -389,13 +389,13 @@ func planStringResolverFlag(f flags.Flag, r flags.StringResolver) (assembledFlag
 	}, nil
 }
 
-// planStringSliceResolverFlag builds an assembledFlag for a string-slice
+// planStringSliceResolverFlag builds an flagSpec for a string-slice
 // CommandFlag that carries a StringSliceResolver.
-func planStringSliceResolverFlag(f flags.Flag, r flags.StringSliceResolver) (assembledFlag, error) {
+func planStringSliceResolverFlag(f flags.Flag, r flags.StringSliceResolver) (flagSpec, error) {
 	meta := f.Definition().Meta
 	name := meta.Name
 	baseRegister := stringArrayRegistrar(meta.Name, meta.Shorthand, meta.Usage, nil, nil)
-	return assembledFlag{
+	return flagSpec{
 		name:         name,
 		kind:         meta.Kind,
 		hasShorthand: meta.Shorthand != "",
