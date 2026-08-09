@@ -166,6 +166,24 @@ func TestRenderCommands_ungrouped(t *testing.T) {
 	if !strings.Contains(got, "version") {
 		t.Errorf("expected version in output, got %q", got)
 	}
+	if !strings.Contains(got, "GENERAL") {
+		t.Errorf("expected a GENERAL section header when no Groups are declared, got %q", got)
+	}
+}
+
+// TestRenderCommands_ungroupedHasBlankLineBeforeSection is a regression
+// test: the no-groups-at-all path used to call renderUngrouped directly,
+// with no leading blank line or header, so the command list ran straight
+// into the USAGE block with no visual separation.
+func TestRenderCommands_ungroupedHasBlankLineBeforeSection(t *testing.T) {
+	printer, _ := newTestPrinter(t)
+	parent := newCmd("leaf", "")
+	parent.AddCommand(newCmd("version", "Print version"))
+
+	got := renderCommands(parent, printer)
+	if !strings.HasPrefix(got, "\n") {
+		t.Errorf("expected output to start with a blank line before the GENERAL section, got %q", got)
+	}
 }
 
 func TestRenderCommands_grouped(t *testing.T) {

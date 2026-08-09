@@ -96,10 +96,22 @@ func renderCommands(cmd *cobra.Command, printer *ui.Printer) string {
 	width := maxNameWidth(visible)
 	groups := cmd.Groups()
 	if len(groups) == 0 {
-		return renderUngrouped(printer, visible, width, indentCmd)
+		return renderUngroupedSection(printer, visible, width)
 	}
 
 	return renderGrouped(printer, visible, groups, width)
+}
+
+// renderUngroupedSection renders a "GENERAL" header followed by cmds — the
+// same shape used both when a command declares no Groups at all, and for
+// commands left ungrouped within a tree that does declare some.
+func renderUngroupedSection(printer *ui.Printer, cmds []*cobra.Command, width int) string {
+	var b strings.Builder
+	b.WriteString("\n")
+	b.WriteString(printer.Header("GENERAL"))
+	b.WriteString("\n")
+	b.WriteString(renderUngrouped(printer, cmds, width, indentCmd))
+	return b.String()
 }
 
 func renderGrouped(printer *ui.Printer, visible []*cobra.Command, groups []*cobra.Group, width int) string {
@@ -126,10 +138,7 @@ func renderGrouped(printer *ui.Printer, visible []*cobra.Command, groups []*cobr
 	}
 
 	if len(ungrouped) > 0 {
-		b.WriteString("\n")
-		b.WriteString(printer.Header("GENERAL"))
-		b.WriteString("\n")
-		b.WriteString(renderUngrouped(printer, ungrouped, width, indentCmd))
+		b.WriteString(renderUngroupedSection(printer, ungrouped, width))
 	}
 
 	return b.String()
