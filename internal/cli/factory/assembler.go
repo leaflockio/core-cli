@@ -12,12 +12,10 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/leaflockio/core-cli/internal/app"
 	"github.com/leaflockio/core-cli/internal/cli"
 	"github.com/leaflockio/core-cli/internal/cli/flags"
 	"github.com/leaflockio/core-cli/internal/errs"
 	"github.com/leaflockio/core-cli/internal/level"
-	"github.com/spf13/pflag"
 )
 
 var (
@@ -25,7 +23,6 @@ var (
 	errConfigNotTopLevel = errors.New("config and path registry may only be declared by a top-level command")
 	errImplicitFlagInDef = errors.New("must not appear in Definition.Flags; it is added by the engine automatically")
 	errDuplicateFlags    = errors.New("duplicate flag declarations")
-	errInvalidFlagType   = errors.New("must be a CommandFlag or SystemFlag")
 	errUseEmpty          = errors.New("use must not be empty")
 	errUseHasWhitespace  = errors.New("use must be a bare command name, with no whitespace")
 )
@@ -35,28 +32,18 @@ func assemble(def *cli.Definition, lvl level.Level) (*blueprint, error) {
 	if err := validateMeta(def.Meta); err != nil {
 		return nil, err
 	}
-
-	if lvl != level.LevelRoot && def.Handler == nil && len(def.Children) == 0 {
-		return nil, errs.Unexpected(
-			fmt.Errorf("factory[assemble]: command %q: %w", def.Meta.Use, errHandlerNil),
-			errs.Context{
-				Cause:      fmt.Sprintf("command %q declares neither a Handler nor Children", def.Meta.Use),
-				Resolution: "add a Handler, or declare at least one child command",
-			},
-		)
+	if err := checkHandlerOrChildren(def, lvl); err != nil {
+		return nil, err
 	}
-
-	if lvl != level.LevelTop && (def.Config != nil || !def.PathRegistry.IsEmpty()) {
-		return nil, errs.Unexpected(
-			fmt.Errorf("factory[assemble]: command %q: %w", def.Meta.Use, errConfigNotTopLevel),
-			errs.Context{
-				Cause:      fmt.Sprintf("command %q declares Config or PathRegistry but isn't top-level", def.Meta.Use),
-				Resolution: "only a direct child of the root command may declare Config or PathRegistry",
-			},
-		)
+	if err := checkConfigOwner(def, lvl); err != nil {
+		return nil, err
 	}
-
 	if err := validateNoDuplicateFlags(def); err != nil {
+		return nil, err
+	}
+
+	all := allFlags(def)
+	if err := checkFlagsNotImplicit(def, all); err != nil {
 		return nil, err
 	}
 
@@ -69,25 +56,8 @@ func assemble(def *cli.Definition, lvl level.Level) (*blueprint, error) {
 		implicitFlagPlans = append(implicitFlagPlans, p)
 	}
 
-	all := allFlags(def)
 	definedFlagPlans := make([]flagSpec, 0, len(all))
 	for _, f := range all {
-		d := f.Definition()
-		if d.Meta.Sub == flags.SubImplicit {
-			return nil, errs.Unexpected(
-				fmt.Errorf(
-					"factory[assemble]: command %q: implicit system flag %q: %w",
-					def.Meta.Use, d.Meta.Name, errImplicitFlagInDef,
-				),
-				errs.Context{
-					Cause: fmt.Sprintf(
-						"command %q declared implicit system flag %q in Definition.Flags",
-						def.Meta.Use, d.Meta.Name,
-					),
-					Resolution: "remove it — implicit system flags are added automatically by the engine",
-				},
-			)
-		}
 		p, err := planFlag(f)
 		if err != nil {
 			return nil, fmt.Errorf("factory[assemble]: command %q: %w", def.Meta.Use, err)
@@ -103,6 +73,63 @@ func assemble(def *cli.Definition, lvl level.Level) (*blueprint, error) {
 		flags:           definedFlagPlans,
 		persistentFlags: implicitFlagPlans,
 	}, nil
+}
+
+// checkHandlerOrChildren requires def to declare a Handler or at least one
+// child, except at the tree root — a handlerless, childless leaf command
+// would never do anything when invoked.
+func checkHandlerOrChildren(def *cli.Definition, lvl level.Level) error {
+	if lvl == level.LevelRoot || def.Handler != nil || len(def.Children) > 0 {
+		return nil
+	}
+	return errs.Unexpected(
+		fmt.Errorf("factory[assemble]: command %q: %w", def.Meta.Use, errHandlerNil),
+		errs.Context{
+			Cause:      fmt.Sprintf("command %q declares neither a Handler nor Children", def.Meta.Use),
+			Resolution: "add a Handler, or declare at least one child command",
+		},
+	)
+}
+
+// checkConfigOwner requires Config and PathRegistry to be declared only by
+// a top-level command — the one level factory.Build ever loads config for.
+func checkConfigOwner(def *cli.Definition, lvl level.Level) error {
+	if lvl == level.LevelTop || (def.Config == nil && def.PathRegistry.IsEmpty()) {
+		return nil
+	}
+	return errs.Unexpected(
+		fmt.Errorf("factory[assemble]: command %q: %w", def.Meta.Use, errConfigNotTopLevel),
+		errs.Context{
+			Cause:      fmt.Sprintf("command %q declares Config or PathRegistry but isn't top-level", def.Meta.Use),
+			Resolution: "only a direct child of the root command may declare Config or PathRegistry",
+		},
+	)
+}
+
+// checkFlagsNotImplicit rejects any flag in all (def's own declared flags)
+// marked SubImplicit — that subcategory is reserved for implicitSystemFlags,
+// added automatically by the engine, never by a command's own Definition.
+func checkFlagsNotImplicit(def *cli.Definition, all []flags.Flag) error {
+	for _, f := range all {
+		d := f.Definition()
+		if d.Meta.Sub != flags.SubImplicit {
+			continue
+		}
+		return errs.Unexpected(
+			fmt.Errorf(
+				"factory[assemble]: command %q: implicit system flag %q: %w",
+				def.Meta.Use, d.Meta.Name, errImplicitFlagInDef,
+			),
+			errs.Context{
+				Cause: fmt.Sprintf(
+					"command %q declared implicit system flag %q in Definition.Flags",
+					def.Meta.Use, d.Meta.Name,
+				),
+				Resolution: "remove it — implicit system flags are added automatically by the engine",
+			},
+		)
+	}
+	return nil
 }
 
 // allFlags returns every flag def registers.
@@ -184,190 +211,4 @@ func validateNoDuplicateFlags(def *cli.Definition) error {
 		)
 	}
 	return nil
-}
-
-// planFlag dispatches to the correct plan function based on the concrete flag type.
-func planFlag(f flags.Flag) (flagSpec, error) {
-	switch v := f.(type) {
-	case flags.SystemFlag[*flags.BoolValue]:
-		return planBoolSystemFlag(v)
-	case flags.SystemFlag[*flags.StringValue]:
-		return planStringSystemFlag(v)
-	case flags.SystemFlag[*flags.StringSliceValue]:
-		return planStringSliceSystemFlag(v)
-	case flags.CommandFlag[*flags.BoolValue]:
-		if r, ok := v.Resolver.(flags.BoolResolver); ok {
-			return planBoolResolverFlag(f, r)
-		}
-		return planBoolLiteralFlag(v)
-	case flags.CommandFlag[*flags.StringValue]:
-		if r, ok := v.Resolver.(flags.StringResolver); ok {
-			return planStringResolverFlag(f, r)
-		}
-		return planStringLiteralFlag(v)
-	case flags.CommandFlag[*flags.StringSliceValue]:
-		if r, ok := v.Resolver.(flags.StringSliceResolver); ok {
-			return planStringSliceResolverFlag(f, r)
-		}
-		return planStringSliceLiteralFlag(v)
-	}
-	meta := f.Definition().Meta
-	return flagSpec{}, errs.Unexpected(
-		fmt.Errorf("flag %q: unrecognized type %T: %w", meta.Name, f, errInvalidFlagType),
-		errs.Context{
-			Cause:      fmt.Sprintf("flag %q has type %T, which is not a CommandFlag or SystemFlag", meta.Name, f),
-			Resolution: "declare the flag using flags.CommandFlag or flags.SystemFlag",
-		},
-	)
-}
-
-// — System flags —
-
-func planBoolSystemFlag(f flags.SystemFlag[*flags.BoolValue]) (flagSpec, error) {
-	meta := f.Definition().Meta
-	name, effect := meta.Name, f.Effect
-	baseRegister := boolRegistrar(meta.Name, meta.Shorthand, meta.Usage, f.Value.Default(), f.Value.Dest())
-	return flagSpec{
-		name:         name,
-		kind:         meta.Kind,
-		sub:          meta.Sub,
-		hasShorthand: meta.Shorthand != "",
-		register: func(fs *pflag.FlagSet, a *app.App) {
-			baseRegister(fs)
-			wrapWithEffect(fs, name, func() { effect(a) })
-		},
-	}, nil
-}
-
-func planStringSystemFlag(f flags.SystemFlag[*flags.StringValue]) (flagSpec, error) {
-	meta := f.Definition().Meta
-	name, effect := meta.Name, f.Effect
-	baseRegister := stringRegistrar(meta.Name, meta.Shorthand, meta.Usage, f.Value.Default(), f.Value.Dest())
-	return flagSpec{
-		name:         name,
-		kind:         meta.Kind,
-		sub:          meta.Sub,
-		hasShorthand: meta.Shorthand != "",
-		register: func(fs *pflag.FlagSet, a *app.App) {
-			baseRegister(fs)
-			wrapWithEffect(fs, name, func() { effect(a) })
-		},
-	}, nil
-}
-
-func planStringSliceSystemFlag(f flags.SystemFlag[*flags.StringSliceValue]) (flagSpec, error) {
-	meta := f.Definition().Meta
-	name, effect := meta.Name, f.Effect
-	baseRegister := stringArrayRegistrar(meta.Name, meta.Shorthand, meta.Usage, f.Value.Default(), f.Value.Dest())
-	return flagSpec{
-		name:         name,
-		kind:         meta.Kind,
-		sub:          meta.Sub,
-		hasShorthand: meta.Shorthand != "",
-		register: func(fs *pflag.FlagSet, a *app.App) {
-			baseRegister(fs)
-			wrapWithEffect(fs, name, func() { effect(a) })
-		},
-	}, nil
-}
-
-// — Literal command flags —
-
-func planBoolLiteralFlag(f flags.CommandFlag[*flags.BoolValue]) (flagSpec, error) {
-	meta := f.Definition().Meta
-	baseRegister := boolRegistrar(meta.Name, meta.Shorthand, meta.Usage, f.Value.Default(), f.Value.Dest())
-	return flagSpec{
-		name:         meta.Name,
-		kind:         meta.Kind,
-		hasShorthand: meta.Shorthand != "",
-		register:     func(fs *pflag.FlagSet, _ *app.App) { baseRegister(fs) },
-	}, nil
-}
-
-func planStringLiteralFlag(f flags.CommandFlag[*flags.StringValue]) (flagSpec, error) {
-	meta := f.Definition().Meta
-	baseRegister := stringRegistrar(meta.Name, meta.Shorthand, meta.Usage, f.Value.Default(), f.Value.Dest())
-	return flagSpec{
-		name:         meta.Name,
-		kind:         meta.Kind,
-		hasShorthand: meta.Shorthand != "",
-		register:     func(fs *pflag.FlagSet, _ *app.App) { baseRegister(fs) },
-	}, nil
-}
-
-func planStringSliceLiteralFlag(f flags.CommandFlag[*flags.StringSliceValue]) (flagSpec, error) {
-	meta := f.Definition().Meta
-	baseRegister := stringArrayRegistrar(meta.Name, meta.Shorthand, meta.Usage, f.Value.Default(), f.Value.Dest())
-	return flagSpec{
-		name:         meta.Name,
-		kind:         meta.Kind,
-		hasShorthand: meta.Shorthand != "",
-		register:     func(fs *pflag.FlagSet, _ *app.App) { baseRegister(fs) },
-	}, nil
-}
-
-// — Resolver flags —
-
-func planBoolResolverFlag(f flags.Flag, r flags.BoolResolver) (flagSpec, error) {
-	meta := f.Definition().Meta
-	name := meta.Name
-	baseRegister := boolRegistrar(meta.Name, meta.Shorthand, meta.Usage, false, nil)
-	return flagSpec{
-		name:         name,
-		kind:         meta.Kind,
-		hasShorthand: meta.Shorthand != "",
-		hasResolver:  true,
-		register:     func(fs *pflag.FlagSet, _ *app.App) { baseRegister(fs) },
-		resolve: func(fs *pflag.FlagSet) error {
-			raw, err := fs.GetBool(name)
-			if err != nil {
-				return err
-			}
-			return r.Resolve(raw)
-		},
-	}, nil
-}
-
-// planStringResolverFlag builds an flagSpec for a string CommandFlag that
-// carries a StringResolver.
-func planStringResolverFlag(f flags.Flag, r flags.StringResolver) (flagSpec, error) {
-	meta := f.Definition().Meta
-	name := meta.Name
-	baseRegister := stringRegistrar(meta.Name, meta.Shorthand, meta.Usage, "", nil)
-	return flagSpec{
-		name:         name,
-		kind:         meta.Kind,
-		hasShorthand: meta.Shorthand != "",
-		hasResolver:  true,
-		register:     func(fs *pflag.FlagSet, _ *app.App) { baseRegister(fs) },
-		resolve: func(fs *pflag.FlagSet) error {
-			raw, err := fs.GetString(name)
-			if err != nil {
-				return err
-			}
-			return r.Resolve(raw)
-		},
-	}, nil
-}
-
-// planStringSliceResolverFlag builds an flagSpec for a string-slice
-// CommandFlag that carries a StringSliceResolver.
-func planStringSliceResolverFlag(f flags.Flag, r flags.StringSliceResolver) (flagSpec, error) {
-	meta := f.Definition().Meta
-	name := meta.Name
-	baseRegister := stringArrayRegistrar(meta.Name, meta.Shorthand, meta.Usage, nil, nil)
-	return flagSpec{
-		name:         name,
-		kind:         meta.Kind,
-		hasShorthand: meta.Shorthand != "",
-		hasResolver:  true,
-		register:     func(fs *pflag.FlagSet, _ *app.App) { baseRegister(fs) },
-		resolve: func(fs *pflag.FlagSet) error {
-			raw, err := fs.GetStringArray(name)
-			if err != nil {
-				return err
-			}
-			return r.Resolve(raw)
-		},
-	}, nil
 }

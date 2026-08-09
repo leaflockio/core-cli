@@ -17,7 +17,6 @@ import (
 	"github.com/leaflockio/core-cli/internal/cli/flags"
 	"github.com/leaflockio/core-cli/internal/level"
 	"github.com/leaflockio/core-cli/internal/paths"
-	"github.com/spf13/pflag"
 )
 
 // — assemble —
@@ -282,6 +281,113 @@ func TestAssemble_returns_error_when_implicit_flag_planning_fails(t *testing.T) 
 	}
 }
 
+// — checkHandlerOrChildren —
+
+func TestCheckHandlerOrChildren_nilAtLevelRoot(t *testing.T) {
+	def := &cli.Definition{Meta: &cli.Meta{Use: "test"}}
+	if err := checkHandlerOrChildren(def, level.LevelRoot); err != nil {
+		t.Errorf("unexpected error at LevelRoot: %v", err)
+	}
+}
+
+func TestCheckHandlerOrChildren_nilWhenHandlerSet(t *testing.T) {
+	def := &cli.Definition{Meta: &cli.Meta{Use: "test"}, Handler: nopHandler}
+	if err := checkHandlerOrChildren(def, level.LevelTop); err != nil {
+		t.Errorf("unexpected error when Handler is set: %v", err)
+	}
+}
+
+func TestCheckHandlerOrChildren_nilWhenChildrenDeclared(t *testing.T) {
+	def := &cli.Definition{Meta: &cli.Meta{Use: "test"}, Children: []cli.Command{&stubCommand{use: "child"}}}
+	if err := checkHandlerOrChildren(def, level.LevelTop); err != nil {
+		t.Errorf("unexpected error when Children is non-empty: %v", err)
+	}
+}
+
+func TestCheckHandlerOrChildren_errorsWhenNeitherSet(t *testing.T) {
+	def := &cli.Definition{Meta: &cli.Meta{Use: "test"}}
+	err := checkHandlerOrChildren(def, level.LevelTop)
+	if err == nil {
+		t.Fatal("expected error for nil Handler with no children, got nil")
+	}
+	if !errors.Is(err, errHandlerNil) {
+		t.Errorf("error = %v, want errors.Is match for errHandlerNil", err)
+	}
+}
+
+// — checkConfigOwner —
+
+func TestCheckConfigOwner_nilAtLevelTop(t *testing.T) {
+	def := &cli.Definition{Meta: &cli.Meta{Use: "test"}, Config: stubConfigLoader{}}
+	if err := checkConfigOwner(def, level.LevelTop); err != nil {
+		t.Errorf("unexpected error at LevelTop: %v", err)
+	}
+}
+
+func TestCheckConfigOwner_nilWhenNeitherDeclared(t *testing.T) {
+	def := &cli.Definition{Meta: &cli.Meta{Use: "test"}}
+	if err := checkConfigOwner(def, level.LevelRoot); err != nil {
+		t.Errorf("unexpected error when neither Config nor PathRegistry is declared: %v", err)
+	}
+}
+
+func TestCheckConfigOwner_errorsForConfigBelowLevelTop(t *testing.T) {
+	def := &cli.Definition{Meta: &cli.Meta{Use: "test"}, Config: stubConfigLoader{}}
+	err := checkConfigOwner(def, level.LevelRoot)
+	if err == nil {
+		t.Fatal("expected error for Config declared below LevelTop, got nil")
+	}
+	if !errors.Is(err, errConfigNotTopLevel) {
+		t.Errorf("error = %v, want errors.Is match for errConfigNotTopLevel", err)
+	}
+}
+
+func TestCheckConfigOwner_errorsForPathRegistryBelowLevelTop(t *testing.T) {
+	registry := paths.NewRegistry()
+	if err := registry.Add(paths.KnownPath{Name: "x"}); err != nil {
+		t.Fatalf("unexpected error adding path: %v", err)
+	}
+	def := &cli.Definition{Meta: &cli.Meta{Use: "test"}, PathRegistry: registry}
+	if err := checkConfigOwner(def, level.LevelNested); err == nil {
+		t.Fatal("expected error for PathRegistry declared below LevelTop, got nil")
+	}
+}
+
+// — checkFlagsNotImplicit —
+
+func TestCheckFlagsNotImplicit_nilWhenNoFlags(t *testing.T) {
+	def := minDef("test")
+	if err := checkFlagsNotImplicit(def, nil); err != nil {
+		t.Errorf("unexpected error: %v", err)
+	}
+}
+
+func TestCheckFlagsNotImplicit_nilWhenAllCommandFlags(t *testing.T) {
+	def := minDef("test")
+	all := []flags.Flag{flags.CommandFlag[*flags.BoolValue]{Value: flags.Bool("verbose", "")}}
+	if err := checkFlagsNotImplicit(def, all); err != nil {
+		t.Errorf("unexpected error: %v", err)
+	}
+}
+
+func TestCheckFlagsNotImplicit_errorsForImplicitFlag(t *testing.T) {
+	def := minDef("test")
+	all := []flags.Flag{
+		flags.SystemFlag[*flags.BoolValue]{
+			Sub:    flags.SubImplicit,
+			Value:  flags.Bool("custom-implicit", ""),
+			Effect: func(_ *app.App) {},
+		},
+	}
+	err := checkFlagsNotImplicit(def, all)
+	if err == nil {
+		t.Fatal("expected error for implicit flag, got nil")
+	}
+	if !errors.Is(err, errImplicitFlagInDef) {
+		t.Errorf("error = %v, want errors.Is match for errImplicitFlagInDef", err)
+	}
+}
+
 // — validateMeta —
 
 func TestValidateMeta_returns_nil_for_bare_use(t *testing.T) {
@@ -313,9 +419,6 @@ func TestValidateMeta_allows_argsUsage_set_separately(t *testing.T) {
 		t.Errorf("unexpected error: %v", err)
 	}
 }
-
-// Group validation moved off assemble()'s early peek and into execute()'s
-// real per-child build loop — see checkChildGroup in executor_test.go.
 
 // — validateNoDuplicateFlags —
 
@@ -387,471 +490,5 @@ func TestValidateNoDuplicateFlags_detects_clash_with_implicit_flags(t *testing.T
 	err := validateNoDuplicateFlags(def)
 	if err == nil {
 		t.Fatal("expected error for clash with implicit no-color flag, got nil")
-	}
-}
-
-// — planFlag routing —
-
-func TestPlanFlag_routes_bool_system_flag(t *testing.T) {
-	f := flags.SystemFlag[*flags.BoolValue]{
-		Sub:    flags.SubImplicit,
-		Value:  flags.Bool("test", ""),
-		Effect: func(_ *app.App) {},
-	}
-	p, err := planFlag(f)
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
-	if p.kind != flags.KindSystem {
-		t.Errorf("kind = %q, want KindSystem", p.kind)
-	}
-}
-
-func TestPlanFlag_routes_string_system_flag(t *testing.T) {
-	f := flags.SystemFlag[*flags.StringValue]{
-		Sub:    flags.SubImplicit,
-		Value:  flags.String("test", ""),
-		Effect: func(_ *app.App) {},
-	}
-	p, err := planFlag(f)
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
-	if p.kind != flags.KindSystem {
-		t.Errorf("kind = %q, want KindSystem", p.kind)
-	}
-}
-
-func TestPlanFlag_routes_string_slice_system_flag(t *testing.T) {
-	f := flags.SystemFlag[*flags.StringSliceValue]{
-		Sub:    flags.SubImplicit,
-		Value:  flags.StringSlice("test", ""),
-		Effect: func(_ *app.App) {},
-	}
-	p, err := planFlag(f)
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
-	if p.kind != flags.KindSystem {
-		t.Errorf("kind = %q, want KindSystem", p.kind)
-	}
-}
-
-func TestPlanFlag_routes_bool_literal_flag(t *testing.T) {
-	f := flags.CommandFlag[*flags.BoolValue]{Value: flags.Bool("verbose", "")}
-	p, err := planFlag(f)
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
-	if p.kind != flags.KindCommand {
-		t.Errorf("kind = %q, want KindCommand", p.kind)
-	}
-	if p.hasResolver {
-		t.Error("hasResolver must be false for a literal flag")
-	}
-}
-
-func TestPlanFlag_routes_string_literal_flag(t *testing.T) {
-	f := flags.CommandFlag[*flags.StringValue]{Value: flags.String("output", "")}
-	p, err := planFlag(f)
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
-	if p.kind != flags.KindCommand {
-		t.Errorf("kind = %q, want KindCommand", p.kind)
-	}
-
-	fs := pflag.NewFlagSet("test", pflag.ContinueOnError)
-	p.register(fs, nil)
-	if fs.Lookup("output") == nil {
-		t.Error("register must register the \"output\" flag on the FlagSet")
-	}
-}
-
-func TestPlanFlag_routes_string_slice_literal_flag(t *testing.T) {
-	f := flags.CommandFlag[*flags.StringSliceValue]{Value: flags.StringSlice("tags", "")}
-	p, err := planFlag(f)
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
-	if p.kind != flags.KindCommand {
-		t.Errorf("kind = %q, want KindCommand", p.kind)
-	}
-
-	fs := pflag.NewFlagSet("test", pflag.ContinueOnError)
-	p.register(fs, nil)
-	if fs.Lookup("tags") == nil {
-		t.Error("register must register the \"tags\" flag on the FlagSet")
-	}
-}
-
-func TestPlanFlag_routes_string_slice_resolver_flag(t *testing.T) {
-	r := &stubStringSliceResolver{}
-	f := flags.CommandFlag[*flags.StringSliceValue]{
-		Value:    flags.StringSlice("var", ""),
-		Resolver: r,
-	}
-	p, err := planFlag(f)
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
-	if !p.hasResolver {
-		t.Error("hasResolver must be true for a resolver flag")
-	}
-}
-
-func TestPlanFlag_routes_bool_resolver_flag(t *testing.T) {
-	r := &stubBoolResolver{}
-	f := flags.CommandFlag[*flags.BoolValue]{
-		Value:    flags.Bool("dry-run", ""),
-		Resolver: r,
-	}
-	p, err := planFlag(f)
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
-	if !p.hasResolver {
-		t.Error("hasResolver must be true for a bool resolver flag")
-	}
-}
-
-func TestPlanFlag_routes_string_resolver_flag(t *testing.T) {
-	r := &stubStringResolver{}
-	f := flags.CommandFlag[*flags.StringValue]{
-		Value:    flags.String("format", ""),
-		Resolver: r,
-	}
-	p, err := planFlag(f)
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
-	if !p.hasResolver {
-		t.Error("hasResolver must be true for a string resolver flag")
-	}
-}
-
-func TestPlanFlag_returns_error_for_unrecognized_type(t *testing.T) {
-	_, err := planFlag(unknownFlag{})
-	if err == nil {
-		t.Fatal("expected error for unrecognized flag type, got nil")
-	}
-	if !errors.Is(err, errInvalidFlagType) {
-		t.Errorf("error = %v, want errors.Is match for errInvalidFlagType", err)
-	}
-}
-
-// — system flag effect —
-//
-// System flag effects fire immediately when pflag parses the flag (via the
-// effectValue wrapper — see effectvalue.go), not via a separate post-parse
-// check. So these tests assert on state after Parse alone.
-
-func TestPlanBoolSystemFlag_effects_do_not_cross_trigger_between_flags(t *testing.T) {
-	var aCalled, bCalled bool
-	fa := flags.SystemFlag[*flags.BoolValue]{
-		Sub:    flags.SubImplicit,
-		Value:  flags.Bool("flag-a", ""),
-		Effect: func(_ *app.App) { aCalled = true },
-	}
-	fb := flags.SystemFlag[*flags.BoolValue]{
-		Sub:    flags.SubImplicit,
-		Value:  flags.Bool("flag-b", ""),
-		Effect: func(_ *app.App) { bCalled = true },
-	}
-	pa, err := planFlag(fa)
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
-	pb, err := planFlag(fb)
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
-
-	fs := pflag.NewFlagSet("test", pflag.ContinueOnError)
-	pa.register(fs, nil)
-	pb.register(fs, nil)
-
-	if err := fs.Parse([]string{"--flag-a"}); err != nil {
-		t.Fatalf("Parse failed: %v", err)
-	}
-	if !aCalled {
-		t.Error("flag-a's effect must fire when only flag-a is set")
-	}
-	if bCalled {
-		t.Error("flag-b's effect must not fire when only flag-a is set")
-	}
-}
-
-func TestPlanBoolSystemFlag_effect_fires_when_flag_is_changed(t *testing.T) {
-	var called bool
-	f := flags.SystemFlag[*flags.BoolValue]{
-		Sub:    flags.SubImplicit,
-		Value:  flags.Bool("test-flag", ""),
-		Effect: func(_ *app.App) { called = true },
-	}
-	p, err := planFlag(f)
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
-
-	fs := pflag.NewFlagSet("test", pflag.ContinueOnError)
-	p.register(fs, nil)
-	if err := fs.Parse([]string{"--test-flag"}); err != nil {
-		t.Fatalf("Parse failed: %v", err)
-	}
-
-	if !called {
-		t.Error("effect must fire when flag is explicitly set")
-	}
-}
-
-func TestPlanBoolSystemFlag_effect_does_not_fire_when_flag_not_set(t *testing.T) {
-	var called bool
-	f := flags.SystemFlag[*flags.BoolValue]{
-		Sub:    flags.SubImplicit,
-		Value:  flags.Bool("test-flag", ""),
-		Effect: func(_ *app.App) { called = true },
-	}
-	p, err := planFlag(f)
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
-
-	fs := pflag.NewFlagSet("test", pflag.ContinueOnError)
-	p.register(fs, nil)
-	if err := fs.Parse([]string{}); err != nil {
-		t.Fatalf("Parse failed: %v", err)
-	}
-
-	if called {
-		t.Error("effect must not fire when flag is not set")
-	}
-}
-
-// — string system flag effect —
-
-func TestPlanStringSystemFlag_effect_fires_when_flag_is_changed(t *testing.T) {
-	var called bool
-	f := flags.SystemFlag[*flags.StringValue]{
-		Sub:    flags.SubImplicit,
-		Value:  flags.String("test-str", ""),
-		Effect: func(_ *app.App) { called = true },
-	}
-	p, err := planFlag(f)
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
-
-	fs := pflag.NewFlagSet("test", pflag.ContinueOnError)
-	p.register(fs, nil)
-	if err := fs.Parse([]string{"--test-str", "val"}); err != nil {
-		t.Fatalf("Parse failed: %v", err)
-	}
-
-	if !called {
-		t.Error("effect must fire when string system flag is explicitly set")
-	}
-}
-
-func TestPlanStringSystemFlag_effect_does_not_fire_when_flag_not_set(t *testing.T) {
-	var called bool
-	f := flags.SystemFlag[*flags.StringValue]{
-		Sub:    flags.SubImplicit,
-		Value:  flags.String("test-str", ""),
-		Effect: func(_ *app.App) { called = true },
-	}
-	p, err := planFlag(f)
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
-
-	fs := pflag.NewFlagSet("test", pflag.ContinueOnError)
-	p.register(fs, nil)
-	_ = fs.Parse([]string{})
-
-	if called {
-		t.Error("effect must not fire when string system flag is not set")
-	}
-}
-
-// — string slice system flag effect —
-
-func TestPlanStringSliceSystemFlag_effect_fires_when_flag_is_changed(t *testing.T) {
-	var called bool
-	f := flags.SystemFlag[*flags.StringSliceValue]{
-		Sub:    flags.SubImplicit,
-		Value:  flags.StringSlice("test-slice", ""),
-		Effect: func(_ *app.App) { called = true },
-	}
-	p, err := planFlag(f)
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
-
-	fs := pflag.NewFlagSet("test", pflag.ContinueOnError)
-	p.register(fs, nil)
-	if err := fs.Parse([]string{"--test-slice", "a"}); err != nil {
-		t.Fatalf("Parse failed: %v", err)
-	}
-
-	if !called {
-		t.Error("effect must fire when string slice system flag is explicitly set")
-	}
-}
-
-func TestPlanStringSliceSystemFlag_effect_does_not_fire_when_flag_not_set(t *testing.T) {
-	var called bool
-	f := flags.SystemFlag[*flags.StringSliceValue]{
-		Sub:    flags.SubImplicit,
-		Value:  flags.StringSlice("test-slice", ""),
-		Effect: func(_ *app.App) { called = true },
-	}
-	p, err := planFlag(f)
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
-
-	fs := pflag.NewFlagSet("test", pflag.ContinueOnError)
-	p.register(fs, nil)
-	_ = fs.Parse([]string{})
-
-	if called {
-		t.Error("effect must not fire when string slice system flag is not set")
-	}
-}
-
-// — resolver flag resolve —
-
-func TestPlanBoolResolverFlag_resolve_calls_resolver(t *testing.T) {
-	r := &stubBoolResolver{}
-	f := flags.CommandFlag[*flags.BoolValue]{
-		Value:    flags.Bool("dry-run", ""),
-		Resolver: r,
-	}
-	p, err := planFlag(f)
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
-
-	fs := pflag.NewFlagSet("test", pflag.ContinueOnError)
-	p.register(fs, nil)
-	if err := fs.Parse([]string{"--dry-run"}); err != nil {
-		t.Fatalf("Parse failed: %v", err)
-	}
-	if err := p.resolve(fs); err != nil {
-		t.Fatalf("resolve failed: %v", err)
-	}
-
-	if !r.called {
-		t.Error("Resolve must be called on the bool resolver")
-	}
-	if !r.got {
-		t.Error("resolver received false, want true")
-	}
-}
-
-func TestPlanStringResolverFlag_resolve_calls_resolver(t *testing.T) {
-	r := &stubStringResolver{}
-	f := flags.CommandFlag[*flags.StringValue]{
-		Value:    flags.String("format", ""),
-		Resolver: r,
-	}
-	p, err := planFlag(f)
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
-
-	fs := pflag.NewFlagSet("test", pflag.ContinueOnError)
-	p.register(fs, nil)
-	if err := fs.Parse([]string{"--format", "json"}); err != nil {
-		t.Fatalf("Parse failed: %v", err)
-	}
-	if err := p.resolve(fs); err != nil {
-		t.Fatalf("resolve failed: %v", err)
-	}
-
-	if !r.called {
-		t.Error("Resolve must be called on the string resolver")
-	}
-	if r.got != "json" {
-		t.Errorf("resolver received %q, want %q", r.got, "json")
-	}
-}
-
-func TestPlanStringSliceResolverFlag_resolve_calls_resolver(t *testing.T) {
-	r := &stubStringSliceResolver{}
-	f := flags.CommandFlag[*flags.StringSliceValue]{
-		Value:    flags.StringSlice("var", ""),
-		Resolver: r,
-	}
-	p, err := planFlag(f)
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
-
-	fs := pflag.NewFlagSet("test", pflag.ContinueOnError)
-	p.register(fs, nil)
-	if err := fs.Parse([]string{"--var", "a", "--var", "b"}); err != nil {
-		t.Fatalf("Parse failed: %v", err)
-	}
-	if err := p.resolve(fs); err != nil {
-		t.Fatalf("resolve failed: %v", err)
-	}
-
-	if !r.called {
-		t.Error("Resolve must be called on the resolver")
-	}
-	if len(r.got) != 2 || r.got[0] != "a" || r.got[1] != "b" {
-		t.Errorf("resolver received %v, want [a b]", r.got)
-	}
-}
-
-func TestPlanBoolResolverFlag_resolve_returns_error_when_flag_not_registered(t *testing.T) {
-	r := &stubBoolResolver{}
-	f := flags.CommandFlag[*flags.BoolValue]{
-		Value:    flags.Bool("dry-run", ""),
-		Resolver: r,
-	}
-	p, err := planFlag(f)
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
-	fs := pflag.NewFlagSet("test", pflag.ContinueOnError)
-	if err := p.resolve(fs); err == nil {
-		t.Fatal("expected error when flag not registered in FlagSet, got nil")
-	}
-}
-
-func TestPlanStringResolverFlag_resolve_returns_error_when_flag_not_registered(t *testing.T) {
-	r := &stubStringResolver{}
-	f := flags.CommandFlag[*flags.StringValue]{
-		Value:    flags.String("format", ""),
-		Resolver: r,
-	}
-	p, err := planFlag(f)
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
-	fs := pflag.NewFlagSet("test", pflag.ContinueOnError)
-	if err := p.resolve(fs); err == nil {
-		t.Fatal("expected error when flag not registered in FlagSet, got nil")
-	}
-}
-
-func TestPlanStringSliceResolverFlag_resolve_returns_error_when_flag_not_registered(t *testing.T) {
-	r := &stubStringSliceResolver{}
-	f := flags.CommandFlag[*flags.StringSliceValue]{
-		Value:    flags.StringSlice("var", ""),
-		Resolver: r,
-	}
-	p, err := planFlag(f)
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
-
-	// Resolve against an empty FlagSet — flag is not registered, GetStringArray will fail.
-	fs := pflag.NewFlagSet("test", pflag.ContinueOnError)
-	if err := p.resolve(fs); err == nil {
-		t.Fatal("expected error when flag not registered in FlagSet, got nil")
 	}
 }
