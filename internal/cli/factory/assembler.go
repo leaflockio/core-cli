@@ -27,12 +27,18 @@ var (
 	errDuplicateFlags    = errors.New("duplicate flag declarations")
 	errInvalidFlagType   = errors.New("must be a CommandFlag or SystemFlag")
 	errUndeclaredGroup   = errors.New("group is not declared in the parent's Groups")
+	errUseEmpty          = errors.New("use must not be empty")
+	errUseHasWhitespace  = errors.New("use must be a bare command name, with no whitespace")
 )
 
 // assemble validates def and produces an assembled plan, using a only to
 // resolve each child's own Definition (via Define) for group validation —
 // children are not built here, only peeked at.
 func assemble(def *cli.Definition, lvl level.Level, a *app.App) (*assembled, error) {
+	if err := validateMeta(def.Meta); err != nil {
+		return nil, err
+	}
+
 	if lvl != level.LevelRoot && def.Handler == nil && len(def.Children) == 0 {
 		return nil, errs.Unexpected(
 			fmt.Errorf("factory[assemble]: command %q: %w", def.Meta.Use, errHandlerNil),
@@ -109,6 +115,35 @@ func assemble(def *cli.Definition, lvl level.Level, a *app.App) (*assembled, err
 // allFlags returns every flag def registers.
 func allFlags(def *cli.Definition) []flags.Flag {
 	return def.Flags
+}
+
+// validateMeta checks a command's Meta for authoring mistakes. Currently
+// just Use's shape; a natural home for further Meta-level checks later.
+//
+// Use must be a non-empty, whitespace-free bare command name. Every
+// framework lookup that matches on command identity (config-file names,
+// invoked-command routing) compares against Use directly, so a usage
+// pattern accidentally embedded in it (e.g. "check [file...]") silently
+// breaks those lookups instead of erroring — put that in ArgsUsage via
+// WithArgsUsage instead.
+func validateMeta(meta *cli.Meta) error {
+	if meta.Use == "" {
+		return errs.Unexpected(errUseEmpty, errs.Context{
+			Cause:      "a command's Meta.Use was empty",
+			Resolution: "every command must declare a non-empty Use — its bare name",
+		})
+	}
+	if strings.ContainsAny(meta.Use, " \t") {
+		return errs.Unexpected(
+			fmt.Errorf("factory[assemble]: command %q: %w", meta.Use, errUseHasWhitespace),
+			errs.Context{
+				Cause: fmt.Sprintf("command %q's Use contains whitespace", meta.Use),
+				Resolution: "Use must be the bare command name only — put a positional-argument " +
+					`hint in ArgsUsage instead, e.g. WithArgsUsage("[file...]")`,
+			},
+		)
+	}
+	return nil
 }
 
 // validateChildGroups requires every child's own Group to be either empty or

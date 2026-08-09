@@ -28,7 +28,7 @@ var (
 type brokenCmd struct{}
 
 func (brokenCmd) Define(*app.App) *cli.Definition {
-	return &cli.Definition{Meta: cli.Meta{Use: "broken"}}
+	return &cli.Definition{Meta: &cli.Meta{Use: "broken"}}
 }
 
 // withBrokenCommands temporarily swaps commands for a slice that fails to

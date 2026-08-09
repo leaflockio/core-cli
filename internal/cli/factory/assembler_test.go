@@ -23,7 +23,7 @@ import (
 // — assemble —
 
 func TestAssemble_returns_error_when_handler_nil_and_no_children(t *testing.T) {
-	def := cli.Definition{Meta: cli.Meta{Use: "test"}}
+	def := cli.Definition{Meta: &cli.Meta{Use: "test"}}
 	_, err := assemble(&def, level.LevelTop, nil)
 	if err == nil {
 		t.Fatal("expected error for nil Handler with no children, got nil")
@@ -33,8 +33,30 @@ func TestAssemble_returns_error_when_handler_nil_and_no_children(t *testing.T) {
 	}
 }
 
+func TestAssemble_returns_error_when_use_is_empty(t *testing.T) {
+	def := cli.Definition{Meta: &cli.Meta{Use: ""}}
+	_, err := assemble(&def, level.LevelRoot, nil)
+	if err == nil {
+		t.Fatal("expected error for empty Use, got nil")
+	}
+	if !errors.Is(err, errUseEmpty) {
+		t.Errorf("error = %v, want errors.Is match for errUseEmpty", err)
+	}
+}
+
+func TestAssemble_returns_error_when_use_has_whitespace(t *testing.T) {
+	def := cli.Definition{Meta: &cli.Meta{Use: "check [file...]"}}
+	_, err := assemble(&def, level.LevelRoot, nil)
+	if err == nil {
+		t.Fatal("expected error for Use containing whitespace, got nil")
+	}
+	if !errors.Is(err, errUseHasWhitespace) {
+		t.Errorf("error = %v, want errors.Is match for errUseHasWhitespace", err)
+	}
+}
+
 func TestAssemble_allows_nil_handler_and_no_children_when_levelRoot(t *testing.T) {
-	def := cli.Definition{Meta: cli.Meta{Use: "test"}}
+	def := cli.Definition{Meta: &cli.Meta{Use: "test"}}
 	_, err := assemble(&def, level.LevelRoot, nil)
 	if err != nil {
 		t.Fatalf("unexpected error for level.LevelRoot with nil Handler and no children: %v", err)
@@ -43,7 +65,7 @@ func TestAssemble_allows_nil_handler_and_no_children_when_levelRoot(t *testing.T
 
 func TestAssemble_allows_nil_handler_when_children_declared(t *testing.T) {
 	def := &cli.Definition{
-		Meta:     cli.Meta{Use: "parent"},
+		Meta:     &cli.Meta{Use: "parent"},
 		Children: []cli.Command{&stubCommand{use: "child"}},
 	}
 	_, err := assemble(def, level.LevelTop, nil)
@@ -257,6 +279,38 @@ func TestAssemble_returns_error_when_implicit_flag_planning_fails(t *testing.T) 
 	_, err := assemble(minDef("test"), level.LevelTop, nil)
 	if err == nil {
 		t.Fatal("expected error when implicit flag planning fails, got nil")
+	}
+}
+
+// — validateMeta —
+
+func TestValidateMeta_returns_nil_for_bare_use(t *testing.T) {
+	if err := validateMeta(&cli.Meta{Use: "check"}); err != nil {
+		t.Errorf("unexpected error: %v", err)
+	}
+}
+
+func TestValidateMeta_returns_error_for_empty_use(t *testing.T) {
+	if err := validateMeta(&cli.Meta{Use: ""}); !errors.Is(err, errUseEmpty) {
+		t.Errorf("error = %v, want errors.Is match for errUseEmpty", err)
+	}
+}
+
+func TestValidateMeta_returns_error_for_use_with_space(t *testing.T) {
+	if err := validateMeta(&cli.Meta{Use: "check [file...]"}); !errors.Is(err, errUseHasWhitespace) {
+		t.Errorf("error = %v, want errors.Is match for errUseHasWhitespace", err)
+	}
+}
+
+func TestValidateMeta_returns_error_for_use_with_tab(t *testing.T) {
+	if err := validateMeta(&cli.Meta{Use: "check\tfile"}); !errors.Is(err, errUseHasWhitespace) {
+		t.Errorf("error = %v, want errors.Is match for errUseHasWhitespace", err)
+	}
+}
+
+func TestValidateMeta_allows_argsUsage_set_separately(t *testing.T) {
+	if err := validateMeta(&cli.Meta{Use: "check", ArgsUsage: "[file...]"}); err != nil {
+		t.Errorf("unexpected error: %v", err)
 	}
 }
 

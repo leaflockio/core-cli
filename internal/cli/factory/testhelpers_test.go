@@ -45,7 +45,7 @@ func (stubConfigLoader) Validate() error             { return nil }
 // minDef returns a minimal valid Definition for the given command name.
 func minDef(use string) *cli.Definition {
 	return &cli.Definition{
-		Meta:    cli.Meta{Use: use},
+		Meta:    &cli.Meta{Use: use},
 		Handler: nopHandler,
 	}
 }
@@ -54,7 +54,7 @@ func minDef(use string) *cli.Definition {
 func assembledPlan(use, short, long string) *assembled {
 	return &assembled{
 		def: cli.Definition{
-			Meta:    cli.Meta{Use: use, Short: short, Long: long},
+			Meta:    &cli.Meta{Use: use, Short: short, Long: long},
 			Handler: func(_ *app.App, _ *cobra.Command, _ []string) error { return nil },
 		},
 	}
@@ -91,7 +91,7 @@ type stubCommand struct{ use string }
 
 func (c *stubCommand) Define(_ *app.App) *cli.Definition {
 	return &cli.Definition{
-		Meta:    cli.Meta{Use: c.use},
+		Meta:    &cli.Meta{Use: c.use},
 		Handler: func(_ *app.App, _ *cobra.Command, _ []string) error { return nil },
 	}
 }
@@ -105,7 +105,7 @@ type groupedStubCommand struct {
 
 func (c *groupedStubCommand) Define(_ *app.App) *cli.Definition {
 	return &cli.Definition{
-		Meta:    cli.Meta{Use: c.use},
+		Meta:    &cli.Meta{Use: c.use},
 		Group:   c.group,
 		Handler: func(_ *app.App, _ *cobra.Command, _ []string) error { return nil },
 	}
@@ -123,7 +123,7 @@ type groupedStubCommandWithOwnGroups struct {
 
 func (c *groupedStubCommandWithOwnGroups) Define(_ *app.App) *cli.Definition {
 	return &cli.Definition{
-		Meta:    cli.Meta{Use: c.use},
+		Meta:    &cli.Meta{Use: c.use},
 		Group:   c.group,
 		Groups:  []cli.Group{{ID: c.group, Title: string(c.group)}},
 		Handler: func(_ *app.App, _ *cobra.Command, _ []string) error { return nil },
@@ -173,7 +173,7 @@ func (r *stubStringSliceResolver) Resolve(raw []string) error {
 type nilHandlerCommand struct{}
 
 func (c *nilHandlerCommand) Define(_ *app.App) *cli.Definition {
-	return &cli.Definition{Meta: cli.Meta{Use: "bad"}}
+	return &cli.Definition{Meta: &cli.Meta{Use: "bad"}}
 }
 
 // errStringSliceResolver always returns an error from Resolve.

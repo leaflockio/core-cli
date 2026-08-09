@@ -12,8 +12,19 @@ import (
 	"strings"
 
 	"github.com/leaflockio/core-cli/internal/app"
+	"github.com/leaflockio/core-cli/internal/cli"
 	"github.com/spf13/cobra"
 )
+
+// cobraUse builds cobra's combined Use string from meta.Use (the bare name)
+// and meta.ArgsUsage (an optional positional-argument hint) — meta.Use
+// itself always stays just the bare name for every internal lookup.
+func cobraUse(meta *cli.Meta) string {
+	if meta.ArgsUsage == "" {
+		return meta.Use
+	}
+	return meta.Use + " " + meta.ArgsUsage
+}
 
 // execute wires a cobra.Command from an assembled plan, including its children.
 func (f *Factory) execute(plan *assembled, a *app.App) (*cobra.Command, error) {
@@ -21,7 +32,7 @@ func (f *Factory) execute(plan *assembled, a *app.App) (*cobra.Command, error) {
 	meta := def.Meta
 
 	cmd := &cobra.Command{
-		Use:                meta.Use,
+		Use:                cobraUse(meta),
 		Short:              meta.Short,
 		Long:               meta.Long,
 		GroupID:            string(def.Group),

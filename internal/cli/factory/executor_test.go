@@ -37,6 +37,42 @@ func TestExecute_builds_command_with_correct_metadata(t *testing.T) {
 	}
 }
 
+// TestExecute_appendsArgsUsageToCommandUse is a regression test: the real
+// cobra command's Use must combine Meta.Use with Meta.ArgsUsage, while
+// Meta.Use itself (read everywhere else in the framework for command
+// identity) stays just the bare name.
+func TestExecute_appendsArgsUsageToCommandUse(t *testing.T) {
+	plan := &assembled{
+		def: cli.Definition{
+			Meta:    &cli.Meta{Use: "check", ArgsUsage: "[file...]"},
+			Handler: func(_ *app.App, _ *cobra.Command, _ []string) error { return nil },
+		},
+	}
+	cmd, err := (&Factory{}).execute(plan, nil)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if cmd.Use != "check [file...]" {
+		t.Errorf("Use = %q, want %q", cmd.Use, "check [file...]")
+	}
+}
+
+// — cobraUse —
+
+func TestCobraUse_returnsBareUseWhenNoArgsUsage(t *testing.T) {
+	got := cobraUse(&cli.Meta{Use: "check"})
+	if got != "check" {
+		t.Errorf("cobraUse = %q, want %q", got, "check")
+	}
+}
+
+func TestCobraUse_appendsArgsUsage(t *testing.T) {
+	got := cobraUse(&cli.Meta{Use: "check", ArgsUsage: "[file...]"})
+	if got != "check [file...]" {
+		t.Errorf("cobraUse = %q, want %q", got, "check [file...]")
+	}
+}
+
 func TestExecute_RunE_rejects_exclusive_flags_set_together(t *testing.T) {
 	plan := assembledPlan("mycmd", "", "")
 	plan.def.FlagRules = []flags.Rule{flags.Exclusive{Flags: boolFlags("all", "staged")}}

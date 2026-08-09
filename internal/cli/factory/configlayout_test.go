@@ -31,7 +31,7 @@ type parentStubCommand struct {
 
 func (c *parentStubCommand) Define(_ *app.App) *cli.Definition {
 	return &cli.Definition{
-		Meta:     cli.Meta{Use: c.use},
+		Meta:     &cli.Meta{Use: c.use},
 		Handler:  nopHandler,
 		Children: c.children,
 	}
@@ -39,11 +39,14 @@ func (c *parentStubCommand) Define(_ *app.App) *cli.Definition {
 
 // configStubCommand is a minimal cli.Command that declares a Config, for
 // exercising checkConfigLayout's configCommands collection.
-type configStubCommand struct{ use string }
+type configStubCommand struct {
+	use       string
+	argsUsage string
+}
 
 func (c configStubCommand) Define(_ *app.App) *cli.Definition {
 	return &cli.Definition{
-		Meta:    cli.Meta{Use: c.use},
+		Meta:    &cli.Meta{Use: c.use, ArgsUsage: c.argsUsage},
 		Handler: nopHandler,
 		Config:  stubConfigLoader{},
 	}
@@ -77,6 +80,33 @@ func TestCheckConfigLayout_collects_config_declaring_children(t *testing.T) {
 	}
 	if layout == nil {
 		t.Fatal("layout should not be nil on success")
+	}
+}
+
+// TestCheckConfigLayout_recognizesCommandWithArgsUsage is a regression test:
+// a command like check declares Meta.Use: "check" and ArgsUsage: "[file...]"
+// separately. Before that split existed, Use held "check [file...]" and the
+// catalog checkConfigLayout builds would never match a real leaf/check.yaml
+// against it, misclassifying a valid file as unrecognized.
+func TestCheckConfigLayout_recognizesCommandWithArgsUsage(t *testing.T) {
+	old := peekProjectRoot
+	dir := t.TempDir()
+	peekProjectRoot = func(_ *app.App, _ string) (string, error) { return dir, nil }
+	t.Cleanup(func() { peekProjectRoot = old })
+
+	if err := os.WriteFile(filepath.Join(dir, "check.yaml"), []byte("x: 1\n"), 0o600); err != nil {
+		t.Fatalf("WriteFile: %v", err)
+	}
+
+	root := &parentStubCommand{use: "root", children: []cli.Command{
+		configStubCommand{use: "check", argsUsage: "[file...]"},
+	}}
+	layout, err := checkConfigLayout(root, &app.App{})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if len(layout.Warnings) != 0 {
+		t.Errorf("expected check.yaml to be recognized via bare Use, got warnings: %v", layout.Warnings)
 	}
 }
 

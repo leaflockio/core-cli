@@ -293,11 +293,14 @@ func TestFactory_Build_no_color_effect_fires_on_handlerless_bare_invocation(t *t
 	}
 }
 
-type stubCmd struct{ use string }
+type stubCmd struct {
+	use       string
+	argsUsage string
+}
 
 func (c *stubCmd) Define(_ *app.App) *cli.Definition {
 	return &cli.Definition{
-		Meta:    cli.Meta{Use: c.use},
+		Meta:    &cli.Meta{Use: c.use, ArgsUsage: c.argsUsage},
 		Handler: func(_ *app.App, _ *cobra.Command, _ []string) error { return nil },
 	}
 }
@@ -309,7 +312,7 @@ type parentStubCmd struct {
 
 func (c *parentStubCmd) Define(_ *app.App) *cli.Definition {
 	return &cli.Definition{
-		Meta:     cli.Meta{Use: c.use},
+		Meta:     &cli.Meta{Use: c.use},
 		Handler:  func(_ *app.App, _ *cobra.Command, _ []string) error { return nil },
 		Children: c.children,
 	}
@@ -322,7 +325,7 @@ type handlerlessParentStubCmd struct {
 
 func (c *handlerlessParentStubCmd) Define(_ *app.App) *cli.Definition {
 	return &cli.Definition{
-		Meta:     cli.Meta{Use: c.use},
+		Meta:     &cli.Meta{Use: c.use},
 		Children: c.children,
 	}
 }
@@ -330,7 +333,7 @@ func (c *handlerlessParentStubCmd) Define(_ *app.App) *cli.Definition {
 type nilHandlerCmd struct{}
 
 func (c *nilHandlerCmd) Define(_ *app.App) *cli.Definition {
-	return &cli.Definition{Meta: cli.Meta{Use: "bad"}}
+	return &cli.Definition{Meta: &cli.Meta{Use: "bad"}}
 }
 
 type groupedParentStubCmd struct {
@@ -341,7 +344,7 @@ type groupedParentStubCmd struct {
 
 func (c *groupedParentStubCmd) Define(_ *app.App) *cli.Definition {
 	return &cli.Definition{
-		Meta:     cli.Meta{Use: c.use},
+		Meta:     &cli.Meta{Use: c.use},
 		Groups:   c.groups,
 		Handler:  func(_ *app.App, _ *cobra.Command, _ []string) error { return nil },
 		Children: c.children,
@@ -355,7 +358,7 @@ type groupedChildStubCmd struct {
 
 func (c *groupedChildStubCmd) Define(_ *app.App) *cli.Definition {
 	return &cli.Definition{
-		Meta:    cli.Meta{Use: c.use},
+		Meta:    &cli.Meta{Use: c.use},
 		Group:   c.group,
 		Handler: func(_ *app.App, _ *cobra.Command, _ []string) error { return nil },
 	}
@@ -391,7 +394,7 @@ type configStubCmd struct{ use string }
 
 func (c *configStubCmd) Define(_ *app.App) *cli.Definition {
 	return &cli.Definition{
-		Meta:    cli.Meta{Use: c.use},
+		Meta:    &cli.Meta{Use: c.use},
 		Handler: func(_ *app.App, _ *cobra.Command, _ []string) error { return nil },
 		Config:  nopConfigLoader{},
 	}
@@ -417,7 +420,7 @@ type configLoaderStubCmd struct {
 
 func (c *configLoaderStubCmd) Define(_ *app.App) *cli.Definition {
 	return &cli.Definition{
-		Meta:    cli.Meta{Use: c.use},
+		Meta:    &cli.Meta{Use: c.use},
 		Handler: func(_ *app.App, _ *cobra.Command, _ []string) error { return nil },
 		Config:  c.cfg,
 	}

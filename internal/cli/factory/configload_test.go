@@ -233,7 +233,7 @@ type configLoaderStubCommand struct {
 
 func (c configLoaderStubCommand) Define(_ *app.App) *cli.Definition {
 	return &cli.Definition{
-		Meta:    cli.Meta{Use: c.use},
+		Meta:    &cli.Meta{Use: c.use},
 		Handler: nopHandler,
 		Config:  c.cfg,
 	}
