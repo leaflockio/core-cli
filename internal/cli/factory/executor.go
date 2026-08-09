@@ -17,8 +17,7 @@ import (
 )
 
 // cobraUse builds cobra's combined Use string from meta.Use (the bare name)
-// and meta.ArgsUsage (an optional positional-argument hint) — meta.Use
-// itself always stays just the bare name for every internal lookup.
+// and meta.ArgsUsage (an optional positional-argument hint).
 func cobraUse(meta *cli.Meta) string {
 	if meta.ArgsUsage == "" {
 		return meta.Use
