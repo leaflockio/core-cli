@@ -14,6 +14,9 @@ type Meta struct {
 	Use   string
 	Short string
 	Long  string
+	// ArgsUsage is an optional cobra-style positional-argument hint shown in
+	// help output, e.g. "[file...]". Empty when the command takes none.
+	ArgsUsage string
 	// Args is the positional argument validator. Defaults to a validator that
 	// rejects an unrecognized subcommand name, suggesting close matches.
 	Args cobra.PositionalArgs
@@ -24,8 +27,8 @@ type Meta struct {
 
 // NewMeta returns a Meta with defaults applied. Fields that have defaults can
 // be individually overridden using their corresponding WithX method on this type.
-func NewMeta(use, short, long string) Meta {
-	return Meta{
+func NewMeta(use, short, long string) *Meta {
+	return &Meta{
 		Use:   use,
 		Short: short,
 		Long:  long,
@@ -35,14 +38,23 @@ func NewMeta(use, short, long string) Meta {
 
 // WithArgs returns a copy of the Meta with Args replaced. Use this for
 // commands that accept positional arguments.
-func (m Meta) WithArgs(args cobra.PositionalArgs) Meta {
-	m.Args = args
-	return m
+func (m *Meta) WithArgs(args cobra.PositionalArgs) *Meta {
+	c := *m
+	c.Args = args
+	return &c
+}
+
+// WithArgsUsage returns a copy of the Meta with ArgsUsage set.
+func (m *Meta) WithArgsUsage(pattern string) *Meta {
+	c := *m
+	c.ArgsUsage = pattern
+	return &c
 }
 
 // WithDisableSuggestions returns a copy of the Meta with DisableSuggestions
 // set to true.
-func (m Meta) WithDisableSuggestions() Meta {
-	m.DisableSuggestions = true
-	return m
+func (m *Meta) WithDisableSuggestions() *Meta {
+	c := *m
+	c.DisableSuggestions = true
+	return &c
 }

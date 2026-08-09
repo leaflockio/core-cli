@@ -19,7 +19,7 @@ import (
 // accepts, what protects it, what it exposes, and what it does.
 type Definition struct {
 	// Meta holds the command's identity — Use, Short, Long, Args.
-	Meta Meta
+	Meta *Meta
 
 	// Group is which of the parent's Groups this command belongs to.
 	// Validated against the parent Definition's own Groups — never this
@@ -54,7 +54,7 @@ type Definition struct {
 
 // NewDefinition returns a Definition with Meta set. Use the WithX methods
 // to set any other fields.
-func NewDefinition(meta Meta) *Definition {
+func NewDefinition(meta *Meta) *Definition {
 	return &Definition{
 		Meta: meta,
 	}

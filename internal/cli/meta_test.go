@@ -45,6 +45,13 @@ func TestNewMeta_disableSuggestions_defaultsToFalse(t *testing.T) {
 	}
 }
 
+func TestNewMeta_argsUsage_defaultsToEmpty(t *testing.T) {
+	m := cli.NewMeta("foo", "short", "")
+	if m.ArgsUsage != "" {
+		t.Errorf("ArgsUsage should default to empty, got %q", m.ArgsUsage)
+	}
+}
+
 func TestMeta_WithArgs_overrides_default(t *testing.T) {
 	m := cli.NewMeta("foo", "short", "").WithArgs(cobra.ArbitraryArgs)
 	cmd := &cobra.Command{}
@@ -59,6 +66,21 @@ func TestMeta_WithArgs_does_not_mutate_original(t *testing.T) {
 	cmd := &cobra.Command{}
 	if err := original.Args(cmd, []string{"unexpected"}); err == nil {
 		t.Error("WithArgs mutated the original Meta — original should still reject arguments")
+	}
+}
+
+func TestMeta_WithArgsUsage_setsField(t *testing.T) {
+	m := cli.NewMeta("check", "short", "").WithArgsUsage("[file...]")
+	if m.ArgsUsage != "[file...]" {
+		t.Errorf("ArgsUsage = %q, want %q", m.ArgsUsage, "[file...]")
+	}
+}
+
+func TestMeta_WithArgsUsage_does_not_mutate_original(t *testing.T) {
+	original := cli.NewMeta("check", "short", "")
+	_ = original.WithArgsUsage("[file...]")
+	if original.ArgsUsage != "" {
+		t.Errorf("WithArgsUsage mutated the original Meta — should still be empty, got %q", original.ArgsUsage)
 	}
 }
 
