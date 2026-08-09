@@ -155,6 +155,8 @@
     "dryrun",
     "gpgsign",
     "PULLREQUEST",
-    "TARGETBRANCH"
+    "TARGETBRANCH",
+    "nocolor",
+    "noconfig"
   ]
 }

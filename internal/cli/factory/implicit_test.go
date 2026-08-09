@@ -53,3 +53,12 @@ func TestImplicitSystemFlags_contains_nocolor(t *testing.T) {
 	}
 	t.Error("implicitSystemFlags must contain the no-color flag")
 }
+
+func TestImplicitSystemFlags_contains_noconfig(t *testing.T) {
+	for _, f := range implicitSystemFlags {
+		if f.Definition().Meta.Name == "no-config" {
+			return
+		}
+	}
+	t.Error("implicitSystemFlags must contain the no-config flag")
+}

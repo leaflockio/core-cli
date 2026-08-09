@@ -10,10 +10,12 @@ package factory
 import (
 	"github.com/leaflockio/core-cli/internal/cli/flags"
 	"github.com/leaflockio/core-cli/internal/cli/flags/system/nocolor"
+	"github.com/leaflockio/core-cli/internal/cli/flags/system/noconfig"
 )
 
 // implicitSystemFlags are registered on every command unconditionally.
 // Developers must not add these to Definition.Flags.
 var implicitSystemFlags = []flags.Flag{
 	nocolor.NoColor,
+	noconfig.NoConfig,
 }
