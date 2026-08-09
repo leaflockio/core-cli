@@ -18,6 +18,7 @@ import (
 	"github.com/leaflockio/core-cli/internal/cli/cmdconfig"
 	"github.com/leaflockio/core-cli/internal/cli/factory"
 	"github.com/leaflockio/core-cli/internal/cli/flags/system/noconfig"
+	"github.com/leaflockio/core-cli/internal/cli/hooks/ontreeready"
 	"github.com/leaflockio/core-cli/internal/config"
 	"github.com/leaflockio/core-cli/internal/invocation"
 	"github.com/leaflockio/core-cli/internal/terminal"
@@ -336,6 +337,31 @@ func (c *nilHandlerCmd) Define(_ *app.App) *cli.Definition {
 	return &cli.Definition{Meta: &cli.Meta{Use: "bad"}}
 }
 
+// treeReadyStubCmd additionally implements ontreeready.OnTreeReady, so
+// Build's post-build notification can be exercised without pulling in a
+// real command package.
+type treeReadyStubCmd struct {
+	use        string
+	children   []cli.Command
+	calledWith *cobra.Command
+	callCount  int
+}
+
+func (c *treeReadyStubCmd) Define(_ *app.App) *cli.Definition {
+	return &cli.Definition{
+		Meta:     &cli.Meta{Use: c.use},
+		Handler:  func(_ *app.App, _ *cobra.Command, _ []string) error { return nil },
+		Children: c.children,
+	}
+}
+
+func (c *treeReadyStubCmd) OnTreeReady(root *cobra.Command) {
+	c.calledWith = root
+	c.callCount++
+}
+
+var _ ontreeready.OnTreeReady = (*treeReadyStubCmd)(nil)
+
 type groupedParentStubCmd struct {
 	use      string
 	groups   []cli.Group
@@ -477,5 +503,43 @@ func TestFactory_Build_returns_error_when_invoked_config_unreadable(t *testing.T
 	_, err = factory.New().Build(parent, a)
 	if err == nil {
 		t.Fatal("expected error when the invoked command's config file can't be decoded, got nil")
+	}
+}
+
+func TestFactory_Build_callsOnTreeReady_onRoot(t *testing.T) {
+	root := &treeReadyStubCmd{use: "root"}
+
+	cmd, err := factory.New().Build(root, testApp(t))
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if root.callCount != 1 {
+		t.Fatalf("callCount = %d, want 1", root.callCount)
+	}
+	if root.calledWith != cmd {
+		t.Error("OnTreeReady was not passed the built root command")
+	}
+}
+
+func TestFactory_Build_callsOnTreeReady_onChild(t *testing.T) {
+	child := &treeReadyStubCmd{use: "child"}
+	root := &parentStubCmd{use: "root", children: []cli.Command{child}}
+
+	cmd, err := factory.New().Build(root, testApp(t))
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if child.callCount != 1 {
+		t.Fatalf("callCount = %d, want 1", child.callCount)
+	}
+	if child.calledWith != cmd {
+		t.Error("OnTreeReady was not passed the built root command, not the child's own")
+	}
+}
+
+func TestFactory_Build_skipsOnTreeReady_forCommandsNotImplementingHook(t *testing.T) {
+	// Must not panic — most commands don't implement the hook.
+	if _, err := factory.New().Build(&stubCmd{use: "test"}, testApp(t)); err != nil {
+		t.Fatalf("unexpected error: %v", err)
 	}
 }

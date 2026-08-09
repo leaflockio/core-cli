@@ -13,6 +13,7 @@ import (
 	"github.com/leaflockio/core-cli/internal/app"
 	"github.com/leaflockio/core-cli/internal/cli"
 	"github.com/leaflockio/core-cli/internal/cli/flags/system/noconfig"
+	"github.com/leaflockio/core-cli/internal/cli/hooks/ontreeready"
 	"github.com/leaflockio/core-cli/internal/errs"
 	"github.com/leaflockio/core-cli/internal/level"
 	"github.com/spf13/cobra"
@@ -71,6 +72,7 @@ func (f *Factory) Build(cmd cli.Command, a *app.App) (*cobra.Command, error) {
 	}
 
 	registerPersistent(cobraCmd, plan.persistentFlags, a)
+	ontreeready.Notify(cmd, a, cobraCmd)
 
 	return cobraCmd, nil
 }

@@ -157,6 +157,7 @@
     "PULLREQUEST",
     "TARGETBRANCH",
     "nocolor",
-    "noconfig"
+    "noconfig",
+    "ontreeready"
   ]
 }
