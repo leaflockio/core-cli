@@ -31,9 +31,11 @@ func TestDetect_gitRepoWithRemote(t *testing.T) {
 
 	detectGit = func(_ string) (*git.Snapshot, []error) {
 		return &git.Snapshot{
-			IsRepo:    true,
-			RootDir:   dir,
-			RemoteURL: "https://github.com/leaflockio/core-cli.git",
+			IsRepo:        true,
+			RootDir:       dir,
+			RemoteURL:     "https://github.com/leaflockio/core-cli.git",
+			DefaultRemote: "origin",
+			DefaultBranch: "main",
 		}, nil
 	}
 	listGitFiles = func(_ string) ([]string, error) { return nil, nil }
@@ -58,8 +60,34 @@ func TestDetect_gitRepoWithRemote(t *testing.T) {
 	if info.RepoName != "core-cli" {
 		t.Errorf("expected RepoName=core-cli, got %q", info.RepoName)
 	}
+	if info.DefaultRemote != "origin" {
+		t.Errorf("expected DefaultRemote=origin, got %q", info.DefaultRemote)
+	}
+	if info.DefaultBranch != "main" {
+		t.Errorf("expected DefaultBranch=main, got %q", info.DefaultBranch)
+	}
 	if info.License.Found {
 		t.Error("expected License.Found=false for empty dir")
+	}
+}
+
+// --- Info.BaseRef ---
+
+func TestInfoBaseRef_resolved(t *testing.T) {
+	info := &Info{DefaultRemote: "origin", DefaultBranch: "main"}
+	got, err := info.BaseRef()
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if got != "origin/main" {
+		t.Errorf("BaseRef = %q, want %q", got, "origin/main")
+	}
+}
+
+func TestInfoBaseRef_errorsWhenUnresolved(t *testing.T) {
+	info := &Info{}
+	if _, err := info.BaseRef(); err == nil {
+		t.Error("expected error when DefaultRemote/DefaultBranch are empty")
 	}
 }
 

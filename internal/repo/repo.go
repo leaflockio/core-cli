@@ -64,11 +64,25 @@ type Info struct {
 	// RepoName is the repository name portion of RemoteURL (e.g. "core-cli").
 	// Empty when RemoteURL is empty.
 	RepoName string
+	// DefaultRemote is the repository's actual default remote — the only
+	// remote configured, or "origin" when there are several and it's one of
+	// them. Empty when neither holds.
+	DefaultRemote string
+	// DefaultBranch is DefaultRemote's actual default branch, resolved from
+	// its recorded HEAD. Empty when that isn't recorded locally; never
+	// guessed.
+	DefaultBranch string
 	// Languages is the language composition of the repository, ordered by
 	// file count descending.
 	Languages lang.Composition
 	// License holds the result of license file detection at the repo root.
 	License LicenseInfo
+}
+
+// BaseRef returns the ref for i's resolved DefaultRemote/DefaultBranch.
+// Errors when either wasn't determined.
+func (i *Info) BaseRef() (string, error) {
+	return git.BaseRefFrom(i.DefaultRemote, i.DefaultBranch)
 }
 
 // Detect builds an Info by inspecting the current working directory.
@@ -87,6 +101,8 @@ func Detect() *Info {
 		info.RootDir = snap.RootDir
 		info.RemoteURL = snap.RemoteURL
 		info.Host, info.Owner, info.RepoName = parseRemoteURL(info.RemoteURL)
+		info.DefaultRemote = snap.DefaultRemote
+		info.DefaultBranch = snap.DefaultBranch
 	} else {
 		info.RootDir = wd
 	}
