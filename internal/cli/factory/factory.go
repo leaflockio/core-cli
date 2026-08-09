@@ -12,6 +12,7 @@ import (
 
 	"github.com/leaflockio/core-cli/internal/app"
 	"github.com/leaflockio/core-cli/internal/cli"
+	"github.com/leaflockio/core-cli/internal/cli/flags/system/noconfig"
 	"github.com/leaflockio/core-cli/internal/errs"
 	"github.com/leaflockio/core-cli/internal/level"
 	"github.com/spf13/cobra"
@@ -54,13 +55,14 @@ func (f *Factory) Build(cmd cli.Command, a *app.App) (*cobra.Command, error) {
 		})
 	}
 
-	layout, err := checkConfigLayout(cmd, a)
-	if err != nil {
-		return nil, err
-	}
-
-	if err := loadInvokedConfig(cmd, a, layout); err != nil {
-		return nil, err
+	if !noConfigRequested(a) {
+		layout, err := checkConfigLayout(cmd, a)
+		if err != nil {
+			return nil, err
+		}
+		if err := loadInvokedConfig(cmd, a, layout); err != nil {
+			return nil, err
+		}
 	}
 
 	plan, cobraCmd, err := f.buildNode(cmd, a, level.LevelRoot)
@@ -71,6 +73,27 @@ func (f *Factory) Build(cmd cli.Command, a *app.App) (*cobra.Command, error) {
 	registerPersistent(cobraCmd, plan.persistentFlags, a)
 
 	return cobraCmd, nil
+}
+
+// noConfigRequested reports whether --no-config (or its shorthand, if one
+// is ever registered) was passed. Checked directly against a's raw
+// invocation, not cobra's parsed flags — this runs before cobra parses
+// anything (see the noconfig package doc for why).
+func noConfigRequested(a *app.App) bool {
+	if a.Invocation == nil {
+		return false
+	}
+	meta := noconfig.NoConfig.Definition().Meta
+	fm := a.Invocation.FlagMap()
+	if _, ok := fm[meta.LongFlag()]; ok {
+		return true
+	}
+	if short := meta.ShortFlag(); short != "" {
+		if _, ok := fm[short]; ok {
+			return true
+		}
+	}
+	return false
 }
 
 // buildNode assembles and wires cmd, recursing into children via itself.
