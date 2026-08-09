@@ -393,11 +393,12 @@ func TestRenderFooter_noSubcommands(t *testing.T) {
 func TestCommand_OnTreeReady_usesStashedPrinter(t *testing.T) {
 	printer, out := newTestPrinter(t)
 	root := newCmd("leaf", "A great tool")
-	root.AddCommand(newHelpChild())
+	self := newHelpChild()
+	root.AddCommand(self)
 
 	c := &command{}
 	c.Define(&app.App{Printer: printer})
-	c.OnTreeReady(root)
+	c.OnTreeReady(self, root)
 	_ = root.Help()
 
 	if !strings.Contains(out.String(), "A great tool") {
@@ -409,10 +410,11 @@ func TestCommand_OnTreeReady_usesStashedPrinter(t *testing.T) {
 
 func TestSet_writesToPrinterOut(t *testing.T) {
 	printer, out := newTestPrinter(t)
-	cmd := newCmd("leaf", "A great tool")
-	cmd.AddCommand(newHelpChild())
-	setHelp(cmd, printer)
-	_ = cmd.Help()
+	root := newCmd("leaf", "A great tool")
+	self := newHelpChild()
+	root.AddCommand(self)
+	setHelp(self, root, printer)
+	_ = root.Help()
 
 	if !strings.Contains(out.String(), "A great tool") {
 		t.Errorf("expected help output in printer.Out(), got %q", out.String())
@@ -423,8 +425,9 @@ func TestSet_helpCommand_showsKnownCommandHelp(t *testing.T) {
 	printer, out := newTestPrinter(t)
 	root := &cobra.Command{Use: "leaf", Args: cli.NewMeta("leaf", "", "").Args}
 	root.AddCommand(newCmd("version", "Print the version"))
-	root.AddCommand(newHelpChild())
-	setHelp(root, printer)
+	self := newHelpChild()
+	root.AddCommand(self)
+	setHelp(self, root, printer)
 
 	root.SetArgs([]string{"help", "version"})
 	if err := root.Execute(); err != nil {
@@ -439,22 +442,12 @@ func TestSet_helpCommand_rejectsUnknownTopic(t *testing.T) {
 	printer, _ := newTestPrinter(t)
 	root := &cobra.Command{Use: "leaf", Args: cli.NewMeta("leaf", "", "").Args, SilenceErrors: true, SilenceUsage: true}
 	root.AddCommand(newCmd("version", "Print the version"))
-	root.AddCommand(newHelpChild())
-	setHelp(root, printer)
+	self := newHelpChild()
+	root.AddCommand(self)
+	setHelp(self, root, printer)
 
 	root.SetArgs([]string{"help", "banana"})
 	if err := root.Execute(); err == nil {
 		t.Error("expected an error for an unrecognized help topic, got nil")
 	}
-}
-
-// TestSet_noHelpChild_fallsBackToCobraDefault documents the impossible-in-
-// practice case: cmd/registry.go always includes help.New(), so setHelp
-// never actually runs without a "help" child. If it somehow did,
-// SetHelpCommand is simply never called and cobra's own default help
-// command takes over — no panic, no error, just a silent fallback.
-func TestSet_noHelpChild_fallsBackToCobraDefault(t *testing.T) {
-	printer, _ := newTestPrinter(t)
-	cmd := newCmd("leaf", "A great tool")
-	setHelp(cmd, printer)
 }

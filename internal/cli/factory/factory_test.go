@@ -341,10 +341,11 @@ func (c *nilHandlerCmd) Define(_ *app.App) *cli.Definition {
 // Build's post-build notification can be exercised without pulling in a
 // real command package.
 type treeReadyStubCmd struct {
-	use        string
-	children   []cli.Command
-	calledWith *cobra.Command
-	callCount  int
+	use       string
+	children  []cli.Command
+	gotSelf   *cobra.Command
+	gotRoot   *cobra.Command
+	callCount int
 }
 
 func (c *treeReadyStubCmd) Define(_ *app.App) *cli.Definition {
@@ -355,8 +356,9 @@ func (c *treeReadyStubCmd) Define(_ *app.App) *cli.Definition {
 	}
 }
 
-func (c *treeReadyStubCmd) OnTreeReady(root *cobra.Command) {
-	c.calledWith = root
+func (c *treeReadyStubCmd) OnTreeReady(self, root *cobra.Command) {
+	c.gotSelf = self
+	c.gotRoot = root
 	c.callCount++
 }
 
@@ -516,8 +518,11 @@ func TestFactory_Build_callsOnTreeReady_onRoot(t *testing.T) {
 	if root.callCount != 1 {
 		t.Fatalf("callCount = %d, want 1", root.callCount)
 	}
-	if root.calledWith != cmd {
-		t.Error("OnTreeReady was not passed the built root command")
+	if root.gotSelf != cmd {
+		t.Error("OnTreeReady's self was not the built root command")
+	}
+	if root.gotRoot != cmd {
+		t.Error("OnTreeReady's root was not the built root command")
 	}
 }
 
@@ -532,8 +537,11 @@ func TestFactory_Build_callsOnTreeReady_onChild(t *testing.T) {
 	if child.callCount != 1 {
 		t.Fatalf("callCount = %d, want 1", child.callCount)
 	}
-	if child.calledWith != cmd {
-		t.Error("OnTreeReady was not passed the built root command, not the child's own")
+	if child.gotSelf != cmd.Commands()[0] {
+		t.Error("OnTreeReady's self must be the child's own built command, not root's")
+	}
+	if child.gotRoot != cmd {
+		t.Error("OnTreeReady's root must be the built root command")
 	}
 }
 

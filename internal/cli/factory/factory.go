@@ -13,7 +13,6 @@ import (
 	"github.com/leaflockio/core-cli/internal/app"
 	"github.com/leaflockio/core-cli/internal/cli"
 	"github.com/leaflockio/core-cli/internal/cli/flags/system/noconfig"
-	"github.com/leaflockio/core-cli/internal/cli/hooks/ontreeready"
 	"github.com/leaflockio/core-cli/internal/errs"
 	"github.com/leaflockio/core-cli/internal/level"
 	"github.com/spf13/cobra"
@@ -66,13 +65,14 @@ func (f *Factory) Build(cmd cli.Command, a *app.App) (*cobra.Command, error) {
 		}
 	}
 
-	plan, cobraCmd, err := f.buildNode(cmd, a, level.LevelRoot)
+	var hooks []hookRecord
+	plan, cobraCmd, err := f.buildNode(cmd, a, level.LevelRoot, &hooks)
 	if err != nil {
 		return nil, err
 	}
 
 	registerPersistent(cobraCmd, plan.persistentFlags, a)
-	ontreeready.Notify(cmd, a, cobraCmd)
+	fireTreeReady(hooks, cobraCmd)
 
 	return cobraCmd, nil
 }
@@ -99,7 +99,9 @@ func noConfigRequested(a *app.App) bool {
 }
 
 // buildNode assembles and wires cmd, recursing into children via itself.
-func (f *Factory) buildNode(cmd cli.Command, a *app.App, lvl level.Level) (*blueprint, *cobra.Command, error) {
+func (f *Factory) buildNode(
+	cmd cli.Command, a *app.App, lvl level.Level, hooks *[]hookRecord,
+) (*blueprint, *cobra.Command, error) {
 	def := cmd.Define(a)
 
 	plan, err := assemble(def, lvl, a)
@@ -107,10 +109,12 @@ func (f *Factory) buildNode(cmd cli.Command, a *app.App, lvl level.Level) (*blue
 		return nil, nil, err
 	}
 
-	cobraCmd, err := f.execute(plan, a)
+	cobraCmd, err := f.execute(plan, a, hooks)
 	if err != nil {
 		return nil, nil, err
 	}
+
+	discoverHooks(cmd, cobraCmd, hooks)
 
 	return plan, cobraCmd, nil
 }

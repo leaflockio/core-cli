@@ -22,7 +22,7 @@ var errResolve = errors.New("resolve failed")
 
 func TestExecute_builds_command_with_correct_metadata(t *testing.T) {
 	plan := minBlueprint("mycmd", "short desc", "long desc")
-	cmd, err := (&Factory{}).execute(plan, nil)
+	cmd, err := (&Factory{}).execute(plan, nil, nil)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -48,7 +48,7 @@ func TestExecute_appendsArgsUsageToCommandUse(t *testing.T) {
 			Handler: func(_ *app.App, _ *cobra.Command, _ []string) error { return nil },
 		},
 	}
-	cmd, err := (&Factory{}).execute(plan, nil)
+	cmd, err := (&Factory{}).execute(plan, nil, nil)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -113,7 +113,7 @@ func TestExecute_RunE_rejects_exclusive_flags_set_together(t *testing.T) {
 		mustPlanFlag(flags.CommandFlag[*flags.BoolValue]{Value: flags.Bool("staged", "")}),
 	}
 
-	cmd, err := (&Factory{}).execute(plan, nil)
+	cmd, err := (&Factory{}).execute(plan, nil, nil)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -138,7 +138,7 @@ func TestExecute_RunE_does_not_call_handler_when_exclusive_flags_conflict(t *tes
 		mustPlanFlag(flags.CommandFlag[*flags.BoolValue]{Value: flags.Bool("staged", "")}),
 	}
 
-	cmd, err := (&Factory{}).execute(plan, nil)
+	cmd, err := (&Factory{}).execute(plan, nil, nil)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -159,7 +159,7 @@ func TestExecute_RunE_allows_single_exclusive_flag(t *testing.T) {
 		mustPlanFlag(flags.CommandFlag[*flags.BoolValue]{Value: flags.Bool("staged", "")}),
 	}
 
-	cmd, err := (&Factory{}).execute(plan, nil)
+	cmd, err := (&Factory{}).execute(plan, nil, nil)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -175,7 +175,7 @@ func TestExecute_registers_declared_groups_on_command(t *testing.T) {
 	plan := minBlueprint("mycmd", "", "")
 	plan.def.Groups = []cli.Group{{ID: "read", Title: "read"}, {ID: "write", Title: "write"}}
 
-	cmd, err := (&Factory{}).execute(plan, nil)
+	cmd, err := (&Factory{}).execute(plan, nil, nil)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -191,7 +191,7 @@ func TestExecute_normalizes_group_title_to_upper_case(t *testing.T) {
 	plan := minBlueprint("mycmd", "", "")
 	plan.def.Groups = []cli.Group{{ID: "read", Title: "read ops"}}
 
-	cmd, err := (&Factory{}).execute(plan, nil)
+	cmd, err := (&Factory{}).execute(plan, nil, nil)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -205,7 +205,7 @@ func TestExecute_normalizes_group_title_to_upper_case(t *testing.T) {
 func TestExecute_registers_no_groups_when_none_declared(t *testing.T) {
 	plan := minBlueprint("mycmd", "", "")
 
-	cmd, err := (&Factory{}).execute(plan, nil)
+	cmd, err := (&Factory{}).execute(plan, nil, nil)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -218,7 +218,7 @@ func TestExecute_sets_groupID_from_def_group(t *testing.T) {
 	plan := minBlueprint("mycmd", "", "")
 	plan.def.Group = "read"
 
-	cmd, err := (&Factory{}).execute(plan, nil)
+	cmd, err := (&Factory{}).execute(plan, nil, nil)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -231,7 +231,7 @@ func TestExecute_propagates_disableSuggestions_to_command(t *testing.T) {
 	plan := minBlueprint("mycmd", "", "")
 	plan.def.Meta.DisableSuggestions = true
 
-	cmd, err := (&Factory{}).execute(plan, nil)
+	cmd, err := (&Factory{}).execute(plan, nil, nil)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -246,7 +246,7 @@ func TestExecute_registers_flags_on_command(t *testing.T) {
 		flags.CommandFlag[*flags.BoolValue]{Value: flags.Bool("verbose", "enable verbose")},
 	))
 
-	cmd, err := (&Factory{}).execute(plan, nil)
+	cmd, err := (&Factory{}).execute(plan, nil, nil)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -265,7 +265,7 @@ func TestExecute_registers_system_flag_that_fires_effect_on_parse(t *testing.T) 
 	plan := minBlueprint("mycmd", "", "")
 	plan.flags = []flagSpec{mustPlanFlag(f)}
 
-	cmd, err := (&Factory{}).execute(plan, nil)
+	cmd, err := (&Factory{}).execute(plan, nil, nil)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -288,7 +288,7 @@ func TestExecute_registered_system_flag_does_not_fire_effect_when_not_set(t *tes
 	plan := minBlueprint("mycmd", "", "")
 	plan.flags = []flagSpec{mustPlanFlag(f)}
 
-	cmd, err := (&Factory{}).execute(plan, nil)
+	cmd, err := (&Factory{}).execute(plan, nil, nil)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -309,7 +309,7 @@ func TestExecute_RunE_runs_resolver(t *testing.T) {
 	plan := minBlueprint("mycmd", "", "")
 	plan.flags = []flagSpec{mustPlanFlag(f)}
 
-	cmd, err := (&Factory{}).execute(plan, nil)
+	cmd, err := (&Factory{}).execute(plan, nil, nil)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -333,7 +333,7 @@ func TestExecute_RunE_returns_resolver_error(t *testing.T) {
 	plan := minBlueprint("mycmd", "", "")
 	plan.flags = []flagSpec{mustPlanFlag(f)}
 
-	cmd, err := (&Factory{}).execute(plan, nil)
+	cmd, err := (&Factory{}).execute(plan, nil, nil)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -350,7 +350,7 @@ func TestExecute_RunE_calls_handler(t *testing.T) {
 		return nil
 	}
 
-	cmd, err := (&Factory{}).execute(plan, nil)
+	cmd, err := (&Factory{}).execute(plan, nil, nil)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -370,7 +370,7 @@ func TestExecute_RunE_passes_the_running_command_to_handler(t *testing.T) {
 		return nil
 	}
 
-	cmd, err := (&Factory{}).execute(plan, nil)
+	cmd, err := (&Factory{}).execute(plan, nil, nil)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -388,7 +388,7 @@ func TestExecute_RunE_renders_help_when_handler_is_nil(t *testing.T) {
 	plan.def.Children = []cli.Command{&stubCommand{use: "child"}}
 	plan.hasChildren = true
 
-	cmd, err := (&Factory{}).execute(plan, nil)
+	cmd, err := (&Factory{}).execute(plan, nil, nil)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -411,7 +411,7 @@ func TestExecute_RunE_rejects_unknown_subcommand_when_handler_is_nil(t *testing.
 	plan.def.Children = []cli.Command{&stubCommand{use: "child"}}
 	plan.hasChildren = true
 
-	cmd, err := (&Factory{}).execute(plan, nil)
+	cmd, err := (&Factory{}).execute(plan, nil, nil)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -426,7 +426,7 @@ func TestExecute_adds_children_as_subcommands(t *testing.T) {
 	plan.def.Children = []cli.Command{child}
 	plan.hasChildren = true
 
-	cmd, err := (&Factory{}).execute(plan, nil)
+	cmd, err := (&Factory{}).execute(plan, nil, nil)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -443,7 +443,7 @@ func TestExecute_returns_error_when_child_build_fails(t *testing.T) {
 	plan.def.Children = []cli.Command{&nilHandlerCommand{}}
 	plan.hasChildren = true
 
-	_, err := (&Factory{}).execute(plan, nil)
+	_, err := (&Factory{}).execute(plan, nil, nil)
 	if err == nil {
 		t.Fatal("expected error when child build fails, got nil")
 	}
@@ -455,7 +455,7 @@ func TestExecute_non_root_plan_children_are_levelNested(t *testing.T) {
 	plan.def.Children = []cli.Command{&nilHandlerCommand{}}
 	plan.hasChildren = true
 
-	_, err := (&Factory{}).execute(plan, nil)
+	_, err := (&Factory{}).execute(plan, nil, nil)
 	if err == nil {
 		t.Fatal("expected error: a non-root plan's child is levelNested, never exempt " +
 			"from the Handler-or-Children guard")
@@ -471,7 +471,7 @@ func TestExecute_does_not_register_persistentFlags_on_flagset(t *testing.T) {
 	plan := minBlueprint("mycmd", "", "")
 	plan.persistentFlags = []flagSpec{mustPlanFlag(f)}
 
-	cmd, err := (&Factory{}).execute(plan, nil)
+	cmd, err := (&Factory{}).execute(plan, nil, nil)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}

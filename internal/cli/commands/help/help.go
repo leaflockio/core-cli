@@ -31,10 +31,6 @@ var (
 	colSep    = strings.Repeat(" ", colSepWidth)
 )
 
-// commandName is this command's own name — used both to declare it and,
-// once the tree is built, to find it again by name in setHelp.
-const commandName = "help"
-
 // New returns the "help" command.
 func New() cli.Command {
 	return &command{}
@@ -48,7 +44,7 @@ func (c *command) Define(a *app.App) *cli.Definition {
 	if a != nil {
 		c.printer = a.Printer
 	}
-	meta := cli.NewMeta(commandName, "Help about any command", "").
+	meta := cli.NewMeta("help", "Help about any command", "").
 		WithArgsUsage("[command]").
 		WithArgs(cobra.ArbitraryArgs)
 	return cli.NewDefinition(meta).WithHandler(c.run)
@@ -58,22 +54,17 @@ func (c *command) run(_ *app.App, cmd *cobra.Command, args []string) error {
 	return cli.ShowHelp(cmd, args)
 }
 
-func (c *command) OnTreeReady(root *cobra.Command) {
-	setHelp(root, c.printer)
+func (c *command) OnTreeReady(self, root *cobra.Command) {
+	setHelp(self, root, c.printer)
 }
 
-// setHelp registers the styled help function on cmd.
-func setHelp(cmd *cobra.Command, printer *ui.Printer) {
-	cmd.SetHelpFunc(func(c *cobra.Command, _ []string) {
+// setHelp registers the styled help function on root and designates self
+// as root's official help command.
+func setHelp(self, root *cobra.Command, printer *ui.Printer) {
+	root.SetHelpFunc(func(c *cobra.Command, _ []string) {
 		fmt.Fprint(printer.Out(), render(c, printer))
 	})
-
-	for _, c := range cmd.Commands() {
-		if c.Name() == commandName {
-			cmd.SetHelpCommand(c)
-			return
-		}
-	}
+	root.SetHelpCommand(self)
 }
 
 func render(cmd *cobra.Command, printer *ui.Printer) string {

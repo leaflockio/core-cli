@@ -26,7 +26,7 @@ func cobraUse(meta *cli.Meta) string {
 }
 
 // execute wires a cobra.Command from plan, including its children.
-func (f *Factory) execute(plan *blueprint, a *app.App) (*cobra.Command, error) {
+func (f *Factory) execute(plan *blueprint, a *app.App, hooks *[]hookRecord) (*cobra.Command, error) {
 	def := plan.def
 	meta := def.Meta
 
@@ -50,7 +50,7 @@ func (f *Factory) execute(plan *blueprint, a *app.App) (*cobra.Command, error) {
 	cmd.RunE = buildRunE(&def, plan, a)
 
 	for _, child := range def.Children {
-		_, childCmd, err := f.buildNode(child, a, plan.level.Next())
+		_, childCmd, err := f.buildNode(child, a, plan.level.Next(), hooks)
 		if err != nil {
 			return nil, fmt.Errorf("factory[execute]: command %q: child %w", def.Meta.Use, err)
 		}
