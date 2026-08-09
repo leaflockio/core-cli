@@ -70,6 +70,33 @@ func TestParseFlag(t *testing.T) {
 			wantValue:    "",
 			wantConsumed: 1,
 		},
+		{
+			name:         "shorthand boolean flag",
+			tok:          "-n",
+			tokens:       []string{"-n"},
+			i:            0,
+			wantName:     "-n",
+			wantValue:    "",
+			wantConsumed: 1,
+		},
+		{
+			name:         "shorthand equals form",
+			tok:          "-f=./main.go",
+			tokens:       []string{"-f=./main.go"},
+			i:            0,
+			wantName:     "-f",
+			wantValue:    "./main.go",
+			wantConsumed: 1,
+		},
+		{
+			name:         "shorthand value as next token",
+			tok:          "-f",
+			tokens:       []string{"-f", "./main.go"},
+			i:            0,
+			wantName:     "-f",
+			wantValue:    "./main.go",
+			wantConsumed: 2,
+		},
 	}
 
 	for _, tt := range tests {
@@ -139,6 +166,15 @@ func TestParseFlags(t *testing.T) {
 			want: []Flag{
 				{Name: "--dry-run", Value: ""},
 				{Name: "--all", Value: ""},
+			},
+		},
+		{
+			name:   "mix of shorthand and long flags",
+			tokens: []string{"license", "check", "-v", "--file", "./main.go", "-n"},
+			want: []Flag{
+				{Name: "-v", Value: ""},
+				{Name: "--file", Value: "./main.go"},
+				{Name: "-n", Value: ""},
 			},
 		},
 	}
