@@ -281,6 +281,75 @@ func TestAssemble_returns_error_when_implicit_flag_planning_fails(t *testing.T) 
 	}
 }
 
+// — runChecks —
+
+func TestRunChecks_nilWhenAllPass(t *testing.T) {
+	def := minDef("test")
+	if err := runChecks(def, level.LevelTop); err != nil {
+		t.Errorf("unexpected error: %v", err)
+	}
+}
+
+func TestRunChecks_stopsAtFirstFailure(t *testing.T) {
+	var secondCalled bool
+	original := assembleChecks
+	assembleChecks = []func(*cli.Definition, level.Level) error{
+		func(*cli.Definition, level.Level) error { return errHandlerNil },
+		func(*cli.Definition, level.Level) error { secondCalled = true; return nil },
+	}
+	defer func() { assembleChecks = original }()
+
+	err := runChecks(minDef("test"), level.LevelTop)
+	if !errors.Is(err, errHandlerNil) {
+		t.Errorf("error = %v, want errors.Is match for errHandlerNil", err)
+	}
+	if secondCalled {
+		t.Error("runChecks must stop at the first failing check, not run every check")
+	}
+}
+
+// — planFlags —
+
+func TestPlanFlags_emptyWhenNoFlags(t *testing.T) {
+	specs, err := planFlags(nil, "test")
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if len(specs) != 0 {
+		t.Errorf("len(specs) = %d, want 0", len(specs))
+	}
+}
+
+func TestPlanFlags_plansEachFlag(t *testing.T) {
+	fs := []flags.Flag{
+		flags.CommandFlag[*flags.BoolValue]{Value: flags.Bool("verbose", "")},
+		flags.CommandFlag[*flags.StringValue]{Value: flags.String("output", "")},
+	}
+	specs, err := planFlags(fs, "test")
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if len(specs) != 2 {
+		t.Fatalf("len(specs) = %d, want 2", len(specs))
+	}
+	if specs[0].name != "verbose" || specs[1].name != "output" {
+		t.Errorf("specs = %+v, want names [verbose output] in order", specs)
+	}
+}
+
+func TestPlanFlags_returnsErrorFromPlanFlag(t *testing.T) {
+	_, err := planFlags([]flags.Flag{unknownFlag{}}, "mycmd")
+	if err == nil {
+		t.Fatal("expected error for unrecognized flag type, got nil")
+	}
+	if !errors.Is(err, errInvalidFlagType) {
+		t.Errorf("error = %v, want errors.Is match for errInvalidFlagType", err)
+	}
+	if !strings.Contains(err.Error(), `"mycmd"`) {
+		t.Errorf("error = %v, want it to include the command name for context", err)
+	}
+}
+
 // — checkHandlerOrChildren —
 
 func TestCheckHandlerOrChildren_nilAtLevelRoot(t *testing.T) {
@@ -357,29 +426,29 @@ func TestCheckConfigOwner_errorsForPathRegistryBelowLevelTop(t *testing.T) {
 
 func TestCheckFlagsNotImplicit_nilWhenNoFlags(t *testing.T) {
 	def := minDef("test")
-	if err := checkFlagsNotImplicit(def, nil); err != nil {
+	if err := checkFlagsNotImplicit(def, level.LevelTop); err != nil {
 		t.Errorf("unexpected error: %v", err)
 	}
 }
 
 func TestCheckFlagsNotImplicit_nilWhenAllCommandFlags(t *testing.T) {
 	def := minDef("test")
-	all := []flags.Flag{flags.CommandFlag[*flags.BoolValue]{Value: flags.Bool("verbose", "")}}
-	if err := checkFlagsNotImplicit(def, all); err != nil {
+	def.Flags = []flags.Flag{flags.CommandFlag[*flags.BoolValue]{Value: flags.Bool("verbose", "")}}
+	if err := checkFlagsNotImplicit(def, level.LevelTop); err != nil {
 		t.Errorf("unexpected error: %v", err)
 	}
 }
 
 func TestCheckFlagsNotImplicit_errorsForImplicitFlag(t *testing.T) {
 	def := minDef("test")
-	all := []flags.Flag{
+	def.Flags = []flags.Flag{
 		flags.SystemFlag[*flags.BoolValue]{
 			Sub:    flags.SubImplicit,
 			Value:  flags.Bool("custom-implicit", ""),
 			Effect: func(_ *app.App) {},
 		},
 	}
-	err := checkFlagsNotImplicit(def, all)
+	err := checkFlagsNotImplicit(def, level.LevelTop)
 	if err == nil {
 		t.Fatal("expected error for implicit flag, got nil")
 	}
@@ -391,31 +460,36 @@ func TestCheckFlagsNotImplicit_errorsForImplicitFlag(t *testing.T) {
 // — validateMeta —
 
 func TestValidateMeta_returns_nil_for_bare_use(t *testing.T) {
-	if err := validateMeta(&cli.Meta{Use: "check"}); err != nil {
+	def := &cli.Definition{Meta: &cli.Meta{Use: "check"}}
+	if err := validateMeta(def, level.LevelTop); err != nil {
 		t.Errorf("unexpected error: %v", err)
 	}
 }
 
 func TestValidateMeta_returns_error_for_empty_use(t *testing.T) {
-	if err := validateMeta(&cli.Meta{Use: ""}); !errors.Is(err, errUseEmpty) {
+	def := &cli.Definition{Meta: &cli.Meta{Use: ""}}
+	if err := validateMeta(def, level.LevelTop); !errors.Is(err, errUseEmpty) {
 		t.Errorf("error = %v, want errors.Is match for errUseEmpty", err)
 	}
 }
 
 func TestValidateMeta_returns_error_for_use_with_space(t *testing.T) {
-	if err := validateMeta(&cli.Meta{Use: "check [file...]"}); !errors.Is(err, errUseHasWhitespace) {
+	def := &cli.Definition{Meta: &cli.Meta{Use: "check [file...]"}}
+	if err := validateMeta(def, level.LevelTop); !errors.Is(err, errUseHasWhitespace) {
 		t.Errorf("error = %v, want errors.Is match for errUseHasWhitespace", err)
 	}
 }
 
 func TestValidateMeta_returns_error_for_use_with_tab(t *testing.T) {
-	if err := validateMeta(&cli.Meta{Use: "check\tfile"}); !errors.Is(err, errUseHasWhitespace) {
+	def := &cli.Definition{Meta: &cli.Meta{Use: "check\tfile"}}
+	if err := validateMeta(def, level.LevelTop); !errors.Is(err, errUseHasWhitespace) {
 		t.Errorf("error = %v, want errors.Is match for errUseHasWhitespace", err)
 	}
 }
 
 func TestValidateMeta_allows_argsUsage_set_separately(t *testing.T) {
-	if err := validateMeta(&cli.Meta{Use: "check", ArgsUsage: "[file...]"}); err != nil {
+	def := &cli.Definition{Meta: &cli.Meta{Use: "check", ArgsUsage: "[file...]"}}
+	if err := validateMeta(def, level.LevelTop); err != nil {
 		t.Errorf("unexpected error: %v", err)
 	}
 }
@@ -428,7 +502,7 @@ func TestValidateNoDuplicateFlags_returns_nil_when_no_duplicates(t *testing.T) {
 		flags.CommandFlag[*flags.BoolValue]{Value: flags.Bool("verbose", "").WithShorthand("v")},
 		flags.CommandFlag[*flags.StringValue]{Value: flags.String("output", "").WithShorthand("o")},
 	}
-	if err := validateNoDuplicateFlags(def); err != nil {
+	if err := validateNoDuplicateFlags(def, level.LevelTop); err != nil {
 		t.Errorf("unexpected error: %v", err)
 	}
 }
@@ -439,7 +513,7 @@ func TestValidateNoDuplicateFlags_returns_error_for_duplicate_name(t *testing.T)
 		flags.CommandFlag[*flags.BoolValue]{Value: flags.Bool("verbose", "")},
 		flags.CommandFlag[*flags.StringValue]{Value: flags.String("verbose", "")},
 	}
-	err := validateNoDuplicateFlags(def)
+	err := validateNoDuplicateFlags(def, level.LevelTop)
 	if err == nil {
 		t.Fatal("expected error for duplicate flag name, got nil")
 	}
@@ -454,7 +528,7 @@ func TestValidateNoDuplicateFlags_returns_error_for_duplicate_shorthand(t *testi
 		flags.CommandFlag[*flags.BoolValue]{Value: flags.Bool("verbose", "").WithShorthand("v")},
 		flags.CommandFlag[*flags.StringValue]{Value: flags.String("version", "").WithShorthand("v")},
 	}
-	err := validateNoDuplicateFlags(def)
+	err := validateNoDuplicateFlags(def, level.LevelTop)
 	if err == nil {
 		t.Fatal("expected error for duplicate shorthand, got nil")
 	}
@@ -469,7 +543,7 @@ func TestValidateNoDuplicateFlags_reports_all_violations(t *testing.T) {
 		flags.CommandFlag[*flags.BoolValue]{Value: flags.Bool("flag", "").WithShorthand("f")},
 		flags.CommandFlag[*flags.StringValue]{Value: flags.String("flag", "").WithShorthand("f")},
 	}
-	err := validateNoDuplicateFlags(def)
+	err := validateNoDuplicateFlags(def, level.LevelTop)
 	if err == nil {
 		t.Fatal("expected error for multiple violations, got nil")
 	}
@@ -487,7 +561,7 @@ func TestValidateNoDuplicateFlags_detects_clash_with_implicit_flags(t *testing.T
 	def.Flags = []flags.Flag{
 		flags.CommandFlag[*flags.BoolValue]{Value: flags.Bool("no-color", "")},
 	}
-	err := validateNoDuplicateFlags(def)
+	err := validateNoDuplicateFlags(def, level.LevelTop)
 	if err == nil {
 		t.Fatal("expected error for clash with implicit no-color flag, got nil")
 	}

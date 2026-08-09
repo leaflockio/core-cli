@@ -27,42 +27,42 @@ var (
 	errUseHasWhitespace  = errors.New("use must be a bare command name, with no whitespace")
 )
 
+// assembleChecks are assemble's validation gates, ordered cheapest/most-
+// local first.
+var assembleChecks = []func(*cli.Definition, level.Level) error{
+	validateMeta,
+	checkHandlerOrChildren,
+	checkConfigOwner,
+	validateNoDuplicateFlags,
+	checkFlagsNotImplicit,
+}
+
+// runChecks runs every assembleChecks gate against def, stopping at the
+// first failure.
+func runChecks(def *cli.Definition, lvl level.Level) error {
+	for _, check := range assembleChecks {
+		if err := check(def, lvl); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
 // assemble validates def and produces a blueprint.
 func assemble(def *cli.Definition, lvl level.Level) (*blueprint, error) {
-	if err := validateMeta(def.Meta); err != nil {
-		return nil, err
-	}
-	if err := checkHandlerOrChildren(def, lvl); err != nil {
-		return nil, err
-	}
-	if err := checkConfigOwner(def, lvl); err != nil {
-		return nil, err
-	}
-	if err := validateNoDuplicateFlags(def); err != nil {
+	if err := runChecks(def, lvl); err != nil {
 		return nil, err
 	}
 
 	all := allFlags(def)
-	if err := checkFlagsNotImplicit(def, all); err != nil {
+
+	implicitFlagPlans, err := planFlags(implicitSystemFlags, def.Meta.Use)
+	if err != nil {
 		return nil, err
 	}
-
-	implicitFlagPlans := make([]flagSpec, 0, len(implicitSystemFlags))
-	for _, f := range implicitSystemFlags {
-		p, err := planFlag(f)
-		if err != nil {
-			return nil, fmt.Errorf("factory[assemble]: command %q: %w", def.Meta.Use, err)
-		}
-		implicitFlagPlans = append(implicitFlagPlans, p)
-	}
-
-	definedFlagPlans := make([]flagSpec, 0, len(all))
-	for _, f := range all {
-		p, err := planFlag(f)
-		if err != nil {
-			return nil, fmt.Errorf("factory[assemble]: command %q: %w", def.Meta.Use, err)
-		}
-		definedFlagPlans = append(definedFlagPlans, p)
+	definedFlagPlans, err := planFlags(all, def.Meta.Use)
+	if err != nil {
+		return nil, err
 	}
 
 	return &blueprint{
@@ -73,6 +73,18 @@ func assemble(def *cli.Definition, lvl level.Level) (*blueprint, error) {
 		flags:           definedFlagPlans,
 		persistentFlags: implicitFlagPlans,
 	}, nil
+}
+
+func planFlags(fs []flags.Flag, use string) ([]flagSpec, error) {
+	specs := make([]flagSpec, 0, len(fs))
+	for _, f := range fs {
+		p, err := planFlag(f)
+		if err != nil {
+			return nil, fmt.Errorf("factory[assemble]: command %q: %w", use, err)
+		}
+		specs = append(specs, p)
+	}
+	return specs, nil
 }
 
 // checkHandlerOrChildren requires def to declare a Handler or at least one
@@ -106,11 +118,11 @@ func checkConfigOwner(def *cli.Definition, lvl level.Level) error {
 	)
 }
 
-// checkFlagsNotImplicit rejects any flag in all (def's own declared flags)
-// marked SubImplicit — that subcategory is reserved for implicitSystemFlags,
-// added automatically by the engine, never by a command's own Definition.
-func checkFlagsNotImplicit(def *cli.Definition, all []flags.Flag) error {
-	for _, f := range all {
+// checkFlagsNotImplicit rejects any flag in def's own declared Flags marked
+// SubImplicit — that subcategory is reserved for implicitSystemFlags, added
+// automatically by the engine, never by a command's own Definition.
+func checkFlagsNotImplicit(def *cli.Definition, _ level.Level) error {
+	for _, f := range allFlags(def) {
 		d := f.Definition()
 		if d.Meta.Sub != flags.SubImplicit {
 			continue
@@ -137,16 +149,9 @@ func allFlags(def *cli.Definition) []flags.Flag {
 	return def.Flags
 }
 
-// validateMeta checks a command's Meta for authoring mistakes. Currently
-// just Use's shape; a natural home for further Meta-level checks later.
-//
-// Use must be a non-empty, whitespace-free bare command name. Every
-// framework lookup that matches on command identity (config-file names,
-// invoked-command routing) compares against Use directly, so a usage
-// pattern accidentally embedded in it (e.g. "check [file...]") silently
-// breaks those lookups instead of erroring — put that in ArgsUsage via
-// WithArgsUsage instead.
-func validateMeta(meta *cli.Meta) error {
+// validateMeta checks a command's Meta for authoring mistakes.
+func validateMeta(def *cli.Definition, _ level.Level) error {
+	meta := def.Meta
 	if meta.Use == "" {
 		return errs.Unexpected(errUseEmpty, errs.Context{
 			Cause:      "a command's Meta.Use was empty",
@@ -168,7 +173,7 @@ func validateMeta(meta *cli.Meta) error {
 
 // validateNoDuplicateFlags counts every flag name and shorthand across implicit
 // and definition flags in one pass, then reports all violations together.
-func validateNoDuplicateFlags(def *cli.Definition) error {
+func validateNoDuplicateFlags(def *cli.Definition, _ level.Level) error {
 	nameCount := map[string]int{}
 	shortCount := map[string]int{}
 
