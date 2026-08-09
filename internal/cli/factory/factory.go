@@ -104,7 +104,7 @@ func (f *Factory) buildNode(
 ) (*blueprint, *cobra.Command, error) {
 	def := cmd.Define(a)
 
-	plan, err := assemble(def, lvl, a)
+	plan, err := assemble(def, lvl)
 	if err != nil {
 		return nil, nil, err
 	}

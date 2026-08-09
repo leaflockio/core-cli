@@ -26,15 +26,12 @@ var (
 	errImplicitFlagInDef = errors.New("must not appear in Definition.Flags; it is added by the engine automatically")
 	errDuplicateFlags    = errors.New("duplicate flag declarations")
 	errInvalidFlagType   = errors.New("must be a CommandFlag or SystemFlag")
-	errUndeclaredGroup   = errors.New("group is not declared in the parent's Groups")
 	errUseEmpty          = errors.New("use must not be empty")
 	errUseHasWhitespace  = errors.New("use must be a bare command name, with no whitespace")
 )
 
-// assemble validates def and produces a blueprint, using a only to resolve
-// each child's own Definition (via Define) for group validation — children
-// are not built here, only peeked at.
-func assemble(def *cli.Definition, lvl level.Level, a *app.App) (*blueprint, error) {
+// assemble validates def and produces a blueprint.
+func assemble(def *cli.Definition, lvl level.Level) (*blueprint, error) {
 	if err := validateMeta(def.Meta); err != nil {
 		return nil, err
 	}
@@ -60,10 +57,6 @@ func assemble(def *cli.Definition, lvl level.Level, a *app.App) (*blueprint, err
 	}
 
 	if err := validateNoDuplicateFlags(def); err != nil {
-		return nil, err
-	}
-
-	if err := validateChildGroups(def, a); err != nil {
 		return nil, err
 	}
 
@@ -144,38 +137,6 @@ func validateMeta(meta *cli.Meta) error {
 		)
 	}
 	return nil
-}
-
-// validateChildGroups requires every child's own Group to be either empty or
-// a member of def's own declared Groups — the exact set execute() registers
-// on def's built command, so a child's GroupID is always backed by a real
-// registration.
-func validateChildGroups(def *cli.Definition, a *app.App) error {
-	declared := make(map[cli.GroupID]bool, len(def.Groups))
-	for _, g := range def.Groups {
-		declared[g.ID] = true
-	}
-
-	msgs := make([]string, 0, len(def.Children))
-	for _, child := range def.Children {
-		childDef := child.Define(a)
-		if childDef.Group == "" || declared[childDef.Group] {
-			continue
-		}
-		msgs = append(msgs, fmt.Sprintf("child %q: group %q is not declared in %q's Groups",
-			childDef.Meta.Use, childDef.Group, def.Meta.Use))
-	}
-	if len(msgs) == 0 {
-		return nil
-	}
-
-	return errs.Unexpected(
-		fmt.Errorf("factory[assemble]: command %q: %s: %w", def.Meta.Use, strings.Join(msgs, "; "), errUndeclaredGroup),
-		errs.Context{
-			Cause:      fmt.Sprintf("command %q: %s", def.Meta.Use, strings.Join(msgs, "; ")),
-			Resolution: "add the group to the parent's WithGroups, or remove it from the child's WithGroup",
-		},
-	)
 }
 
 // validateNoDuplicateFlags counts every flag name and shorthand across implicit

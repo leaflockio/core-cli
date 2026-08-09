@@ -227,6 +227,87 @@ func TestExecute_sets_groupID_from_def_group(t *testing.T) {
 	}
 }
 
+// — checkChildGroup —
+
+func TestCheckChildGroup_nilWhenChildGroupEmpty(t *testing.T) {
+	parentDef := &cli.Definition{Meta: &cli.Meta{Use: "parent"}}
+	childDef := &cli.Definition{Meta: &cli.Meta{Use: "child"}}
+
+	if err := checkChildGroup(parentDef, childDef, map[cli.GroupID]bool{}); err != nil {
+		t.Errorf("unexpected error for child with no Group declared: %v", err)
+	}
+}
+
+func TestCheckChildGroup_nilWhenChildGroupDeclaredInParent(t *testing.T) {
+	parentDef := &cli.Definition{Meta: &cli.Meta{Use: "parent"}}
+	childDef := &cli.Definition{Meta: &cli.Meta{Use: "child"}, Group: "read"}
+
+	if err := checkChildGroup(parentDef, childDef, map[cli.GroupID]bool{"read": true}); err != nil {
+		t.Errorf("unexpected error for child group declared in parent's Groups: %v", err)
+	}
+}
+
+func TestCheckChildGroup_errorsWhenChildGroupUndeclared(t *testing.T) {
+	parentDef := &cli.Definition{Meta: &cli.Meta{Use: "parent"}}
+	childDef := &cli.Definition{Meta: &cli.Meta{Use: "child"}, Group: "read"}
+
+	err := checkChildGroup(parentDef, childDef, map[cli.GroupID]bool{})
+	if err == nil {
+		t.Fatal("expected error for child group not declared in parent's Groups, got nil")
+	}
+	if !errors.Is(err, errUndeclaredGroup) {
+		t.Errorf("error = %v, want errors.Is match for errUndeclaredGroup", err)
+	}
+}
+
+// TestCheckChildGroup_ignoresOwnGroupsNotParents proves a child's own
+// Groups (what it offers ITS OWN children) has no bearing on validating the
+// child's own Group, which is checked only against the parent's Groups.
+func TestCheckChildGroup_ignoresOwnGroupsNotParents(t *testing.T) {
+	parentDef := &cli.Definition{Meta: &cli.Meta{Use: "parent"}}
+	childDef := &cli.Definition{
+		Meta:   &cli.Meta{Use: "child"},
+		Group:  "read",
+		Groups: []cli.Group{{ID: "read", Title: "read"}},
+	}
+
+	err := checkChildGroup(parentDef, childDef, map[cli.GroupID]bool{})
+	if err == nil {
+		t.Fatal("expected error: child's own Groups must not satisfy validation of its own Group")
+	}
+}
+
+// — execute()'s group validation —
+
+func TestExecute_returns_error_when_child_group_undeclared(t *testing.T) {
+	plan := minBlueprint("parent", "", "")
+	plan.def.Children = []cli.Command{&groupedStubCommand{use: "child", group: "read"}}
+	plan.hasChildren = true
+
+	_, err := (&Factory{}).execute(plan, nil, nil)
+	if err == nil {
+		t.Fatal("expected error for undeclared child group, got nil")
+	}
+}
+
+func TestExecute_allows_child_group_declared_in_parent_groups(t *testing.T) {
+	plan := minBlueprint("parent", "", "")
+	plan.def.Groups = []cli.Group{{ID: "read", Title: "read"}}
+	plan.def.Children = []cli.Command{&groupedStubCommand{use: "child", group: "read"}}
+	plan.hasChildren = true
+
+	cmd, err := (&Factory{}).execute(plan, nil, nil)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	for _, sub := range cmd.Commands() {
+		if sub.Use == "child" {
+			return
+		}
+	}
+	t.Error("child command must be registered as a subcommand")
+}
+
 func TestExecute_propagates_disableSuggestions_to_command(t *testing.T) {
 	plan := minBlueprint("mycmd", "", "")
 	plan.def.Meta.DisableSuggestions = true

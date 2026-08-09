@@ -111,25 +111,6 @@ func (c *groupedStubCommand) Define(_ *app.App) *cli.Definition {
 	}
 }
 
-// groupedStubCommandWithOwnGroups is like groupedStubCommand, but also
-// declares Groups (the taxonomy it offers ITS OWN children) that happens to
-// include its own group value — proving that a command's own Groups never
-// satisfies validation of its own Group, which is checked against its
-// parent's Groups instead.
-type groupedStubCommandWithOwnGroups struct {
-	use   string
-	group cli.GroupID
-}
-
-func (c *groupedStubCommandWithOwnGroups) Define(_ *app.App) *cli.Definition {
-	return &cli.Definition{
-		Meta:    &cli.Meta{Use: c.use},
-		Group:   c.group,
-		Groups:  []cli.Group{{ID: c.group, Title: string(c.group)}},
-		Handler: func(_ *app.App, _ *cobra.Command, _ []string) error { return nil },
-	}
-}
-
 // stubBoolResolver records calls to Resolve.
 type stubBoolResolver struct {
 	called bool
