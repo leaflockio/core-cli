@@ -88,6 +88,10 @@ const (
 	// GIT005 is used when a base ref begins with "-", which would let git
 	// parse it as an option rather than a revision.
 	GIT005 Code = "GIT005"
+
+	// GIT006 is used when a file has no commit history to derive a date
+	// from.
+	GIT006 Code = "GIT006"
 )
 
 // WSP domain covers errors from the workspace package.
