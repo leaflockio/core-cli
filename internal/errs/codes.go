@@ -171,6 +171,21 @@ const (
 	CLI001 Code = "CLI001"
 )
 
+// VAR domain covers errors from the vars package.
+const (
+	// VAR001 is used when a user-defined variable name contains a
+	// character outside [A-Za-z0-9_].
+	VAR001 Code = "VAR001"
+
+	// VAR002 is used when a variable's value expands back to itself,
+	// directly or through other variables, while resolving a template.
+	VAR002 Code = "VAR002"
+
+	// VAR003 is used when a template references a variable name that
+	// isn't known at all.
+	VAR003 Code = "VAR003"
+)
+
 // INT domain covers unexpected internal failures that indicate a bug in leaf.
 // These codes are reserved — only errs.Internal() assigns them. Callers must
 // never construct an INT error directly.
