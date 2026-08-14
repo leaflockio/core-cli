@@ -184,6 +184,14 @@ const (
 	// VAR003 is used when a template references a variable name that
 	// isn't known at all.
 	VAR003 Code = "VAR003"
+
+	// VAR004 is used when GIT_HOST, GIT_OWNER, or GIT_REPO cannot be
+	// derived because the repository has no usable remote.
+	VAR004 Code = "VAR004"
+
+	// VAR005 is used when SPDX_ID cannot be derived because no
+	// classifiable LICENSE file was found at the repository root.
+	VAR005 Code = "VAR005"
 )
 
 // INT domain covers unexpected internal failures that indicate a bug in leaf.
