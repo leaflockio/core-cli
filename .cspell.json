@@ -155,6 +155,7 @@
     "gitowner",
     "gitrepo",
     "filecreatedyear",
+    "filemodifiedyear",
     "ACDMRTUXB",
     "dryrun",
     "gpgsign",
