@@ -94,6 +94,13 @@ const (
 	GIT006 Code = "GIT006"
 )
 
+// REPO domain covers errors from the internal/repo package.
+const (
+	// REPO001 is used when a git remote URL doesn't match a recognized SSH
+	// or HTTPS format.
+	REPO001 Code = "REPO001"
+)
+
 // WSP domain covers errors from the workspace package.
 const (
 	// WSP001 is used when the home directory cannot be resolved at workspace

@@ -13,12 +13,14 @@ import (
 	"path/filepath"
 	"testing"
 
+	"github.com/leaflockio/core-cli/internal/errs"
 	"github.com/leaflockio/core-cli/internal/git"
 )
 
 var (
-	errWalkFailed  = errors.New("walk failed")
-	errGetwdFailed = errors.New("getwd failed")
+	errWalkFailed     = errors.New("walk failed")
+	errGetwdFailed    = errors.New("getwd failed")
+	errRemoteURLFetch = errors.New("remote url fetch failed")
 )
 
 // --- Detect ---
@@ -112,6 +114,24 @@ func TestDetect_gitRepoRemoteFails(t *testing.T) {
 	}
 	if info.Host != "" || info.Owner != "" || info.RepoName != "" {
 		t.Error("expected empty Host/Owner/RepoName when RemoteURL is empty")
+	}
+}
+
+func TestDetect_propagatesRemoteURLFetchError(t *testing.T) {
+	dir := t.TempDir()
+	origDetect := detectGit
+	origList := listGitFiles
+	defer func() { detectGit = origDetect; listGitFiles = origList }()
+
+	detectGit = func(_ string) (*git.Snapshot, []error) {
+		return &git.Snapshot{IsRepo: true, RootDir: dir, RemoteURLErr: errRemoteURLFetch}, nil
+	}
+	listGitFiles = func(_ string) ([]string, error) { return nil, nil }
+
+	info := Detect()
+
+	if !errors.Is(info.RemoteErr, errRemoteURLFetch) {
+		t.Errorf("RemoteErr = %v, want it to wrap %v", info.RemoteErr, errRemoteURLFetch)
 	}
 }
 
@@ -248,58 +268,85 @@ func TestDetect_gitListFilesFailsFallsBackToWalkFiles(t *testing.T) {
 // --- parseRemoteURL ---
 
 func TestParseRemoteURL_empty(t *testing.T) {
-	h, o, r := parseRemoteURL("")
+	h, o, r, err := parseRemoteURL("")
 	if h != "" || o != "" || r != "" {
 		t.Errorf("expected empty results for empty input, got %q %q %q", h, o, r)
+	}
+	if err != nil {
+		t.Errorf("expected no error for empty input, got %v", err)
 	}
 }
 
 func TestParseRemoteURL_httpsWithGitSuffix(t *testing.T) {
-	h, o, r := parseRemoteURL("https://github.com/leaflockio/core-cli.git")
+	h, o, r, err := parseRemoteURL("https://github.com/leaflockio/core-cli.git")
 	if h != "github.com" || o != "leaflockio" || r != "core-cli" {
 		t.Errorf("unexpected: host=%q owner=%q repo=%q", h, o, r)
+	}
+	if err != nil {
+		t.Errorf("unexpected error: %v", err)
 	}
 }
 
 func TestParseRemoteURL_httpsWithoutGitSuffix(t *testing.T) {
-	h, o, r := parseRemoteURL("https://github.com/leaflockio/core-cli")
+	h, o, r, err := parseRemoteURL("https://github.com/leaflockio/core-cli")
 	if h != "github.com" || o != "leaflockio" || r != "core-cli" {
 		t.Errorf("unexpected: host=%q owner=%q repo=%q", h, o, r)
+	}
+	if err != nil {
+		t.Errorf("unexpected error: %v", err)
 	}
 }
 
 func TestParseRemoteURL_httpScheme(t *testing.T) {
-	h, o, r := parseRemoteURL("http://github.com/leaflockio/core-cli")
+	h, o, r, err := parseRemoteURL("http://github.com/leaflockio/core-cli")
 	if h != "github.com" || o != "leaflockio" || r != "core-cli" {
 		t.Errorf("unexpected: host=%q owner=%q repo=%q", h, o, r)
+	}
+	if err != nil {
+		t.Errorf("unexpected error: %v", err)
 	}
 }
 
 func TestParseRemoteURL_httpsInsufficientParts(t *testing.T) {
-	h, o, r := parseRemoteURL("https://github.com/onlyorg")
+	h, o, r, err := parseRemoteURL("https://github.com/onlyorg")
 	if h != "" || o != "" || r != "" {
 		t.Errorf("expected empty results for incomplete HTTPS URL, got %q %q %q", h, o, r)
+	}
+	var e *errs.Error
+	if !errors.As(err, &e) || e.Code != errs.REPO001 {
+		t.Errorf("expected REPO001 error, got %v", err)
 	}
 }
 
 func TestParseRemoteURL_sshFull(t *testing.T) {
-	h, o, r := parseRemoteURL("git@github.com:leaflockio/core-cli.git")
+	h, o, r, err := parseRemoteURL("git@github.com:leaflockio/core-cli.git")
 	if h != "github.com" || o != "leaflockio" || r != "core-cli" {
 		t.Errorf("unexpected: host=%q owner=%q repo=%q", h, o, r)
+	}
+	if err != nil {
+		t.Errorf("unexpected error: %v", err)
 	}
 }
 
 func TestParseRemoteURL_sshNoColon(t *testing.T) {
-	h, o, r := parseRemoteURL("git@github.com")
+	h, o, r, err := parseRemoteURL("git@github.com")
 	if h != "" || o != "" || r != "" {
 		t.Errorf("expected empty results for SSH URL with no colon, got %q %q %q", h, o, r)
+	}
+	var e *errs.Error
+	if !errors.As(err, &e) || e.Code != errs.REPO001 {
+		t.Errorf("expected REPO001 error, got %v", err)
 	}
 }
 
 func TestParseRemoteURL_sshNoSlashInPath(t *testing.T) {
-	h, o, r := parseRemoteURL("git@github.com:leaflockio")
+	h, o, r, err := parseRemoteURL("git@github.com:leaflockio")
 	if h != "github.com" || o != "" || r != "" {
 		t.Errorf("expected host-only result for SSH URL without slash, got %q %q %q", h, o, r)
+	}
+	var e *errs.Error
+	if !errors.As(err, &e) || e.Code != errs.REPO001 {
+		t.Errorf("expected REPO001 error, got %v", err)
 	}
 }
 

@@ -11,11 +11,13 @@
 package repo
 
 import (
+	"fmt"
 	"os"
 	"path/filepath"
 	"strings"
 
 	"github.com/google/licenseclassifier/v2/assets"
+	"github.com/leaflockio/core-cli/internal/errs"
 	"github.com/leaflockio/core-cli/internal/fstree"
 	"github.com/leaflockio/core-cli/internal/git"
 	"github.com/leaflockio/core-cli/internal/repo/lang"
@@ -54,7 +56,10 @@ type Info struct {
 	// RemoteURL is the URL of the repository's default remote — the only
 	// remote configured, or "origin" when there are several and it's one of
 	// them. Empty if not a git repo or no default remote could be resolved.
+	// RemoteErr is set when fetching or parsing that URL failed — nil in
+	// every other case, including when there's simply no remote to use.
 	RemoteURL string
+	RemoteErr error
 	// Host is the git hosting provider parsed from RemoteURL (e.g. "github.com").
 	// Empty when RemoteURL is empty.
 	Host string
@@ -100,7 +105,12 @@ func Detect() *Info {
 		info.IsGit = true
 		info.RootDir = snap.RootDir
 		info.RemoteURL = snap.RemoteURL
-		info.Host, info.Owner, info.RepoName = parseRemoteURL(info.RemoteURL)
+		info.RemoteErr = snap.RemoteURLErr
+		var parseErr error
+		info.Host, info.Owner, info.RepoName, parseErr = parseRemoteURL(info.RemoteURL)
+		if info.RemoteErr == nil {
+			info.RemoteErr = parseErr
+		}
 		info.DefaultRemote = snap.DefaultRemote
 		info.DefaultBranch = snap.DefaultBranch
 	} else {
@@ -128,9 +138,9 @@ func Detect() *Info {
 //
 //	https://github.com/leaflockio/core-cli.git → github.com, leaflockio, core-cli
 //	git@github.com:leaflockio/core-cli.git     → github.com, leaflockio, core-cli
-func parseRemoteURL(rawURL string) (string, string, string) {
+func parseRemoteURL(rawURL string) (string, string, string, error) {
 	if rawURL == "" {
-		return "", "", ""
+		return "", "", "", nil
 	}
 	url := strings.TrimSuffix(rawURL, ".git")
 	if strings.HasPrefix(url, "git@") {
@@ -141,24 +151,23 @@ func parseRemoteURL(rawURL string) (string, string, string) {
 
 // parseSSHRemoteURL extracts host, owner, and repo from an SSH remote URL
 // of the form git@github.com:org/repo.
-func parseSSHRemoteURL(url string) (string, string, string) {
+func parseSSHRemoteURL(url string) (string, string, string, error) {
 	url = strings.TrimPrefix(url, "git@")
 	parts := strings.SplitN(url, ":", 2)
 	if len(parts) != 2 {
-		return "", "", ""
+		return "", "", "", notRecognizedRemoteURLError(url)
 	}
 	host := parts[0]
-	var owner, repo string
 	pathParts := strings.SplitN(parts[1], "/", 2)
-	if len(pathParts) == 2 {
-		owner, repo = pathParts[0], pathParts[1]
+	if len(pathParts) != 2 {
+		return host, "", "", notRecognizedRemoteURLError(url)
 	}
-	return host, owner, repo
+	return host, pathParts[0], pathParts[1], nil
 }
 
 // parseHTTPSRemoteURL extracts host, owner, and repo from an HTTPS remote URL
 // of the form https://github.com/org/repo.
-func parseHTTPSRemoteURL(url string) (string, string, string) {
+func parseHTTPSRemoteURL(url string) (string, string, string, error) {
 	for _, prefix := range []string{"https://", "http://"} {
 		if strings.HasPrefix(url, prefix) {
 			url = strings.TrimPrefix(url, prefix)
@@ -167,9 +176,22 @@ func parseHTTPSRemoteURL(url string) (string, string, string) {
 	}
 	parts := strings.SplitN(url, "/", 3)
 	if len(parts) < 3 {
-		return "", "", ""
+		return "", "", "", notRecognizedRemoteURLError(url)
 	}
-	return parts[0], parts[1], parts[2]
+	return parts[0], parts[1], parts[2], nil
+}
+
+// notRecognizedRemoteURLError explains that url doesn't match a
+// recognized SSH or HTTPS git remote URL format.
+func notRecognizedRemoteURLError(url string) error {
+	return errs.Caller(errs.REPO001,
+		fmt.Sprintf("remote URL %q is not a recognized format", url),
+		nil,
+		errs.Context{
+			Cause:      "the remote URL isn't a standard SSH or HTTPS git URL",
+			Resolution: "run `git remote set-url origin <url>` with a standard URL",
+		},
+	)
 }
 
 // licenseFileNames are the candidate filenames for a LICENSE file.
