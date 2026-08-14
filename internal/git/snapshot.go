@@ -33,7 +33,11 @@ type Snapshot struct {
 	// "origin" among them).
 	DefaultRemote string
 	// RemoteURL is the URL of DefaultRemote, or "" if it's empty too.
-	RemoteURL string
+	// RemoteURLErr is set when DefaultRemote is non-empty but fetching its
+	// URL failed — nil in every other case, including when there's simply
+	// no DefaultRemote to fetch from.
+	RemoteURL    string
+	RemoteURLErr error
 	// Branch is the current branch, or "" when HEAD is detached.
 	Branch string
 	// CommitSHA is the commit HEAD points to.
@@ -89,6 +93,7 @@ func Detect(dir string) (*Snapshot, []error) {
 			func() error {
 				var err error
 				s.RemoteURL, err = RemoteURL(root, s.DefaultRemote)
+				s.RemoteURLErr = err
 				return err
 			},
 			func() error {

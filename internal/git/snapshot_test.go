@@ -153,6 +153,36 @@ func TestDetect_leavesFieldEmptyWhenIndividualCallFails(t *testing.T) {
 	}
 }
 
+func TestDetect_remoteURLFetchFailureSetsRemoteURLErr(t *testing.T) {
+	origLookPath := lookPath
+	origOut := runOutput
+	defer func() { lookPath = origLookPath; runOutput = origOut }()
+	lookPath = func(_ string) (string, error) { return "git", nil }
+
+	runOutput = func(_ string, args ...string) ([]byte, error) {
+		switch strings.Join(args, " ") {
+		case "rev-parse --show-toplevel":
+			return []byte("/repo\n"), nil
+		case "remote":
+			return []byte("origin\n"), nil
+		case "remote get-url origin":
+			return nil, errCmdFailed
+		}
+		return []byte(""), nil
+	}
+
+	s, errs := Detect("/repo")
+	if s.RemoteURL != "" {
+		t.Errorf("RemoteURL = %q, want empty", s.RemoteURL)
+	}
+	if s.RemoteURLErr == nil {
+		t.Error("expected RemoteURLErr to be set")
+	}
+	if len(errs) == 0 {
+		t.Error("expected at least one collected error")
+	}
+}
+
 func TestDetect_noRemotesLeavesDependentFieldsEmpty(t *testing.T) {
 	origLookPath := lookPath
 	origOut := runOutput
