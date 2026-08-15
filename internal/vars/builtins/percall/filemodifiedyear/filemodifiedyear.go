@@ -25,7 +25,7 @@ const Name = "FILE_MODIFIED_YEAR"
 // file with no commit history yet (new, untracked, or
 // staged-but-uncommitted) has no prior modification to report, so this
 // falls back to the current year.
-var FileModifiedYear = vars.RegisterBuiltin(vars.NewPerCall(Name))
+var FileModifiedYear = vars.RegisterBuiltin(vars.NewPerCall(Name, `\d{4}(-\d{4})?`, vars.Stable))
 
 func Set(v *vars.Vars, dir, path string) error {
 	return v.SetCall(Name, func(*app.App) (string, error) {

@@ -18,7 +18,7 @@ import (
 const Name = "FILE_NAME"
 
 // FileName is path's base filename, per call.
-var FileName = vars.RegisterBuiltin(vars.NewPerCall(Name))
+var FileName = vars.RegisterBuiltin(vars.NewPerCall(Name, `[A-Za-z0-9_.-]+`, vars.Stable))
 
 func Set(v *vars.Vars, path string) error {
 	return v.SetCall(Name, func(*app.App) (string, error) {

@@ -24,7 +24,7 @@ const Name = "FILE_CREATED_YEAR"
 // FileCreatedYear is the year of path's earliest commit. A file
 // with no commit history yet (new, untracked, or staged-but-uncommitted)
 // has no earlier year to report, so this falls back to the current year.
-var FileCreatedYear = vars.RegisterBuiltin(vars.NewPerCall(Name))
+var FileCreatedYear = vars.RegisterBuiltin(vars.NewPerCall(Name, `\d{4}(-\d{4})?`, vars.Stable))
 
 func Set(v *vars.Vars, dir, path string) error {
 	return v.SetCall(Name, func(*app.App) (string, error) {

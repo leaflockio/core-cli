@@ -7,10 +7,36 @@
 package filename
 
 import (
+	"regexp"
 	"testing"
 
 	"github.com/leaflockio/core-cli/internal/vars"
 )
+
+func TestFileName_volatilityIsStable(t *testing.T) {
+	if FileName.Volatility() != vars.Stable {
+		t.Errorf("Volatility = %v, want Stable", FileName.Volatility())
+	}
+}
+
+func TestFileName_patternMatchesRealisticFileNames(t *testing.T) {
+	re := regexp.MustCompile("^" + FileName.Pattern() + "$")
+	for _, tt := range []struct {
+		in   string
+		want bool
+	}{
+		{"main.go", true},
+		{"file_name.go", true},
+		{"README.md", true},
+		{"", false},
+		{"has space.go", false},
+		{"has/slash.go", false},
+	} {
+		if got := re.MatchString(tt.in); got != tt.want {
+			t.Errorf("pattern.MatchString(%q) = %v, want %v", tt.in, got, tt.want)
+		}
+	}
+}
 
 func TestFileName_registersAndResolves(t *testing.T) {
 	if FileName == nil {
