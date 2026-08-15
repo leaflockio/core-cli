@@ -66,6 +66,18 @@ type Var struct {
 	volatility Volatility
 }
 
+// Pattern is the wildcard regex fragment used to match v's value during
+// Loose comparison.
+func (v *Var) Pattern() string {
+	return v.pattern
+}
+
+// Volatility classifies whether a mismatch on v's value is meaningful
+// drift or expected noise.
+func (v *Var) Volatility() Volatility {
+	return v.volatility
+}
+
 // errNoCompute is the static base error wrapped when resolve finds no
 // compute function set — for WireUp this means a builtin was constructed
 // wrong; for PerCall it means whatever's calling Resolve forgot to call

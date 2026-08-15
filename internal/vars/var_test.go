@@ -402,3 +402,25 @@ func TestVarResolve_computeErrorIsWrappedWithName(t *testing.T) {
 		t.Errorf("error = %q, want it to mention the variable name", err.Error())
 	}
 }
+
+// --- Pattern / Volatility accessors ---
+
+func TestVar_PatternAccessor(t *testing.T) {
+	v, err := NewWireUp("YEAR", `\d{4}`, Volatile, func(*app.App) (string, error) { return "2026", nil })
+	if err != nil {
+		t.Fatalf("NewWireUp: %v", err)
+	}
+	if got := v.Pattern(); got != `\d{4}` {
+		t.Errorf("Pattern() = %q, want %q", got, `\d{4}`)
+	}
+}
+
+func TestVar_VolatilityAccessor(t *testing.T) {
+	v, err := NewWireUp("YEAR", `\d{4}`, Volatile, func(*app.App) (string, error) { return "2026", nil })
+	if err != nil {
+		t.Fatalf("NewWireUp: %v", err)
+	}
+	if got := v.Volatility(); got != Volatile {
+		t.Errorf("Volatility() = %v, want Volatile", got)
+	}
+}
