@@ -16,7 +16,7 @@ import (
 )
 
 // YY is the current year's last two digits.
-var YY = vars.RegisterBuiltin(vars.NewWireUp("YY", compute))
+var YY = vars.RegisterBuiltin(vars.NewWireUp("YY", `\d{2}`, vars.Volatile, compute))
 
 func compute(*app.App) (string, error) {
 	return fmt.Sprintf("%02d", time.Now().Year()%100), nil

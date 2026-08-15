@@ -16,7 +16,7 @@ import (
 )
 
 // Year is the current year.
-var Year = vars.RegisterBuiltin(vars.NewWireUp("YEAR", compute))
+var Year = vars.RegisterBuiltin(vars.NewWireUp("YEAR", `\d{4}(-\d{4})?`, vars.Volatile, compute))
 
 func compute(*app.App) (string, error) {
 	return strconv.Itoa(time.Now().Year()), nil

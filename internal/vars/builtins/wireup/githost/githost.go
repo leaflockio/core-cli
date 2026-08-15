@@ -20,7 +20,7 @@ const Name = "GIT_HOST"
 
 // GitHost is the hosting provider host parsed from the current
 // repository's default remote URL.
-var GitHost = vars.RegisterBuiltin(vars.NewWireUp(Name, compute))
+var GitHost = vars.RegisterBuiltin(vars.NewWireUp(Name, `[A-Za-z0-9.-]+`, vars.Stable, compute))
 
 func compute(a *app.App) (string, error) {
 	if a.Repo.Host == "" {

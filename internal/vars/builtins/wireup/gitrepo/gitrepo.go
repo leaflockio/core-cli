@@ -20,7 +20,7 @@ const Name = "GIT_REPO"
 
 // GitRepo is the repository name portion of the current repository's
 // default remote URL.
-var GitRepo = vars.RegisterBuiltin(vars.NewWireUp(Name, compute))
+var GitRepo = vars.RegisterBuiltin(vars.NewWireUp(Name, `[A-Za-z0-9][A-Za-z0-9._-]*`, vars.Stable, compute))
 
 func compute(a *app.App) (string, error) {
 	if a.Repo.RepoName == "" {

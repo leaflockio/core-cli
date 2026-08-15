@@ -15,7 +15,7 @@ import (
 )
 
 // Date is the current date, in ISO 8601 (YYYY-MM-DD) form.
-var Date = vars.RegisterBuiltin(vars.NewWireUp("DATE", compute))
+var Date = vars.RegisterBuiltin(vars.NewWireUp("DATE", `\d{4}-\d{2}-\d{2}`, vars.Volatile, compute))
 
 func compute(*app.App) (string, error) {
 	return time.Now().Format(time.DateOnly), nil

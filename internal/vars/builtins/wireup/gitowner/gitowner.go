@@ -20,7 +20,7 @@ const Name = "GIT_OWNER"
 
 // GitOwner is the organization or username portion of the current
 // repository's default remote URL.
-var GitOwner = vars.RegisterBuiltin(vars.NewWireUp(Name, compute))
+var GitOwner = vars.RegisterBuiltin(vars.NewWireUp(Name, `[A-Za-z0-9][A-Za-z0-9._-]*`, vars.Stable, compute))
 
 func compute(a *app.App) (string, error) {
 	if a.Repo.Owner == "" {

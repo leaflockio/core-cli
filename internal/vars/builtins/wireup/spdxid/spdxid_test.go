@@ -8,6 +8,7 @@ package spdxid
 
 import (
 	"errors"
+	"regexp"
 	"testing"
 
 	"github.com/leaflockio/core-cli/internal/app"
@@ -44,6 +45,31 @@ func TestCompute_callerErrorWhenNoLicenseClassified(t *testing.T) {
 	}
 	if e.ExitCode != errs.ExitUser {
 		t.Errorf("ExitCode = %d, want %d (ExitUser)", e.ExitCode, errs.ExitUser)
+	}
+}
+
+func TestSPDXID_volatilityIsStable(t *testing.T) {
+	if SPDXID.Volatility() != vars.Stable {
+		t.Errorf("Volatility = %v, want Stable", SPDXID.Volatility())
+	}
+}
+
+func TestSPDXID_patternMatchesRealisticIDs(t *testing.T) {
+	re := regexp.MustCompile("^" + SPDXID.Pattern() + "$")
+	for _, tt := range []struct {
+		in   string
+		want bool
+	}{
+		{"MIT", true},
+		{"Apache-2.0", true},
+		{"GPL-3.0-only", true},
+		{"", false},
+		{"has space", false},
+		{"has/slash", false},
+	} {
+		if got := re.MatchString(tt.in); got != tt.want {
+			t.Errorf("pattern.MatchString(%q) = %v, want %v", tt.in, got, tt.want)
+		}
 	}
 }
 

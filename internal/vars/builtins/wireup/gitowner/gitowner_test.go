@@ -8,6 +8,7 @@ package gitowner
 
 import (
 	"errors"
+	"regexp"
 	"testing"
 
 	"github.com/leaflockio/core-cli/internal/app"
@@ -60,6 +61,33 @@ func TestCompute_callerErrorWhenNoRemoteConfigured(t *testing.T) {
 	}
 	if e.ExitCode != errs.ExitUser {
 		t.Errorf("ExitCode = %d, want %d (ExitUser)", e.ExitCode, errs.ExitUser)
+	}
+}
+
+func TestGitOwner_volatilityIsStable(t *testing.T) {
+	if GitOwner.Volatility() != vars.Stable {
+		t.Errorf("Volatility = %v, want Stable", GitOwner.Volatility())
+	}
+}
+
+func TestGitOwner_patternMatchesRealisticOwners(t *testing.T) {
+	re := regexp.MustCompile("^" + GitOwner.Pattern() + "$")
+	for _, tt := range []struct {
+		in   string
+		want bool
+	}{
+		{"leaflockio", true},
+		{"leaf-lock", true},
+		{"leaf.lock", true},
+		{"a", true},
+		{"", false},
+		{"-leading-hyphen", false},
+		{"has space", false},
+		{"has/slash", false},
+	} {
+		if got := re.MatchString(tt.in); got != tt.want {
+			t.Errorf("pattern.MatchString(%q) = %v, want %v", tt.in, got, tt.want)
+		}
 	}
 }
 

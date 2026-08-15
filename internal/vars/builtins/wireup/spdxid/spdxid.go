@@ -18,7 +18,7 @@ const Name = "SPDX_ID"
 
 // SPDXID is the SPDX identifier classified from the repository's detected
 // LICENSE file.
-var SPDXID = vars.RegisterBuiltin(vars.NewWireUp(Name, compute))
+var SPDXID = vars.RegisterBuiltin(vars.NewWireUp(Name, `[A-Za-z0-9.+-]+`, vars.Stable, compute))
 
 func compute(a *app.App) (string, error) {
 	if a.Repo.License.SPDXID == "" {

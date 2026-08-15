@@ -7,6 +7,7 @@
 package date
 
 import (
+	"regexp"
 	"testing"
 	"time"
 
@@ -21,6 +22,30 @@ func TestCompute_returnsCurrentDateISO8601(t *testing.T) {
 	want := time.Now().Format(time.DateOnly)
 	if got != want {
 		t.Errorf("compute = %q, want %q", got, want)
+	}
+}
+
+func TestDate_volatilityIsVolatile(t *testing.T) {
+	if Date.Volatility() != vars.Volatile {
+		t.Errorf("Volatility = %v, want Volatile", Date.Volatility())
+	}
+}
+
+func TestDate_patternMatchesISO8601Dates(t *testing.T) {
+	re := regexp.MustCompile("^" + Date.Pattern() + "$")
+	for _, tt := range []struct {
+		in   string
+		want bool
+	}{
+		{"2026-08-15", true},
+		{"0001-01-01", true},
+		{"", false},
+		{"2026/08/15", false},
+		{"not-a-date", false},
+	} {
+		if got := re.MatchString(tt.in); got != tt.want {
+			t.Errorf("pattern.MatchString(%q) = %v, want %v", tt.in, got, tt.want)
+		}
 	}
 }
 

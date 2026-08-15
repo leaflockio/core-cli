@@ -8,6 +8,7 @@ package yy
 
 import (
 	"fmt"
+	"regexp"
 	"testing"
 	"time"
 
@@ -22,6 +23,30 @@ func TestCompute_returnsCurrentTwoDigitYear(t *testing.T) {
 	want := fmt.Sprintf("%02d", time.Now().Year()%100)
 	if got != want {
 		t.Errorf("compute = %q, want %q", got, want)
+	}
+}
+
+func TestYY_volatilityIsVolatile(t *testing.T) {
+	if YY.Volatility() != vars.Volatile {
+		t.Errorf("Volatility = %v, want Volatile", YY.Volatility())
+	}
+}
+
+func TestYY_patternMatchesTwoDigitValues(t *testing.T) {
+	re := regexp.MustCompile("^" + YY.Pattern() + "$")
+	for _, tt := range []struct {
+		in   string
+		want bool
+	}{
+		{"26", true},
+		{"00", true},
+		{"", false},
+		{"2026", false},
+		{"a6", false},
+	} {
+		if got := re.MatchString(tt.in); got != tt.want {
+			t.Errorf("pattern.MatchString(%q) = %v, want %v", tt.in, got, tt.want)
+		}
 	}
 }
 

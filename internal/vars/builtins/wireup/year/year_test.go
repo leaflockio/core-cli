@@ -7,6 +7,7 @@
 package year
 
 import (
+	"regexp"
 	"strconv"
 	"testing"
 	"time"
@@ -22,6 +23,30 @@ func TestCompute_returnsCurrentYear(t *testing.T) {
 	want := strconv.Itoa(time.Now().Year())
 	if got != want {
 		t.Errorf("compute = %q, want %q", got, want)
+	}
+}
+
+func TestYear_volatilityIsVolatile(t *testing.T) {
+	if Year.Volatility() != vars.Volatile {
+		t.Errorf("Volatility = %v, want Volatile", Year.Volatility())
+	}
+}
+
+func TestYear_patternMatchesYearShapedValues(t *testing.T) {
+	re := regexp.MustCompile("^" + Year.Pattern() + "$")
+	for _, tt := range []struct {
+		in   string
+		want bool
+	}{
+		{"2026", true},
+		{"2020-2026", true},
+		{"", false},
+		{"26", false},
+		{"not-a-year", false},
+	} {
+		if got := re.MatchString(tt.in); got != tt.want {
+			t.Errorf("pattern.MatchString(%q) = %v, want %v", tt.in, got, tt.want)
+		}
 	}
 }
 

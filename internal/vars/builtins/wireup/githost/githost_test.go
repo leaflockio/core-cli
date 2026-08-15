@@ -8,6 +8,7 @@ package githost
 
 import (
 	"errors"
+	"regexp"
 	"testing"
 
 	"github.com/leaflockio/core-cli/internal/app"
@@ -60,6 +61,31 @@ func TestCompute_callerErrorWhenNoRemoteConfigured(t *testing.T) {
 	}
 	if e.ExitCode != errs.ExitUser {
 		t.Errorf("ExitCode = %d, want %d (ExitUser)", e.ExitCode, errs.ExitUser)
+	}
+}
+
+func TestGitHost_volatilityIsStable(t *testing.T) {
+	if GitHost.Volatility() != vars.Stable {
+		t.Errorf("Volatility = %v, want Stable", GitHost.Volatility())
+	}
+}
+
+func TestGitHost_patternMatchesRealisticHosts(t *testing.T) {
+	re := regexp.MustCompile("^" + GitHost.Pattern() + "$")
+	for _, tt := range []struct {
+		in   string
+		want bool
+	}{
+		{"github.com", true},
+		{"gitlab.example.com", true},
+		{"git-server", true},
+		{"", false},
+		{"has space", false},
+		{"has/slash", false},
+	} {
+		if got := re.MatchString(tt.in); got != tt.want {
+			t.Errorf("pattern.MatchString(%q) = %v, want %v", tt.in, got, tt.want)
+		}
 	}
 }
 
