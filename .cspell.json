@@ -112,6 +112,8 @@
 
     "pathutil",
     "fsutil",
+    "testutil",
+    "gittest",
 
     "debugf",
     "mapstructure",
