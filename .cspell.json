@@ -156,6 +156,7 @@
     "gitrepo",
     "filecreatedyear",
     "filemodifiedyear",
+    "varflag",
     "ACDMRTUXB",
     "dryrun",
     "gpgsign",
