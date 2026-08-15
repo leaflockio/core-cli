@@ -192,6 +192,10 @@ const (
 	// VAR005 is used when SPDX_ID cannot be derived because no
 	// classifiable LICENSE file was found at the repository root.
 	VAR005 Code = "VAR005"
+
+	// VAR006 is used when a --var value isn't in the required KEY=VALUE
+	// format.
+	VAR006 Code = "VAR006"
 )
 
 // INT domain covers unexpected internal failures that indicate a bug in leaf.
