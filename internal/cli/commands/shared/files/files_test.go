@@ -10,12 +10,11 @@ package files
 import (
 	"errors"
 	"os"
-	"os/exec"
 	"path/filepath"
-	"strings"
 	"testing"
 
 	"github.com/leaflockio/core-cli/internal/errs"
+	gittest "github.com/leaflockio/core-cli/internal/testutil/git"
 )
 
 func writeFile(t *testing.T, path string) {
@@ -244,56 +243,10 @@ func TestResolve_statsQueryEqualsDiscoveredWithNoArgs(t *testing.T) {
 
 // --- Resolve: git-routed sources ---
 
-func initGitRepo(t *testing.T) string {
-	t.Helper()
-	dir := t.TempDir()
-	run := func(args ...string) {
-		cmd := exec.Command("git", args...)
-		cmd.Dir = dir
-		if out, err := cmd.CombinedOutput(); err != nil {
-			t.Fatalf("git %v: %v\n%s", args, err, out)
-		}
-	}
-	run("init", "-q")
-	run("config", "user.email", "test@example.com")
-	run("config", "user.name", "test")
-	run("config", "commit.gpgsign", "false") // isolate from the host's global signing config
-	return dir
-}
-
-func gitAdd(t *testing.T, dir string, paths ...string) {
-	t.Helper()
-	cmd := exec.Command("git", append([]string{"add"}, paths...)...)
-	cmd.Dir = dir
-	if out, err := cmd.CombinedOutput(); err != nil {
-		t.Fatalf("git add: %v\n%s", err, out)
-	}
-}
-
-func gitCommit(t *testing.T, dir, msg string) {
-	t.Helper()
-	cmd := exec.Command("git", "commit", "-q", "-m", msg)
-	cmd.Dir = dir
-	if out, err := cmd.CombinedOutput(); err != nil {
-		t.Fatalf("git commit: %v\n%s", err, out)
-	}
-}
-
-func currentCommit(t *testing.T, dir string) string {
-	t.Helper()
-	cmd := exec.Command("git", "rev-parse", "HEAD")
-	cmd.Dir = dir
-	out, err := cmd.CombinedOutput()
-	if err != nil {
-		t.Fatalf("git rev-parse: %v\n%s", err, out)
-	}
-	return strings.TrimSpace(string(out))
-}
-
 func TestResolve_defaultRoutesToGitListFiles(t *testing.T) {
-	dir := initGitRepo(t)
+	dir := gittest.InitRepo(t)
 	writeFile(t, filepath.Join(dir, "a.go"))
-	gitAdd(t, dir, "a.go")
+	gittest.Add(t, dir, "a.go")
 
 	got, _, err := (&Files{}).Resolve(dir, nil)
 	if err != nil {
@@ -305,10 +258,10 @@ func TestResolve_defaultRoutesToGitListFiles(t *testing.T) {
 }
 
 func TestResolve_stagedRoutesToGitResolveStaged(t *testing.T) {
-	dir := initGitRepo(t)
+	dir := gittest.InitRepo(t)
 	writeFile(t, filepath.Join(dir, "a.go"))
 	writeFile(t, filepath.Join(dir, "b.go"))
-	gitAdd(t, dir, "a.go")
+	gittest.Add(t, dir, "a.go")
 
 	got, _, err := (&Files{Staged: true}).Resolve(dir, nil)
 	if err != nil {
@@ -320,15 +273,15 @@ func TestResolve_stagedRoutesToGitResolveStaged(t *testing.T) {
 }
 
 func TestResolve_prRoutesToGitResolvePRFiles(t *testing.T) {
-	dir := initGitRepo(t)
+	dir := gittest.InitRepo(t)
 	writeFile(t, filepath.Join(dir, "a.go"))
-	gitAdd(t, dir, "a.go")
-	gitCommit(t, dir, "initial")
-	base := currentCommit(t, dir)
+	gittest.Add(t, dir, "a.go")
+	gittest.Commit(t, dir, "initial")
+	base := gittest.CurrentCommit(t, dir)
 
 	writeFile(t, filepath.Join(dir, "b.go"))
-	gitAdd(t, dir, "b.go")
-	gitCommit(t, dir, "second")
+	gittest.Add(t, dir, "b.go")
+	gittest.Commit(t, dir, "second")
 
 	got, _, err := (&Files{PR: true, Base: base}).Resolve(dir, nil)
 	if err != nil {
