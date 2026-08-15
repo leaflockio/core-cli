@@ -19,7 +19,7 @@ import (
 func TestRegisterBuiltin_addsToRegistry(t *testing.T) {
 	withRegistry(t, map[string]*Var{}, nil)
 
-	v, err := NewWireUp("YEAR", func(*app.App) (string, error) { return "2026", nil })
+	v, err := NewWireUp("YEAR", ".*", Stable, func(*app.App) (string, error) { return "2026", nil })
 	if err != nil {
 		t.Fatalf("NewWireUp: %v", err)
 	}
@@ -38,7 +38,7 @@ func TestRegisterBuiltin_addsToRegistry(t *testing.T) {
 func TestRegisterBuiltin_propagatesConstructorError(t *testing.T) {
 	withRegistry(t, map[string]*Var{}, nil)
 
-	got := RegisterBuiltin(NewWireUp("bad name", func(*app.App) (string, error) { return "", nil }))
+	got := RegisterBuiltin(NewWireUp("bad name", ".*", Stable, func(*app.App) (string, error) { return "", nil }))
 	if got != nil {
 		t.Errorf("RegisterBuiltin = %v, want nil", got)
 	}
@@ -69,7 +69,7 @@ func TestRegisterBuiltin_rejectsNonBuiltinOrigin(t *testing.T) {
 func TestRegisterBuiltin_rejectsDuplicateName(t *testing.T) {
 	withRegistry(t, map[string]*Var{}, nil)
 
-	first, err := NewWireUp("YEAR", func(*app.App) (string, error) { return "first", nil })
+	first, err := NewWireUp("YEAR", ".*", Stable, func(*app.App) (string, error) { return "first", nil })
 	if err != nil {
 		t.Fatalf("NewWireUp: %v", err)
 	}
@@ -77,7 +77,7 @@ func TestRegisterBuiltin_rejectsDuplicateName(t *testing.T) {
 		t.Fatalf("first RegisterBuiltin = %v, want %v", got, first)
 	}
 
-	second, err := NewWireUp("YEAR", func(*app.App) (string, error) { return "second", nil })
+	second, err := NewWireUp("YEAR", ".*", Stable, func(*app.App) (string, error) { return "second", nil })
 	if err != nil {
 		t.Fatalf("NewWireUp: %v", err)
 	}
@@ -100,7 +100,7 @@ func TestRegisterBuiltin_accumulatesErrorsViaJoin(t *testing.T) {
 		t.Fatalf("NewUserStatic: %v", err)
 	}
 	RegisterBuiltin(userVar, nil)
-	RegisterBuiltin(NewWireUp("bad name", func(*app.App) (string, error) { return "", nil }))
+	RegisterBuiltin(NewWireUp("bad name", ".*", Stable, func(*app.App) (string, error) { return "", nil }))
 
 	if !errors.Is(errRegistration, errNotBuiltin) {
 		t.Errorf("errRegistration = %v, want wrapping errNotBuiltin", errRegistration)

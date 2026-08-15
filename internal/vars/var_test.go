@@ -80,6 +80,12 @@ func TestNewBuiltin_setsFields(t *testing.T) {
 	if v.value != "2026" {
 		t.Errorf("value = %q, want %q", v.value, "2026")
 	}
+	if v.pattern != "2026" {
+		t.Errorf("pattern = %q, want %q (literal value, quoted)", v.pattern, "2026")
+	}
+	if v.volatility != Stable {
+		t.Errorf("volatility = %v, want Stable", v.volatility)
+	}
 }
 
 func TestNewBuiltin_invalidName(t *testing.T) {
@@ -96,7 +102,7 @@ func TestNewBuiltin_invalidName(t *testing.T) {
 // --- NewWireUp ---
 
 func TestNewWireUp_setsFields(t *testing.T) {
-	v, err := NewWireUp("year", func(*app.App) (string, error) { return "2026", nil })
+	v, err := NewWireUp("year", `\d{4}`, Volatile, func(*app.App) (string, error) { return "2026", nil })
 	if err != nil {
 		t.Fatalf("NewWireUp: %v", err)
 	}
@@ -115,10 +121,16 @@ func TestNewWireUp_setsFields(t *testing.T) {
 	if v.compute == nil {
 		t.Error("compute = nil, want the given function")
 	}
+	if v.pattern != `\d{4}` {
+		t.Errorf("pattern = %q, want %q", v.pattern, `\d{4}`)
+	}
+	if v.volatility != Volatile {
+		t.Errorf("volatility = %v, want Volatile", v.volatility)
+	}
 }
 
 func TestNewWireUp_invalidName(t *testing.T) {
-	_, err := NewWireUp("bad name", func(*app.App) (string, error) { return "", nil })
+	_, err := NewWireUp("bad name", ".*", Stable, func(*app.App) (string, error) { return "", nil })
 	if !errors.Is(err, errInvalidName) {
 		t.Errorf("error = %v, want wrapping errInvalidName", err)
 	}
@@ -146,6 +158,12 @@ func TestNewUserStatic_setsFields(t *testing.T) {
 	if v.value != "hello" {
 		t.Errorf("value = %q, want %q", v.value, "hello")
 	}
+	if v.pattern != "hello" {
+		t.Errorf("pattern = %q, want %q (literal value, quoted)", v.pattern, "hello")
+	}
+	if v.volatility != Stable {
+		t.Errorf("volatility = %v, want Stable", v.volatility)
+	}
 }
 
 func TestNewUserStatic_invalidNameIsCallerError(t *testing.T) {
@@ -171,7 +189,7 @@ func TestNewUserStatic_invalidNameIsCallerError(t *testing.T) {
 // --- NewPerCall ---
 
 func TestNewPerCall_setsFields(t *testing.T) {
-	v, err := NewPerCall("file_name")
+	v, err := NewPerCall("file_name", `[^\n]+`, Stable)
 	if err != nil {
 		t.Fatalf("NewPerCall: %v", err)
 	}
@@ -187,10 +205,16 @@ func TestNewPerCall_setsFields(t *testing.T) {
 	if v.compute != nil {
 		t.Error("compute is set, want nil until SetCall")
 	}
+	if v.pattern != `[^\n]+` {
+		t.Errorf("pattern = %q, want %q", v.pattern, `[^\n]+`)
+	}
+	if v.volatility != Stable {
+		t.Errorf("volatility = %v, want Stable", v.volatility)
+	}
 }
 
 func TestNewPerCall_invalidName(t *testing.T) {
-	_, err := NewPerCall("bad name")
+	_, err := NewPerCall("bad name", ".*", Stable)
 	if !errors.Is(err, errInvalidName) {
 		t.Errorf("error = %v, want wrapping errInvalidName", err)
 	}
@@ -235,7 +259,7 @@ func TestVarResolve_wireUpCachesAfterFirstCall(t *testing.T) {
 		calls++
 		return strconv.Itoa(calls), nil
 	}
-	v, err := NewWireUp("X", fn)
+	v, err := NewWireUp("X", ".*", Stable, fn)
 	if err != nil {
 		t.Fatalf("NewWireUp: %v", err)
 	}
@@ -266,7 +290,7 @@ func TestVarResolve_wireUpRetriesAfterComputeError(t *testing.T) {
 		}
 		return "ok", nil
 	}
-	v, err := NewWireUp("X", fn)
+	v, err := NewWireUp("X", ".*", Stable, fn)
 	if err != nil {
 		t.Fatalf("NewWireUp: %v", err)
 	}
@@ -290,7 +314,7 @@ func TestVarResolve_wireUpRetriesAfterComputeError(t *testing.T) {
 }
 
 func TestVarResolve_wireUpNilComputeIsUnexpected(t *testing.T) {
-	v, err := NewWireUp("X", nil)
+	v, err := NewWireUp("X", ".*", Stable, nil)
 	if err != nil {
 		t.Fatalf("NewWireUp: %v", err)
 	}
@@ -312,7 +336,7 @@ func TestVarResolve_wireUpNilComputeIsUnexpected(t *testing.T) {
 }
 
 func TestVarResolve_perCallRecomputesEveryCall(t *testing.T) {
-	v, err := NewPerCall("FILE_NAME")
+	v, err := NewPerCall("FILE_NAME", ".*", Stable)
 	if err != nil {
 		t.Fatalf("NewPerCall: %v", err)
 	}
@@ -340,7 +364,7 @@ func TestVarResolve_perCallRecomputesEveryCall(t *testing.T) {
 }
 
 func TestVarResolve_perCallNilComputeIsUnexpected(t *testing.T) {
-	v, err := NewPerCall("FILE_NAME")
+	v, err := NewPerCall("FILE_NAME", ".*", Stable)
 	if err != nil {
 		t.Fatalf("NewPerCall: %v", err)
 	}
@@ -362,7 +386,7 @@ func TestVarResolve_perCallNilComputeIsUnexpected(t *testing.T) {
 }
 
 func TestVarResolve_computeErrorIsWrappedWithName(t *testing.T) {
-	v, err := NewWireUp("GIT_OWNER", func(*app.App) (string, error) { return "", errBoom })
+	v, err := NewWireUp("GIT_OWNER", ".*", Stable, func(*app.App) (string, error) { return "", errBoom })
 	if err != nil {
 		t.Fatalf("NewWireUp: %v", err)
 	}

@@ -34,7 +34,7 @@ func withRegistry(t *testing.T, reg map[string]*Var, regErr error) {
 
 func TestNew_seedsFromRegistryAndResolvesWireUpEagerly(t *testing.T) {
 	calls := 0
-	wireUp, err := NewWireUp("YEAR", func(*app.App) (string, error) {
+	wireUp, err := NewWireUp("YEAR", ".*", Stable, func(*app.App) (string, error) {
 		calls++
 		return "2026", nil
 	})
@@ -63,7 +63,7 @@ func TestNew_seedsFromRegistryAndResolvesWireUpEagerly(t *testing.T) {
 }
 
 func TestNew_perCallLeftUndeclaredUntilSetCall(t *testing.T) {
-	perCall, err := NewPerCall("FILE_NAME")
+	perCall, err := NewPerCall("FILE_NAME", ".*", Stable)
 	if err != nil {
 		t.Fatalf("NewPerCall: %v", err)
 	}
@@ -83,7 +83,7 @@ func TestNew_perCallLeftUndeclaredUntilSetCall(t *testing.T) {
 }
 
 func TestNew_wireUpResolveErrorPropagates(t *testing.T) {
-	broken, err := NewWireUp("BROKEN", func(*app.App) (string, error) { return "", errBoom })
+	broken, err := NewWireUp("BROKEN", ".*", Stable, func(*app.App) (string, error) { return "", errBoom })
 	if err != nil {
 		t.Fatalf("NewWireUp: %v", err)
 	}
@@ -120,7 +120,7 @@ func TestNew_registrationErrorPropagatesAsUnexpected(t *testing.T) {
 // --- SetCall ---
 
 func TestSetCall_attachesComputeToDeclaredPerCall(t *testing.T) {
-	perCall, err := NewPerCall("FILE_NAME")
+	perCall, err := NewPerCall("FILE_NAME", ".*", Stable)
 	if err != nil {
 		t.Fatalf("NewPerCall: %v", err)
 	}

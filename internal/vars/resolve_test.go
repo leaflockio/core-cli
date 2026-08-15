@@ -133,7 +133,7 @@ func TestResolve_unknownVariableIsCallerError(t *testing.T) {
 }
 
 func TestResolve_perCallWithNoValueIsUnexpected(t *testing.T) {
-	perCall, err := NewPerCall("FILE_NAME")
+	perCall, err := NewPerCall("FILE_NAME", ".*", Stable)
 	if err != nil {
 		t.Fatalf("NewPerCall: %v", err)
 	}
@@ -158,7 +158,7 @@ func TestResolve_perCallWithNoValueIsUnexpected(t *testing.T) {
 // --- Resolve: PerCall recompute / clearCalls ---
 
 func TestResolve_perCallRecomputesForRepeatedReference(t *testing.T) {
-	perCall, err := NewPerCall("FILE_NAME")
+	perCall, err := NewPerCall("FILE_NAME", ".*", Stable)
 	if err != nil {
 		t.Fatalf("NewPerCall: %v", err)
 	}
@@ -179,7 +179,7 @@ func TestResolve_perCallRecomputesForRepeatedReference(t *testing.T) {
 }
 
 func TestResolve_clearsPerCallComputeAfterCall(t *testing.T) {
-	perCall, err := NewPerCall("FILE_NAME")
+	perCall, err := NewPerCall("FILE_NAME", ".*", Stable)
 	if err != nil {
 		t.Fatalf("NewPerCall: %v", err)
 	}
@@ -195,7 +195,7 @@ func TestResolve_clearsPerCallComputeAfterCall(t *testing.T) {
 }
 
 func TestResolve_clearsPerCallComputeEvenWhenUnused(t *testing.T) {
-	perCall, err := NewPerCall("FILE_NAME")
+	perCall, err := NewPerCall("FILE_NAME", ".*", Stable)
 	if err != nil {
 		t.Fatalf("NewPerCall: %v", err)
 	}

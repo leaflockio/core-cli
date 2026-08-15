@@ -47,14 +47,23 @@ const (
 	OriginUserDefined
 )
 
+type Volatility int
+
+const (
+	Stable Volatility = iota
+	Volatile
+)
+
 // Var is a variable resolved once.
 type Var struct {
-	name     string
-	origin   Origin
-	kind     Kind
-	compute  func(*app.App) (string, error)
-	resolved bool
-	value    string
+	name       string
+	origin     Origin
+	kind       Kind
+	compute    func(*app.App) (string, error)
+	resolved   bool
+	value      string
+	pattern    string
+	volatility Volatility
 }
 
 // errNoCompute is the static base error wrapped when resolve finds no
@@ -87,26 +96,46 @@ func (v *Var) resolve(a *app.App) (string, error) {
 	return value, nil
 }
 
-// NewBuiltin constructs a builtin Static variable, a fixed value.
+// NewBuiltin constructs a builtin Static variable, a fixed value. Its
+// pattern matches the value literally and its volatility is Stable.
 func NewBuiltin(name, value string) (*Var, error) {
 	n, err := normalizeName(name)
 	if err != nil {
 		return nil, err
 	}
-	return &Var{name: n, origin: OriginBuiltin, kind: KindStatic, resolved: true, value: value}, nil
+	return &Var{
+		name:       n,
+		origin:     OriginBuiltin,
+		kind:       KindStatic,
+		resolved:   true,
+		value:      value,
+		pattern:    regexp.QuoteMeta(value),
+		volatility: Stable,
+	}, nil
 }
 
 // NewWireUp constructs a builtin WireUp variable: computed once, eagerly,
-// the first time it's resolved.
-func NewWireUp(name string, fn func(*app.App) (string, error)) (*Var, error) {
+// the first time it's resolved. pattern is the wildcard regex fragment
+// used to match this variable's value during Loose comparison; volatility
+// classifies whether a mismatch on it is meaningful drift or expected noise.
+func NewWireUp(name, pattern string, volatility Volatility, fn func(*app.App) (string, error)) (*Var, error) {
 	n, err := normalizeName(name)
 	if err != nil {
 		return nil, err
 	}
-	return &Var{name: n, origin: OriginBuiltin, kind: KindWireUp, compute: fn}, nil
+	return &Var{
+		name:       n,
+		origin:     OriginBuiltin,
+		kind:       KindWireUp,
+		compute:    fn,
+		pattern:    pattern,
+		volatility: volatility,
+	}, nil
 }
 
 // NewUserStatic constructs a user-defined Static variable, a fixed value.
+// Its pattern matches the value literally and its volatility is Stable —
+// a fixed, known value is always a meaningful comparison target.
 func NewUserStatic(name, value string) (*Var, error) {
 	n, err := normalizeName(name)
 	if err != nil {
@@ -119,16 +148,32 @@ func NewUserStatic(name, value string) (*Var, error) {
 			},
 		)
 	}
-	return &Var{name: n, origin: OriginUserDefined, kind: KindStatic, resolved: true, value: value}, nil
+	return &Var{
+		name:       n,
+		origin:     OriginUserDefined,
+		kind:       KindStatic,
+		resolved:   true,
+		value:      value,
+		pattern:    regexp.QuoteMeta(value),
+		volatility: Stable,
+	}, nil
 }
 
 // NewPerCall declares a builtin PerCall variable, known to every Vars that
 // includes it, but not resolvable until a consumer supplies its context —
-// via a builtin-specific setter.
-func NewPerCall(name string) (*Var, error) {
+// via a builtin-specific setter. pattern is the wildcard regex fragment
+// used to match this variable's value during Loose comparison; volatility
+// classifies whether a mismatch on it is meaningful drift or expected noise.
+func NewPerCall(name, pattern string, volatility Volatility) (*Var, error) {
 	n, err := normalizeName(name)
 	if err != nil {
 		return nil, err
 	}
-	return &Var{name: n, origin: OriginBuiltin, kind: KindPerCall}, nil
+	return &Var{
+		name:       n,
+		origin:     OriginBuiltin,
+		kind:       KindPerCall,
+		pattern:    pattern,
+		volatility: volatility,
+	}, nil
 }
