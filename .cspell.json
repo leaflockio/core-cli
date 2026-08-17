@@ -114,6 +114,7 @@
     "fsutil",
     "testutil",
     "gittest",
+    "tfvars",
 
     "debugf",
     "mapstructure",
@@ -166,6 +167,10 @@
     "TARGETBRANCH",
     "nocolor",
     "noconfig",
-    "ontreeready"
+    "ontreeready",
+
+    "cljc",
+    "containerfile",
+    "buckconfig"
   ]
 }

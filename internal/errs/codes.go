@@ -198,6 +198,17 @@ const (
 	VAR006 Code = "VAR006"
 )
 
+// CMT domain covers errors from the internal/comment package.
+const (
+	// CMT001 is used when a line comment style is constructed with an
+	// empty prefix.
+	CMT001 Code = "CMT001"
+
+	// CMT002 is used when a block comment style is constructed with an
+	// empty open or close delimiter.
+	CMT002 Code = "CMT002"
+)
+
 // INT domain covers unexpected internal failures that indicate a bug in leaf.
 // These codes are reserved — only errs.Internal() assigns them. Callers must
 // never construct an INT error directly.
