@@ -15,6 +15,7 @@ import (
 	"github.com/leaflockio/core-cli/internal/generated"
 	"github.com/leaflockio/core-cli/internal/invocation"
 	"github.com/leaflockio/core-cli/internal/platform"
+	"github.com/leaflockio/core-cli/internal/preamble"
 	"github.com/leaflockio/core-cli/internal/repo"
 	"github.com/leaflockio/core-cli/internal/ui"
 	"github.com/leaflockio/core-cli/internal/version"
@@ -125,4 +126,11 @@ func (a *App) ApplyCommentOverrides(extensions, files map[string]comment.Languag
 // generated package, alongside its built-in conventions.
 func (a *App) ApplyGeneratedOverrides(patterns []string) error {
 	return generated.ApplyOverrides(patterns)
+}
+
+// ApplyPreambleOverrides applies extra preamble-detection patterns and
+// PreserveLines exceptions to the preamble package, alongside its
+// built-in markers.
+func (a *App) ApplyPreambleOverrides(overrides []preamble.PatternOverride, perFile map[string]int) ([]string, error) {
+	return preamble.ApplyOverrides(overrides, perFile)
 }

@@ -216,6 +216,17 @@ const (
 	GEN001 Code = "GEN001"
 )
 
+// PRE domain covers errors from the internal/preamble package.
+const (
+	// PRE001 is used when a config-supplied preamble pattern is not a
+	// valid regular expression.
+	PRE001 Code = "PRE001"
+
+	// PRE002 is used when a config-supplied PreserveLines value is not a
+	// positive integer.
+	PRE002 Code = "PRE002"
+)
+
 // INT domain covers unexpected internal failures that indicate a bug in leaf.
 // These codes are reserved — only errs.Internal() assigns them. Callers must
 // never construct an INT error directly.

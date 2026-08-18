@@ -16,6 +16,7 @@ import (
 	"github.com/leaflockio/core-cli/internal/generated"
 	"github.com/leaflockio/core-cli/internal/invocation"
 	"github.com/leaflockio/core-cli/internal/platform"
+	"github.com/leaflockio/core-cli/internal/preamble"
 	"github.com/leaflockio/core-cli/internal/repo"
 	"github.com/leaflockio/core-cli/internal/terminal"
 	"github.com/leaflockio/core-cli/internal/ui"
@@ -143,6 +144,46 @@ func TestApp_ApplyGeneratedOverrides_invalidPattern(t *testing.T) {
 	a := NewBuilder().Build()
 
 	err := a.ApplyGeneratedOverrides([]string{`[unclosed`})
+	if err == nil {
+		t.Fatal("expected error, got nil")
+	}
+}
+
+func TestApp_ApplyPreambleOverrides(t *testing.T) {
+	lines := []string{"# totally-custom-preamble-marker", "code here"}
+	if preamble.Detect(lines, "f.py") != 0 {
+		t.Fatal("precondition failed: content already matches something")
+	}
+
+	a := NewBuilder().Build()
+	warnings, err := a.ApplyPreambleOverrides(
+		[]preamble.PatternOverride{{Pattern: `^# totally-custom-preamble-marker`}}, nil,
+	)
+	if err != nil {
+		t.Fatalf("ApplyPreambleOverrides: %v", err)
+	}
+	if warnings != nil {
+		t.Errorf("warnings = %v, want nil", warnings)
+	}
+
+	if got := preamble.Detect(lines, "f.py"); got != 1 {
+		t.Errorf("Detect after ApplyPreambleOverrides = %d, want 1", got)
+	}
+}
+
+func TestApp_ApplyPreambleOverrides_invalidPattern(t *testing.T) {
+	a := NewBuilder().Build()
+
+	_, err := a.ApplyPreambleOverrides([]preamble.PatternOverride{{Pattern: `[unclosed`}}, nil)
+	if err == nil {
+		t.Fatal("expected error, got nil")
+	}
+}
+
+func TestApp_ApplyPreambleOverrides_nonPositivePreserveLines(t *testing.T) {
+	a := NewBuilder().Build()
+
+	_, err := a.ApplyPreambleOverrides(nil, map[string]int{"*.go": 0})
 	if err == nil {
 		t.Fatal("expected error, got nil")
 	}
