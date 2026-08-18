@@ -10,6 +10,7 @@ package app
 import (
 	"log/slog"
 
+	"github.com/leaflockio/core-cli/internal/comment"
 	"github.com/leaflockio/core-cli/internal/config"
 	"github.com/leaflockio/core-cli/internal/invocation"
 	"github.com/leaflockio/core-cli/internal/platform"
@@ -111,4 +112,10 @@ func (b *Builder) Build() *App {
 		Invocation: b.invocation,
 		Workspace:  b.workspace,
 	}
+}
+
+// ApplyCommentOverrides applies extension- and filename-keyed comment style
+// overrides to the comment package.
+func (a *App) ApplyCommentOverrides(extensions, files map[string]comment.Language) {
+	comment.ApplyOverrides(extensions, files)
 }

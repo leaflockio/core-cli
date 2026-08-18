@@ -12,6 +12,7 @@ import (
 	"log/slog"
 	"testing"
 
+	"github.com/leaflockio/core-cli/internal/comment"
 	"github.com/leaflockio/core-cli/internal/invocation"
 	"github.com/leaflockio/core-cli/internal/platform"
 	"github.com/leaflockio/core-cli/internal/repo"
@@ -97,6 +98,27 @@ func TestBuilder_WithWorkspace(t *testing.T) {
 
 	if a.Workspace != ws {
 		t.Error("Workspace not set correctly")
+	}
+}
+
+func TestApp_ApplyCommentOverrides(t *testing.T) {
+	prev, ok := comment.LanguageForExtension("go")
+	if !ok {
+		t.Fatal("precondition failed: go should be a known extension")
+	}
+	t.Cleanup(func() {
+		comment.ApplyOverrides(map[string]comment.Language{"go": prev}, nil)
+	})
+
+	a := NewBuilder().Build()
+	a.ApplyCommentOverrides(map[string]comment.Language{"go": comment.CSSStyle}, nil)
+
+	got, ok := comment.LanguageForExtension("go")
+	if !ok {
+		t.Fatal("LanguageForExtension(go) ok = false, want true")
+	}
+	if got.Default != comment.CSSStyle.Default {
+		t.Errorf("LanguageForExtension(go) = %v, want CSSStyle", got)
 	}
 }
 
