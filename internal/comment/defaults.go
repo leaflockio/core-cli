@@ -6,10 +6,7 @@
 
 package comment
 
-import (
-	"path/filepath"
-	"strings"
-)
+import "path/filepath"
 
 // Language records every comment form a language supports.
 type Language struct {
@@ -142,7 +139,7 @@ var bareNames = map[string]Language{
 // LanguageForExtension returns the known Language for ext (with or
 // without a leading dot, case-insensitive), and whether one was found.
 func LanguageForExtension(ext string) (Language, bool) {
-	l, ok := languages[strings.ToLower(strings.TrimPrefix(ext, "."))]
+	l, ok := languages[normalizeKey(ext)]
 	return l, ok
 }
 
@@ -151,7 +148,7 @@ func LanguageForExtension(ext string) (Language, bool) {
 // for a file conventionally named without an extension, like Makefile —
 // before falling back to LanguageForExtension.
 func LanguageForFile(path string) (Language, bool) {
-	base := strings.ToLower(strings.TrimPrefix(filepath.Base(path), "."))
+	base := normalizeKey(filepath.Base(path))
 	if l, ok := bareNames[base]; ok {
 		return l, true
 	}
