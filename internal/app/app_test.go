@@ -13,6 +13,7 @@ import (
 	"testing"
 
 	"github.com/leaflockio/core-cli/internal/comment"
+	"github.com/leaflockio/core-cli/internal/generated"
 	"github.com/leaflockio/core-cli/internal/invocation"
 	"github.com/leaflockio/core-cli/internal/platform"
 	"github.com/leaflockio/core-cli/internal/repo"
@@ -119,6 +120,31 @@ func TestApp_ApplyCommentOverrides(t *testing.T) {
 	}
 	if got.Default != comment.CSSStyle.Default {
 		t.Errorf("LanguageForExtension(go) = %v, want CSSStyle", got)
+	}
+}
+
+func TestApp_ApplyGeneratedOverrides(t *testing.T) {
+	content := []byte("// totally-custom-generated-marker\n")
+	if generated.IsGenerated(content) {
+		t.Fatal("precondition failed: content already matches a built-in pattern")
+	}
+
+	a := NewBuilder().Build()
+	if err := a.ApplyGeneratedOverrides([]string{`totally-custom-generated-marker`}); err != nil {
+		t.Fatalf("ApplyGeneratedOverrides: %v", err)
+	}
+
+	if !generated.IsGenerated(content) {
+		t.Error("IsGenerated = false after ApplyGeneratedOverrides, want true")
+	}
+}
+
+func TestApp_ApplyGeneratedOverrides_invalidPattern(t *testing.T) {
+	a := NewBuilder().Build()
+
+	err := a.ApplyGeneratedOverrides([]string{`[unclosed`})
+	if err == nil {
+		t.Fatal("expected error, got nil")
 	}
 }
 

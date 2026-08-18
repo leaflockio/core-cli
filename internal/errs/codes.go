@@ -209,6 +209,13 @@ const (
 	CMT002 Code = "CMT002"
 )
 
+// GEN domain covers errors from the internal/generated package.
+const (
+	// GEN001 is used when a config-supplied generated-file pattern is not a
+	// valid regular expression.
+	GEN001 Code = "GEN001"
+)
+
 // INT domain covers unexpected internal failures that indicate a bug in leaf.
 // These codes are reserved — only errs.Internal() assigns them. Callers must
 // never construct an INT error directly.

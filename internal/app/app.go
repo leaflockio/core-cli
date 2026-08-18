@@ -12,6 +12,7 @@ import (
 
 	"github.com/leaflockio/core-cli/internal/comment"
 	"github.com/leaflockio/core-cli/internal/config"
+	"github.com/leaflockio/core-cli/internal/generated"
 	"github.com/leaflockio/core-cli/internal/invocation"
 	"github.com/leaflockio/core-cli/internal/platform"
 	"github.com/leaflockio/core-cli/internal/repo"
@@ -118,4 +119,10 @@ func (b *Builder) Build() *App {
 // overrides to the comment package.
 func (a *App) ApplyCommentOverrides(extensions, files map[string]comment.Language) {
 	comment.ApplyOverrides(extensions, files)
+}
+
+// ApplyGeneratedOverrides applies extra generated-file patterns to the
+// generated package, alongside its built-in conventions.
+func (a *App) ApplyGeneratedOverrides(patterns []string) error {
+	return generated.ApplyOverrides(patterns)
 }
