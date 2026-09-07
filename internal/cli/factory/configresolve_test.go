@@ -23,7 +23,7 @@ import (
 var errPeekProjectRootFailed = errors.New("peek failed")
 
 // parentStubCommand is a minimal cli.Command that declares Children, for
-// exercising checkConfigLayout's one-level-deep walk.
+// exercising resolveSources's one-level-deep walk.
 type parentStubCommand struct {
 	use      string
 	children []cli.Command
@@ -38,7 +38,7 @@ func (c *parentStubCommand) Define(_ *app.App) *cli.Definition {
 }
 
 // configStubCommand is a minimal cli.Command that declares a Config, for
-// exercising checkConfigLayout's configCommands collection.
+// exercising resolveSources's configCommands collection.
 type configStubCommand struct {
 	use       string
 	argsUsage string
@@ -52,19 +52,19 @@ func (c configStubCommand) Define(_ *app.App) *cli.Definition {
 	}
 }
 
-func TestCheckConfigLayout_returns_error_when_peek_fails(t *testing.T) {
+func TestResolveSources_returns_error_when_peek_fails(t *testing.T) {
 	old := peekProjectRoot
 	peekProjectRoot = func(_ *app.App, _ string) (string, error) { return "", errPeekProjectRootFailed }
 	t.Cleanup(func() { peekProjectRoot = old })
 
 	root := &parentStubCommand{use: "root", children: []cli.Command{&stubCommand{use: "child"}}}
-	_, err := checkConfigLayout(root, nil)
+	_, err := resolveSources(root, nil)
 	if !errors.Is(err, errPeekProjectRootFailed) {
 		t.Errorf("error = %v, want errors.Is match for errPeekProjectRootFailed", err)
 	}
 }
 
-func TestCheckConfigLayout_collects_config_declaring_children(t *testing.T) {
+func TestResolveSources_collects_configCommands(t *testing.T) {
 	old := peekProjectRoot
 	dir := t.TempDir()
 	peekProjectRoot = func(_ *app.App, _ string) (string, error) { return dir, nil }
@@ -74,21 +74,24 @@ func TestCheckConfigLayout_collects_config_declaring_children(t *testing.T) {
 		configStubCommand{use: "license"},
 		&stubCommand{use: "doctor"},
 	}}
-	layout, err := checkConfigLayout(root, &app.App{})
+	sources, err := resolveSources(root, &app.App{})
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-	if layout == nil {
-		t.Fatal("layout should not be nil on success")
+	if _, ok := sources.Commands["license"]; !ok {
+		t.Error("Commands[license] missing, want an entry — license declares Config")
+	}
+	if _, ok := sources.Commands["doctor"]; ok {
+		t.Error("Commands[doctor] present, want no entry — doctor does not declare Config")
 	}
 }
 
-// TestCheckConfigLayout_recognizesCommandWithArgsUsage is a regression test:
-// a command like check declares Meta.Use: "check" and ArgsUsage: "[file...]"
+// TestResolveSources_recognizesCommandWithArgsUsage is a regression test: a
+// command like check declares Meta.Use: "check" and ArgsUsage: "[file...]"
 // separately. Before that split existed, Use held "check [file...]" and the
-// catalog checkConfigLayout builds would never match a real leaf/check.yaml
+// catalog resolveSources builds would never match a real leaf/check.yaml
 // against it, misclassifying a valid file as unrecognized.
-func TestCheckConfigLayout_recognizesCommandWithArgsUsage(t *testing.T) {
+func TestResolveSources_recognizesCommandWithArgsUsage(t *testing.T) {
 	old := peekProjectRoot
 	dir := t.TempDir()
 	peekProjectRoot = func(_ *app.App, _ string) (string, error) { return dir, nil }
@@ -101,16 +104,16 @@ func TestCheckConfigLayout_recognizesCommandWithArgsUsage(t *testing.T) {
 	root := &parentStubCommand{use: "root", children: []cli.Command{
 		configStubCommand{use: "check", argsUsage: "[file...]"},
 	}}
-	layout, err := checkConfigLayout(root, &app.App{})
+	sources, err := resolveSources(root, &app.App{})
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-	if len(layout.Warnings) != 0 {
-		t.Errorf("expected check.yaml to be recognized via bare Use, got warnings: %v", layout.Warnings)
+	if len(sources.Warnings) != 0 {
+		t.Errorf("expected check.yaml to be recognized via bare Use, got warnings: %v", sources.Warnings)
 	}
 }
 
-func TestCheckConfigLayout_returns_error_when_invoked_command_has_extension_conflict(t *testing.T) {
+func TestResolveSources_extensionConflict_recordedNotErrored(t *testing.T) {
 	old := peekProjectRoot
 	dir := t.TempDir()
 	peekProjectRoot = func(_ *app.App, _ string) (string, error) { return dir, nil }
@@ -124,42 +127,61 @@ func TestCheckConfigLayout_returns_error_when_invoked_command_has_extension_conf
 	}
 
 	root := &parentStubCommand{use: "root", children: []cli.Command{configStubCommand{use: "license"}}}
-	a := &app.App{Invocation: &invocation.Invocation{Raw: []string{"license"}}}
-
-	_, err := checkConfigLayout(root, a)
-	if err == nil {
-		t.Fatal("expected error when the invoked command's own config has an extension conflict")
+	sources, err := resolveSources(root, &app.App{})
+	if err != nil {
+		t.Fatalf("an extension conflict must not be a hard error from resolveSources: %v", err)
 	}
-	var e *errs.Error
-	if !errors.As(err, &e) || e.Code != errs.CCF004 {
-		t.Errorf("expected CCF004, got %v", err)
+	exts, ok := sources.ExtensionConflicts["license"]
+	if !ok || len(exts) != 2 {
+		t.Errorf("ExtensionConflicts[license] = %v, want 2 extensions", exts)
 	}
 }
 
-func TestCheckExtensionConflict_nilInvocation_doesNotEscalate(t *testing.T) {
-	layout := &cmdconfig.Layout{ExtensionConflicts: map[string][]string{"license": {"yaml", "json"}}}
-	if err := checkExtensionConflict(&app.App{}, layout); err != nil {
+func TestCheckConflicts_nilInvocation_doesNotEscalate(t *testing.T) {
+	sources := &cmdconfig.Sources{ExtensionConflicts: map[string][]string{"license": {"yaml", "json"}}}
+	if err := checkConflicts(&app.App{}, sources); err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
 }
 
-func TestCheckExtensionConflict_conflictOnDifferentCommand_doesNotEscalate(t *testing.T) {
+func TestCheckConflicts_extensionConflictOnDifferentCommand_doesNotEscalate(t *testing.T) {
 	a := &app.App{Invocation: &invocation.Invocation{Raw: []string{"doctor"}}}
-	layout := &cmdconfig.Layout{ExtensionConflicts: map[string][]string{"license": {"yaml", "json"}}}
-	if err := checkExtensionConflict(a, layout); err != nil {
+	sources := &cmdconfig.Sources{ExtensionConflicts: map[string][]string{"license": {"yaml", "json"}}}
+	if err := checkConflicts(a, sources); err != nil {
 		t.Fatalf("unexpected error for a conflict on a command other than the one running: %v", err)
 	}
 }
 
-func TestCheckExtensionConflict_conflictOnInvokedCommand_escalates(t *testing.T) {
+func TestCheckConflicts_extensionConflictOnInvokedCommand_escalates(t *testing.T) {
 	a := &app.App{Invocation: &invocation.Invocation{Raw: []string{"license", "add"}}}
-	layout := &cmdconfig.Layout{ExtensionConflicts: map[string][]string{"license": {"yaml", "json"}}}
-	err := checkExtensionConflict(a, layout)
+	sources := &cmdconfig.Sources{ExtensionConflicts: map[string][]string{"license": {"yaml", "json"}}}
+	err := checkConflicts(a, sources)
 	if err == nil {
 		t.Fatal("expected error when the conflict belongs to the command actually being invoked")
 	}
 	var e *errs.Error
 	if !errors.As(err, &e) || e.Code != errs.CCF004 {
 		t.Errorf("expected CCF004, got %v", err)
+	}
+}
+
+func TestCheckConflicts_manifestConflictOnDifferentCommand_doesNotEscalate(t *testing.T) {
+	a := &app.App{Invocation: &invocation.Invocation{Raw: []string{"doctor"}}}
+	sources := &cmdconfig.Sources{ManifestConflicts: []string{"license"}}
+	if err := checkConflicts(a, sources); err != nil {
+		t.Fatalf("unexpected error for a conflict on a command other than the one running: %v", err)
+	}
+}
+
+func TestCheckConflicts_manifestConflictOnInvokedCommand_escalates(t *testing.T) {
+	a := &app.App{Invocation: &invocation.Invocation{Raw: []string{"license"}}}
+	sources := &cmdconfig.Sources{ManifestConflicts: []string{"license"}}
+	err := checkConflicts(a, sources)
+	if err == nil {
+		t.Fatal("expected error when the conflict belongs to the command actually being invoked")
+	}
+	var e *errs.Error
+	if !errors.As(err, &e) || e.Code != errs.CCF002 {
+		t.Errorf("expected CCF002, got %v", err)
 	}
 }

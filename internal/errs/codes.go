@@ -136,8 +136,8 @@ const (
 	// file under more than one discoverable extension.
 	CCF004 Code = "CCF004"
 
-	// CCF005 is used when the command actually being run has a config file
-	// that exists but could not be read or decoded.
+	// CCF005 is used when a config file — the manifest, or the command
+	// actually being run — exists but could not be read or decoded.
 	CCF005 Code = "CCF005"
 )
 

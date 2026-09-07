@@ -45,19 +45,6 @@ func testApp(t *testing.T) *app.App {
 	return app.NewBuilder().WithWorkspace(testWorkspace(t)).Build()
 }
 
-// testAppWithConfigDir is like testApp, but also returns the resolved
-// project config directory path so a test can write files into it before
-// calling Build.
-func testAppWithConfigDir(t *testing.T) (*app.App, string) {
-	t.Helper()
-	repoRoot := t.TempDir()
-	ws, err := workspace.New(t.TempDir(), repoRoot)
-	if err != nil {
-		t.Fatalf("workspace.New: %v", err)
-	}
-	return app.NewBuilder().WithWorkspace(ws).Build(), filepath.Join(repoRoot, config.AppName)
-}
-
 func TestFactory_Build_returns_error_for_nil_command(t *testing.T) {
 	_, err := factory.New().Build(nil, nil)
 	if err == nil {
@@ -81,15 +68,14 @@ func TestFactory_Build_returns_error_for_nil_workspace(t *testing.T) {
 }
 
 // writeConflictingConfig writes a manifest.yaml + child.yaml pair into
-// configDir — a hard config-layout conflict (manifest coexisting with a
-// per-command file), used to prove --no-config actually bypasses
-// checkConfigLayout rather than merely not blowing up on a clean layout.
+// configDir — a manifest section coexisting with child's own dedicated
+// file, ambiguous which one applies once child is the invoked command.
 func writeConflictingConfig(t *testing.T, configDir string) {
 	t.Helper()
 	if err := os.MkdirAll(configDir, 0o755); err != nil {
 		t.Fatalf("MkdirAll: %v", err)
 	}
-	if err := os.WriteFile(filepath.Join(configDir, "manifest.yaml"), []byte("x: 1\n"), 0o600); err != nil {
+	if err := os.WriteFile(filepath.Join(configDir, "manifest.yaml"), []byte("child:\n  x: 1\n"), 0o600); err != nil {
 		t.Fatalf("WriteFile manifest: %v", err)
 	}
 	if err := os.WriteFile(filepath.Join(configDir, "child.yaml"), []byte("x: 1\n"), 0o600); err != nil {
@@ -98,19 +84,54 @@ func writeConflictingConfig(t *testing.T, configDir string) {
 }
 
 func TestFactory_Build_returns_error_when_config_layout_conflicts(t *testing.T) {
-	a, configDir := testAppWithConfigDir(t)
-	writeConflictingConfig(t, configDir)
+	repoRoot := t.TempDir()
+	ws, err := workspace.New(t.TempDir(), repoRoot)
+	if err != nil {
+		t.Fatalf("workspace.New: %v", err)
+	}
+	writeConflictingConfig(t, filepath.Join(repoRoot, config.AppName))
 
-	parent := &parentStubCmd{use: "parent", children: []cli.Command{&stubCmd{use: "child"}}}
-	_, err := factory.New().Build(parent, a)
+	a := app.NewBuilder().
+		WithWorkspace(ws).
+		WithInvocation(&invocation.Invocation{Raw: []string{"child"}}).
+		Build()
+
+	parent := &parentStubCmd{use: "parent", children: []cli.Command{&configStubCmd{use: "child"}}}
+	_, err = factory.New().Build(parent, a)
 	if err == nil {
 		t.Fatal("expected error when config layout conflicts, got nil")
 	}
 }
 
+// TestFactory_Build_configConflictOnDifferentCommand_doesNotEscalate proves
+// a manifest/file conflict is only a hard error for the command actually
+// being invoked — a conflict that belongs to a sibling command must not
+// block the one running.
+func TestFactory_Build_configConflictOnDifferentCommand_doesNotEscalate(t *testing.T) {
+	repoRoot := t.TempDir()
+	ws, err := workspace.New(t.TempDir(), repoRoot)
+	if err != nil {
+		t.Fatalf("workspace.New: %v", err)
+	}
+	writeConflictingConfig(t, filepath.Join(repoRoot, config.AppName))
+
+	a := app.NewBuilder().
+		WithWorkspace(ws).
+		WithInvocation(&invocation.Invocation{Raw: []string{"other"}}).
+		Build()
+
+	parent := &parentStubCmd{use: "parent", children: []cli.Command{
+		&configStubCmd{use: "child"},
+		&configStubCmd{use: "other"},
+	}}
+	if _, err := factory.New().Build(parent, a); err != nil {
+		t.Fatalf("expected a conflict on a sibling command not to block the invoked one: %v", err)
+	}
+}
+
 // TestFactory_Build_noConfigSkipsConfigLayoutCheck reuses the exact broken
 // layout from the test above, but with --no-config in the invocation — Build
-// must skip checkConfigLayout/loadInvokedConfig entirely and succeed.
+// must skip config resolution entirely and succeed.
 func TestFactory_Build_noConfigSkipsConfigLayoutCheck(t *testing.T) {
 	repoRoot := t.TempDir()
 	ws, err := workspace.New(t.TempDir(), repoRoot)
@@ -127,7 +148,7 @@ func TestFactory_Build_noConfigSkipsConfigLayoutCheck(t *testing.T) {
 		}).
 		Build()
 
-	parent := &parentStubCmd{use: "parent", children: []cli.Command{&stubCmd{use: "child"}}}
+	parent := &parentStubCmd{use: "parent", children: []cli.Command{&configStubCmd{use: "child"}}}
 	if _, err := factory.New().Build(parent, a); err != nil {
 		t.Fatalf("expected --no-config to skip the config-layout conflict, got error: %v", err)
 	}
@@ -156,7 +177,7 @@ func TestFactory_Build_noConfigShorthandSkipsConfigLayoutCheck(t *testing.T) {
 		}).
 		Build()
 
-	parent := &parentStubCmd{use: "parent", children: []cli.Command{&stubCmd{use: "child"}}}
+	parent := &parentStubCmd{use: "parent", children: []cli.Command{&configStubCmd{use: "child"}}}
 	if _, err := factory.New().Build(parent, a); err != nil {
 		t.Fatalf("expected -n (shorthand) to skip the config-layout conflict, got error: %v", err)
 	}
@@ -454,7 +475,7 @@ func (c *configLoaderStubCmd) Define(_ *app.App) *cli.Definition {
 	}
 }
 
-func TestFactory_Build_flatMode_loadsInvokedCommandConfig(t *testing.T) {
+func TestFactory_Build_manifestSource_loadsInvokedCommandConfig(t *testing.T) {
 	repoRoot := t.TempDir()
 	ws, err := workspace.New(t.TempDir(), repoRoot)
 	if err != nil {

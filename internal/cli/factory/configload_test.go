@@ -45,11 +45,37 @@ func (r *recordingConfigLoader) Validate() error {
 	return r.validateErr
 }
 
+// configLoaderStubCommand is a cli.Command that carries a caller-supplied
+// cmdconfig.ConfigLoader, for asserting on Load/Validate call behavior.
+type configLoaderStubCommand struct {
+	use string
+	cfg cmdconfig.ConfigLoader
+}
+
+func (c configLoaderStubCommand) Define(_ *app.App) *cli.Definition {
+	return &cli.Definition{
+		Meta:    &cli.Meta{Use: c.use},
+		Handler: nopHandler,
+		Config:  c.cfg,
+	}
+}
+
 // peekJoin returns a peekProjectRoot override that joins dir and the
 // requested name, matching what Workspace.Peek does for real.
 func peekJoin(dir string) func(*app.App, string) (string, error) {
 	return func(_ *app.App, name string) (string, error) {
 		return filepath.Join(dir, name), nil
+	}
+}
+
+func assertCCF005(t *testing.T, err error) {
+	t.Helper()
+	if err == nil {
+		t.Fatal("expected error, got nil")
+	}
+	var e *errs.Error
+	if !errors.As(err, &e) || e.Code != errs.CCF005 {
+		t.Errorf("expected CCF005, got %v", err)
 	}
 }
 
@@ -76,8 +102,9 @@ func TestFindChildByName_noMatch_returnsNil(t *testing.T) {
 
 // --- resolveSection ---
 
-func TestResolveSection_layoutNone_returnsNil(t *testing.T) {
-	section, err := resolveSection(&app.App{}, "license", cmdconfig.LayoutNone)
+func TestResolveSection_sourceNone_returnsNil(t *testing.T) {
+	sources := &cmdconfig.Sources{Commands: map[string]cmdconfig.CommandSource{"license": cmdconfig.SourceNone}}
+	section, err := resolveSection(&app.App{}, "license", sources)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -86,7 +113,7 @@ func TestResolveSection_layoutNone_returnsNil(t *testing.T) {
 	}
 }
 
-func TestResolveSection_modular_readsOwnFile(t *testing.T) {
+func TestResolveSection_sourceFile_readsOwnFile(t *testing.T) {
 	old := peekProjectRoot
 	dir := t.TempDir()
 	peekProjectRoot = peekJoin(dir)
@@ -96,7 +123,8 @@ func TestResolveSection_modular_readsOwnFile(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	section, err := resolveSection(&app.App{}, "license", cmdconfig.LayoutModular)
+	sources := &cmdconfig.Sources{Commands: map[string]cmdconfig.CommandSource{"license": cmdconfig.SourceFile}}
+	section, err := resolveSection(&app.App{}, "license", sources)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -105,21 +133,7 @@ func TestResolveSection_modular_readsOwnFile(t *testing.T) {
 	}
 }
 
-func TestResolveSection_modular_noFile_returnsNil(t *testing.T) {
-	old := peekProjectRoot
-	peekProjectRoot = peekJoin(t.TempDir())
-	t.Cleanup(func() { peekProjectRoot = old })
-
-	section, err := resolveSection(&app.App{}, "license", cmdconfig.LayoutModular)
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
-	if section != nil {
-		t.Errorf("section = %v, want nil", section)
-	}
-}
-
-func TestResolveSection_modular_decodeError_returnsCCF005(t *testing.T) {
+func TestResolveSection_sourceFile_decodeError_returnsCCF005(t *testing.T) {
 	old := peekProjectRoot
 	dir := t.TempDir()
 	peekProjectRoot = peekJoin(dir)
@@ -129,23 +143,17 @@ func TestResolveSection_modular_decodeError_returnsCCF005(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	_, err := resolveSection(&app.App{}, "license", cmdconfig.LayoutModular)
+	sources := &cmdconfig.Sources{Commands: map[string]cmdconfig.CommandSource{"license": cmdconfig.SourceFile}}
+	_, err := resolveSection(&app.App{}, "license", sources)
 	assertCCF005(t, err)
 }
 
-func TestResolveSection_flat_extractsOwnKey(t *testing.T) {
-	old := manifestPath
-	dir := t.TempDir()
-	path := filepath.Join(dir, "manifest.yaml")
-	manifestPath = func(_ *app.App) string { return filepath.Join(dir, "manifest") }
-	t.Cleanup(func() { manifestPath = old })
-
-	data := "license:\n  format: spdx\ndoctor:\n  verbose: true\n"
-	if err := os.WriteFile(path, []byte(data), 0o644); err != nil {
-		t.Fatal(err)
+func TestResolveSection_sourceManifest_returnsManifestSection(t *testing.T) {
+	sources := &cmdconfig.Sources{
+		Commands:         map[string]cmdconfig.CommandSource{"license": cmdconfig.SourceManifest},
+		ManifestCommands: map[string]any{"license": map[string]any{"format": "spdx"}},
 	}
-
-	section, err := resolveSection(&app.App{}, "license", cmdconfig.LayoutFlat)
+	section, err := resolveSection(&app.App{}, "license", sources)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -154,18 +162,12 @@ func TestResolveSection_flat_extractsOwnKey(t *testing.T) {
 	}
 }
 
-func TestResolveSection_flat_missingKey_returnsNil(t *testing.T) {
-	old := manifestPath
-	dir := t.TempDir()
-	manifestPath = func(_ *app.App) string { return filepath.Join(dir, "manifest") }
-	t.Cleanup(func() { manifestPath = old })
-
-	data := []byte("doctor:\n  verbose: true\n")
-	if err := os.WriteFile(filepath.Join(dir, "manifest.yaml"), data, 0o644); err != nil {
-		t.Fatal(err)
+func TestResolveSection_sourceManifest_missingSection_returnsNil(t *testing.T) {
+	sources := &cmdconfig.Sources{
+		Commands:         map[string]cmdconfig.CommandSource{"license": cmdconfig.SourceManifest},
+		ManifestCommands: map[string]any{"doctor": map[string]any{"verbose": true}},
 	}
-
-	section, err := resolveSection(&app.App{}, "license", cmdconfig.LayoutFlat)
+	section, err := resolveSection(&app.App{}, "license", sources)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -174,36 +176,11 @@ func TestResolveSection_flat_missingKey_returnsNil(t *testing.T) {
 	}
 }
 
-func TestResolveSection_flat_decodeError_returnsCCF005(t *testing.T) {
-	old := manifestPath
-	dir := t.TempDir()
-	manifestPath = func(_ *app.App) string { return filepath.Join(dir, "manifest") }
-	t.Cleanup(func() { manifestPath = old })
-
-	if err := os.WriteFile(filepath.Join(dir, "manifest.yaml"), []byte("not: [valid: yaml"), 0o644); err != nil {
-		t.Fatal(err)
-	}
-
-	_, err := resolveSection(&app.App{}, "license", cmdconfig.LayoutFlat)
-	assertCCF005(t, err)
-}
-
-func assertCCF005(t *testing.T, err error) {
-	t.Helper()
-	if err == nil {
-		t.Fatal("expected error, got nil")
-	}
-	var e *errs.Error
-	if !errors.As(err, &e) || e.Code != errs.CCF005 {
-		t.Errorf("expected CCF005, got %v", err)
-	}
-}
-
 // --- loadInvokedConfig ---
 
 func TestLoadInvokedConfig_nilInvocation_noop(t *testing.T) {
 	root := &parentStubCommand{use: "root"}
-	if err := loadInvokedConfig(root, &app.App{}, &cmdconfig.Layout{}); err != nil {
+	if err := loadInvokedConfig(root, &app.App{}, &cmdconfig.Sources{}); err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
 }
@@ -211,7 +188,7 @@ func TestLoadInvokedConfig_nilInvocation_noop(t *testing.T) {
 func TestLoadInvokedConfig_noMatchingChild_noop(t *testing.T) {
 	root := &parentStubCommand{use: "root", children: []cli.Command{&stubCommand{use: "doctor"}}}
 	a := &app.App{Invocation: &invocation.Invocation{Raw: []string{"license"}}}
-	if err := loadInvokedConfig(root, a, &cmdconfig.Layout{}); err != nil {
+	if err := loadInvokedConfig(root, a, &cmdconfig.Sources{}); err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
 }
@@ -219,23 +196,8 @@ func TestLoadInvokedConfig_noMatchingChild_noop(t *testing.T) {
 func TestLoadInvokedConfig_matchedChildWithoutConfig_noop(t *testing.T) {
 	root := &parentStubCommand{use: "root", children: []cli.Command{&stubCommand{use: "license"}}}
 	a := &app.App{Invocation: &invocation.Invocation{Raw: []string{"license"}}}
-	if err := loadInvokedConfig(root, a, &cmdconfig.Layout{}); err != nil {
+	if err := loadInvokedConfig(root, a, &cmdconfig.Sources{}); err != nil {
 		t.Fatalf("unexpected error: %v", err)
-	}
-}
-
-// configLoaderStubCommand is a cli.Command that carries a caller-supplied
-// cmdconfig.ConfigLoader, for asserting on Load/Validate call behavior.
-type configLoaderStubCommand struct {
-	use string
-	cfg cmdconfig.ConfigLoader
-}
-
-func (c configLoaderStubCommand) Define(_ *app.App) *cli.Definition {
-	return &cli.Definition{
-		Meta:    &cli.Meta{Use: c.use},
-		Handler: nopHandler,
-		Config:  c.cfg,
 	}
 }
 
@@ -249,8 +211,9 @@ func TestLoadInvokedConfig_peekFails_propagatesError(t *testing.T) {
 		configLoaderStubCommand{use: "license", cfg: rec},
 	}}
 	a := &app.App{Invocation: &invocation.Invocation{Raw: []string{"license"}}}
+	sources := &cmdconfig.Sources{Commands: map[string]cmdconfig.CommandSource{"license": cmdconfig.SourceFile}}
 
-	err := loadInvokedConfig(root, a, &cmdconfig.Layout{Mode: cmdconfig.LayoutModular})
+	err := loadInvokedConfig(root, a, sources)
 	if !errors.Is(err, errPeekProjectRootFailed) {
 		t.Errorf("error = %v, want errors.Is match for errPeekProjectRootFailed", err)
 	}
@@ -270,26 +233,24 @@ func TestLoadInvokedConfig_resolveSectionError_propagates(t *testing.T) {
 		configLoaderStubCommand{use: "license", cfg: rec},
 	}}
 	a := &app.App{Invocation: &invocation.Invocation{Raw: []string{"license"}}}
+	sources := &cmdconfig.Sources{Commands: map[string]cmdconfig.CommandSource{"license": cmdconfig.SourceFile}}
 
-	err := loadInvokedConfig(root, a, &cmdconfig.Layout{Mode: cmdconfig.LayoutModular})
+	err := loadInvokedConfig(root, a, sources)
 	assertCCF005(t, err)
 	if rec.loadCalled {
 		t.Error("Load must not be called when the section can't be resolved")
 	}
 }
 
-func TestLoadInvokedConfig_layoutNone_skipsLoadAndValidate(t *testing.T) {
-	old := peekProjectRoot
-	peekProjectRoot = peekJoin(t.TempDir())
-	t.Cleanup(func() { peekProjectRoot = old })
-
+func TestLoadInvokedConfig_sourceNone_skipsLoadAndValidate(t *testing.T) {
 	rec := &recordingConfigLoader{}
 	root := &parentStubCommand{use: "root", children: []cli.Command{
 		configLoaderStubCommand{use: "license", cfg: rec},
 	}}
 	a := &app.App{Invocation: &invocation.Invocation{Raw: []string{"license"}}}
+	sources := &cmdconfig.Sources{Commands: map[string]cmdconfig.CommandSource{"license": cmdconfig.SourceNone}}
 
-	if err := loadInvokedConfig(root, a, &cmdconfig.Layout{Mode: cmdconfig.LayoutNone}); err != nil {
+	if err := loadInvokedConfig(root, a, sources); err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
 	if rec.loadCalled || rec.validateCalled {
@@ -297,7 +258,7 @@ func TestLoadInvokedConfig_layoutNone_skipsLoadAndValidate(t *testing.T) {
 	}
 }
 
-func TestLoadInvokedConfig_modular_loadsAndValidates(t *testing.T) {
+func TestLoadInvokedConfig_sourceFile_loadsAndValidates(t *testing.T) {
 	old := peekProjectRoot
 	dir := t.TempDir()
 	if err := os.WriteFile(filepath.Join(dir, "license.yaml"), []byte("format: spdx\n"), 0o644); err != nil {
@@ -311,8 +272,31 @@ func TestLoadInvokedConfig_modular_loadsAndValidates(t *testing.T) {
 		configLoaderStubCommand{use: "license", cfg: rec},
 	}}
 	a := &app.App{Invocation: &invocation.Invocation{Raw: []string{"license"}}}
+	sources := &cmdconfig.Sources{Commands: map[string]cmdconfig.CommandSource{"license": cmdconfig.SourceFile}}
 
-	if err := loadInvokedConfig(root, a, &cmdconfig.Layout{Mode: cmdconfig.LayoutModular}); err != nil {
+	if err := loadInvokedConfig(root, a, sources); err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if !rec.loadCalled || !rec.validateCalled {
+		t.Error("Load and Validate must both be called when a config section exists")
+	}
+	if rec.loadedSection["format"] != "spdx" {
+		t.Errorf("loadedSection = %v, want format=spdx", rec.loadedSection)
+	}
+}
+
+func TestLoadInvokedConfig_sourceManifest_loadsAndValidates(t *testing.T) {
+	rec := &recordingConfigLoader{}
+	root := &parentStubCommand{use: "root", children: []cli.Command{
+		configLoaderStubCommand{use: "license", cfg: rec},
+	}}
+	a := &app.App{Invocation: &invocation.Invocation{Raw: []string{"license"}}}
+	sources := &cmdconfig.Sources{
+		Commands:         map[string]cmdconfig.CommandSource{"license": cmdconfig.SourceManifest},
+		ManifestCommands: map[string]any{"license": map[string]any{"format": "spdx"}},
+	}
+
+	if err := loadInvokedConfig(root, a, sources); err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
 	if !rec.loadCalled || !rec.validateCalled {
@@ -337,8 +321,9 @@ func TestLoadInvokedConfig_loadError_propagatesAndSkipsValidate(t *testing.T) {
 		configLoaderStubCommand{use: "license", cfg: rec},
 	}}
 	a := &app.App{Invocation: &invocation.Invocation{Raw: []string{"license"}}}
+	sources := &cmdconfig.Sources{Commands: map[string]cmdconfig.CommandSource{"license": cmdconfig.SourceFile}}
 
-	err := loadInvokedConfig(root, a, &cmdconfig.Layout{Mode: cmdconfig.LayoutModular})
+	err := loadInvokedConfig(root, a, sources)
 	if !errors.Is(err, errLoadFailed) {
 		t.Errorf("error = %v, want errors.Is match for errLoadFailed", err)
 	}
@@ -361,8 +346,9 @@ func TestLoadInvokedConfig_validateError_propagates(t *testing.T) {
 		configLoaderStubCommand{use: "license", cfg: rec},
 	}}
 	a := &app.App{Invocation: &invocation.Invocation{Raw: []string{"license"}}}
+	sources := &cmdconfig.Sources{Commands: map[string]cmdconfig.CommandSource{"license": cmdconfig.SourceFile}}
 
-	err := loadInvokedConfig(root, a, &cmdconfig.Layout{Mode: cmdconfig.LayoutModular})
+	err := loadInvokedConfig(root, a, sources)
 	if !errors.Is(err, errValidateFailed) {
 		t.Errorf("error = %v, want errors.Is match for errValidateFailed", err)
 	}

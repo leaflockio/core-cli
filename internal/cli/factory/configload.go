@@ -12,16 +12,55 @@ import (
 	"github.com/leaflockio/core-cli/internal/app"
 	"github.com/leaflockio/core-cli/internal/cli"
 	"github.com/leaflockio/core-cli/internal/cli/cmdconfig"
+	"github.com/leaflockio/core-cli/internal/cli/flags/system/noconfig"
 	"github.com/leaflockio/core-cli/internal/errs"
 	"github.com/leaflockio/core-cli/internal/level"
 	"github.com/leaflockio/core-cli/internal/store"
 )
 
+// loadConfig is the config-loading entry point for tool.
+func loadConfig(cmd cli.Command, a *app.App) error {
+	if noConfigRequested(a) {
+		return nil
+	}
+
+	sources, err := resolveSources(cmd, a)
+	if err != nil {
+		return err
+	}
+
+	if err := checkConflicts(a, sources); err != nil {
+		return err
+	}
+
+	return loadInvokedConfig(cmd, a, sources)
+}
+
+// noConfigRequested reports whether --no-config was passed. Reads
+// a.Invocation instead of parsed flags because this runs before cobra
+// parses anything (see the noconfig package doc for why).
+func noConfigRequested(a *app.App) bool {
+	if a.Invocation == nil {
+		return false
+	}
+	meta := noconfig.NoConfig.Definition().Meta
+	fm := a.Invocation.FlagMap()
+	if _, ok := fm[meta.LongFlag()]; ok {
+		return true
+	}
+	if short := meta.ShortFlag(); short != "" {
+		if _, ok := fm[short]; ok {
+			return true
+		}
+	}
+	return false
+}
+
 // loadInvokedConfig loads and validates config for the command currently
-// being invoked, using layout to locate it. Returns nil when a has no
-// Invocation, no child matches the invoked command, or the matched command
-// declares no Config.
-func loadInvokedConfig(cmd cli.Command, a *app.App, layout *cmdconfig.Layout) error {
+// being invoked, using sources to locate it. Returns nil when a has no
+// Invocation, no child matches the invoked command, or the matched
+// command declares no Config.
+func loadInvokedConfig(cmd cli.Command, a *app.App, sources *cmdconfig.Sources) error {
 	if a.Invocation == nil {
 		return nil
 	}
@@ -32,7 +71,7 @@ func loadInvokedConfig(cmd cli.Command, a *app.App, layout *cmdconfig.Layout) er
 		return nil
 	}
 
-	section, err := resolveSection(a, invoked, layout.Mode)
+	section, err := resolveSection(a, invoked, sources)
 	if err != nil {
 		return err
 	}
@@ -58,13 +97,14 @@ func findChildByName(cmd cli.Command, a *app.App, name string) *cli.Definition {
 	return nil
 }
 
-// resolveSection reads name's config section according to mode. Returns a
-// nil map when no file backs the section.
-func resolveSection(a *app.App, name string, mode cmdconfig.LayoutMode) (map[string]any, error) {
+// resolveSection reads name's config section: from its own dedicated
+// file when sources reports SourceFile, from sources.ManifestCommands
+// when sources reports SourceManifest, or nil when sources reports
+// SourceNone.
+func resolveSection(a *app.App, name string, sources *cmdconfig.Sources) (map[string]any, error) {
 	var section map[string]any
-
-	switch mode {
-	case cmdconfig.LayoutModular:
+	switch sources.Commands[name] {
+	case cmdconfig.SourceFile:
 		path, err := peekProjectRoot(a, name)
 		if err != nil {
 			return nil, err
@@ -72,20 +112,12 @@ func resolveSection(a *app.App, name string, mode cmdconfig.LayoutMode) (map[str
 		if _, err := store.Load(path, &section); err != nil {
 			return nil, errConfigUnreadable(name, err)
 		}
-
-	case cmdconfig.LayoutFlat:
-		var manifest map[string]any
-		if _, err := store.Load(manifestPath(a), &manifest); err != nil {
-			return nil, errConfigUnreadable(name, err)
+	case cmdconfig.SourceManifest:
+		if v, ok := sources.ManifestCommands[name].(map[string]any); ok {
+			section = v
 		}
-		if s, ok := manifest[name].(map[string]any); ok {
-			section = s
-		}
-
-	case cmdconfig.LayoutNone:
-		// section stays nil — no config directory at all.
+	case cmdconfig.SourceNone:
 	}
-
 	return section, nil
 }
 
