@@ -4,7 +4,7 @@
 // software, via any medium, is strictly prohibited without prior
 // written permission from LeafLock.
 
-package cmdconfig
+package configfield
 
 import (
 	"fmt"
@@ -21,18 +21,18 @@ import (
 // assigned directly.
 func Flatten(src any) (map[string]any, error) {
 	if src == nil {
-		return nil, errs.Unexpected(fmt.Errorf("cmdconfig[flatten]: %w", errNilValue))
+		return nil, errs.Unexpected(fmt.Errorf("configfield[flatten]: %w", errNilValue))
 	}
 
 	rv := reflect.ValueOf(src)
 	for rv.Kind() == reflect.Pointer {
 		if rv.IsNil() {
-			return nil, errs.Unexpected(fmt.Errorf("cmdconfig[flatten]: %w", errNilValue))
+			return nil, errs.Unexpected(fmt.Errorf("configfield[flatten]: %w", errNilValue))
 		}
 		rv = rv.Elem()
 	}
 	if rv.Kind() != reflect.Struct {
-		return nil, errs.Unexpected(fmt.Errorf("cmdconfig[flatten]: %w", errNotStruct))
+		return nil, errs.Unexpected(fmt.Errorf("configfield[flatten]: %w", errNotStruct))
 	}
 
 	return flattenStruct(rv)
@@ -61,7 +61,7 @@ func flattenStruct(rv reflect.Value) (map[string]any, error) {
 func flattenField(m map[string]any, sf *reflect.StructField, fv reflect.Value) error {
 	f, ok := fv.Interface().(field)
 	if !ok {
-		return errs.Unexpected(fmt.Errorf("cmdconfig[flatten]: field %q: %w", sf.Name, errFieldNotWrapped))
+		return errs.Unexpected(fmt.Errorf("configfield[flatten]: field %q: %w", sf.Name, errFieldNotWrapped))
 	}
 	if f.internal() {
 		return nil

@@ -4,7 +4,7 @@
 // software, via any medium, is strictly prohibited without prior
 // written permission from LeafLock.
 
-package cmdconfig
+package configfield
 
 import (
 	"errors"
@@ -84,22 +84,22 @@ func hasFieldMember(t reflect.Type) bool {
 // pointer to one.
 func Validate(v any) error {
 	if v == nil {
-		return errs.Unexpected(fmt.Errorf("cmdconfig[validate]: %w", errNilValue))
+		return errs.Unexpected(fmt.Errorf("configfield[validate]: %w", errNilValue))
 	}
 
 	rv := reflect.ValueOf(v)
 	for rv.Kind() == reflect.Pointer {
 		if rv.IsNil() {
-			return errs.Unexpected(fmt.Errorf("cmdconfig[validate]: %w", errNilValue))
+			return errs.Unexpected(fmt.Errorf("configfield[validate]: %w", errNilValue))
 		}
 		rv = rv.Elem()
 	}
 	if rv.Kind() != reflect.Struct {
-		return errs.Unexpected(fmt.Errorf("cmdconfig[validate]: %s: %w", rv.Type(), errNotStruct))
+		return errs.Unexpected(fmt.Errorf("configfield[validate]: %s: %w", rv.Type(), errNotStruct))
 	}
 
 	if err := validateStruct(rv); err != nil {
-		return errs.Unexpected(fmt.Errorf("cmdconfig[validate]: %w", err))
+		return errs.Unexpected(fmt.Errorf("configfield[validate]: %w", err))
 	}
 	return nil
 }

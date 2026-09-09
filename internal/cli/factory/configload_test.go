@@ -15,6 +15,7 @@ import (
 	"github.com/leaflockio/core-cli/internal/app"
 	"github.com/leaflockio/core-cli/internal/cli"
 	"github.com/leaflockio/core-cli/internal/cli/cmdconfig"
+	"github.com/leaflockio/core-cli/internal/configfield"
 	"github.com/leaflockio/core-cli/internal/errs"
 	"github.com/leaflockio/core-cli/internal/invocation"
 )
@@ -46,10 +47,10 @@ func (r *recordingConfigLoader) Validate() error {
 }
 
 // configLoaderStubCommand is a cli.Command that carries a caller-supplied
-// cmdconfig.ConfigLoader, for asserting on Load/Validate call behavior.
+// configfield.ConfigLoader, for asserting on Load/Validate call behavior.
 type configLoaderStubCommand struct {
 	use string
-	cfg cmdconfig.ConfigLoader
+	cfg configfield.ConfigLoader
 }
 
 func (c configLoaderStubCommand) Define(_ *app.App) *cli.Definition {

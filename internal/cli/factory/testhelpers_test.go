@@ -36,7 +36,7 @@ func causeOf(t *testing.T, err error) string {
 	return e.Contexts[0].Cause
 }
 
-// stubConfigLoader is a minimal cmdconfig.ConfigLoader for Definition.Config tests.
+// stubConfigLoader is a minimal configfield.ConfigLoader for Definition.Config tests.
 type stubConfigLoader struct{}
 
 func (stubConfigLoader) Load(_ map[string]any) error { return nil }

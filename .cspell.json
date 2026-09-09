@@ -138,6 +138,7 @@
     "hujson",
 
     "cmdconfig",
+    "configfield",
     "handlerless",
     "effectvalue",
     "Validatable",

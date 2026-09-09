@@ -4,17 +4,17 @@
 // software, via any medium, is strictly prohibited without prior
 // written permission from LeafLock.
 
-package cmdconfig_test
+package configfield_test
 
 import (
 	"testing"
 
-	"github.com/leaflockio/core-cli/internal/cli/cmdconfig"
+	"github.com/leaflockio/core-cli/internal/configfield"
 )
 
 // TestFlatten_nilSrc verifies an error is returned for a nil src.
 func TestFlatten_nilSrc(t *testing.T) {
-	if _, err := cmdconfig.Flatten(nil); err == nil {
+	if _, err := configfield.Flatten(nil); err == nil {
 		t.Fatal("expected error, got nil")
 	}
 }
@@ -23,10 +23,10 @@ func TestFlatten_nilSrc(t *testing.T) {
 // pointer.
 func TestFlatten_nilPointerSrc(t *testing.T) {
 	type cfg struct {
-		Format cmdconfig.Field[string]
+		Format configfield.Field[string]
 	}
 	var p *cfg
-	if _, err := cmdconfig.Flatten(p); err == nil {
+	if _, err := configfield.Flatten(p); err == nil {
 		t.Fatal("expected error, got nil")
 	}
 }
@@ -34,21 +34,21 @@ func TestFlatten_nilPointerSrc(t *testing.T) {
 // TestFlatten_notAStruct verifies an error is returned for a non-struct
 // value.
 func TestFlatten_notAStruct(t *testing.T) {
-	if _, err := cmdconfig.Flatten(42); err == nil {
+	if _, err := configfield.Flatten(42); err == nil {
 		t.Fatal("expected error, got nil")
 	}
 }
 
 type flattenGoodConfig struct {
-	Format   cmdconfig.Field[string]
+	Format   configfield.Field[string]
 	unexport string
 }
 
 // TestFlatten_structValue verifies a plain struct (not a pointer) is
 // accepted, and an unexported field is skipped.
 func TestFlatten_structValue(t *testing.T) {
-	c := flattenGoodConfig{Format: cmdconfig.Field[string]{Default: "standard"}, unexport: "private"}
-	m, err := cmdconfig.Flatten(c)
+	c := flattenGoodConfig{Format: configfield.Field[string]{Default: "standard"}, unexport: "private"}
+	m, err := configfield.Flatten(c)
 	if err != nil {
 		t.Fatalf("Flatten: %v", err)
 	}
@@ -62,8 +62,8 @@ func TestFlatten_structValue(t *testing.T) {
 
 // TestFlatten_pointerToStruct verifies a pointer to a struct is accepted.
 func TestFlatten_pointerToStruct(t *testing.T) {
-	c := &flattenGoodConfig{Format: cmdconfig.Field[string]{Default: "standard"}}
-	m, err := cmdconfig.Flatten(c)
+	c := &flattenGoodConfig{Format: configfield.Field[string]{Default: "standard"}}
+	m, err := configfield.Flatten(c)
 	if err != nil {
 		t.Fatalf("Flatten: %v", err)
 	}
@@ -73,18 +73,18 @@ func TestFlatten_pointerToStruct(t *testing.T) {
 }
 
 type flattenInternalConfig struct {
-	Format cmdconfig.Field[string]
-	Secret cmdconfig.Field[string]
+	Format configfield.Field[string]
+	Secret configfield.Field[string]
 }
 
 // TestFlatten_internalField_isSkipped verifies a field marked Internal
 // isn't written into the output map.
 func TestFlatten_internalField_isSkipped(t *testing.T) {
 	c := flattenInternalConfig{
-		Format: cmdconfig.Field[string]{Default: "standard"},
-		Secret: cmdconfig.Field[string]{Default: "hidden", Internal: true},
+		Format: configfield.Field[string]{Default: "standard"},
+		Secret: configfield.Field[string]{Default: "hidden", Internal: true},
 	}
-	m, err := cmdconfig.Flatten(&c)
+	m, err := configfield.Flatten(&c)
 	if err != nil {
 		t.Fatalf("Flatten: %v", err)
 	}
@@ -103,19 +103,19 @@ type flattenUnwrappedFieldConfig struct {
 // TestFlatten_unwrappedField_errors verifies flattening a struct with a
 // field that isn't a Field returns an error.
 func TestFlatten_unwrappedField_errors(t *testing.T) {
-	_, err := cmdconfig.Flatten(&flattenUnwrappedFieldConfig{Bad: "x"})
+	_, err := configfield.Flatten(&flattenUnwrappedFieldConfig{Bad: "x"})
 	if err == nil {
 		t.Fatal("expected error, got nil")
 	}
 }
 
 type flattenNestedConfig struct {
-	A cmdconfig.Field[bool]
-	B cmdconfig.Field[bool]
+	A configfield.Field[bool]
+	B configfield.Field[bool]
 }
 
 type flattenWithNestedConfig struct {
-	Nested cmdconfig.Field[flattenNestedConfig]
+	Nested configfield.Field[flattenNestedConfig]
 }
 
 // TestFlatten_structTypedField_isNested verifies a struct-typed Field's
@@ -123,14 +123,14 @@ type flattenWithNestedConfig struct {
 // directly.
 func TestFlatten_structTypedField_isNested(t *testing.T) {
 	c := flattenWithNestedConfig{
-		Nested: cmdconfig.Field[flattenNestedConfig]{
+		Nested: configfield.Field[flattenNestedConfig]{
 			Default: flattenNestedConfig{
-				A: cmdconfig.Field[bool]{Default: true},
-				B: cmdconfig.Field[bool]{Default: false},
+				A: configfield.Field[bool]{Default: true},
+				B: configfield.Field[bool]{Default: false},
 			},
 		},
 	}
-	m, err := cmdconfig.Flatten(&c)
+	m, err := configfield.Flatten(&c)
 	if err != nil {
 		t.Fatalf("Flatten: %v", err)
 	}
@@ -147,21 +147,21 @@ func TestFlatten_structTypedField_isNested(t *testing.T) {
 }
 
 type flattenNestedBadConfig struct {
-	A cmdconfig.Field[bool]
+	A configfield.Field[bool]
 	B string
 }
 
 type flattenWithNestedBadConfig struct {
-	Nested cmdconfig.Field[flattenNestedBadConfig]
+	Nested configfield.Field[flattenNestedBadConfig]
 }
 
 // TestFlatten_structTypedField_nestedErrorIsPropagated verifies an error
 // while flattening a struct-typed Field's nested value is propagated.
 func TestFlatten_structTypedField_nestedErrorIsPropagated(t *testing.T) {
 	c := flattenWithNestedBadConfig{
-		Nested: cmdconfig.Field[flattenNestedBadConfig]{Default: flattenNestedBadConfig{}},
+		Nested: configfield.Field[flattenNestedBadConfig]{Default: flattenNestedBadConfig{}},
 	}
-	_, err := cmdconfig.Flatten(&c)
+	_, err := configfield.Flatten(&c)
 	if err == nil {
 		t.Fatal("expected error, got nil")
 	}

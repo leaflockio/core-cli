@@ -4,9 +4,9 @@
 // software, via any medium, is strictly prohibited without prior
 // written permission from LeafLock.
 
-// Package cmdconfig decodes and validates a command's config value without
+// Package configfield decodes and validates a typed config value without
 // knowing its concrete type.
-package cmdconfig
+package configfield
 
 import (
 	"io/fs"

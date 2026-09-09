@@ -15,11 +15,11 @@ import (
 
 	"github.com/leaflockio/core-cli/internal/app"
 	"github.com/leaflockio/core-cli/internal/cli"
-	"github.com/leaflockio/core-cli/internal/cli/cmdconfig"
 	"github.com/leaflockio/core-cli/internal/cli/factory"
 	"github.com/leaflockio/core-cli/internal/cli/flags/system/noconfig"
 	"github.com/leaflockio/core-cli/internal/cli/hooks/ontreeready"
 	"github.com/leaflockio/core-cli/internal/config"
+	"github.com/leaflockio/core-cli/internal/configfield"
 	"github.com/leaflockio/core-cli/internal/invocation"
 	"github.com/leaflockio/core-cli/internal/terminal"
 	"github.com/leaflockio/core-cli/internal/ui"
@@ -433,7 +433,7 @@ func TestFactory_Build_allows_child_group_declared_in_parent_groups(t *testing.T
 	}
 }
 
-// nopConfigLoader is a minimal cmdconfig.ConfigLoader for Build-level tests.
+// nopConfigLoader is a minimal configfield.ConfigLoader for Build-level tests.
 type nopConfigLoader struct{}
 
 func (nopConfigLoader) Load(_ map[string]any) error { return nil }
@@ -464,7 +464,7 @@ func (r *recordingConfigLoader) Validate() error { return nil }
 
 type configLoaderStubCmd struct {
 	use string
-	cfg cmdconfig.ConfigLoader
+	cfg configfield.ConfigLoader
 }
 
 func (c *configLoaderStubCmd) Define(_ *app.App) *cli.Definition {

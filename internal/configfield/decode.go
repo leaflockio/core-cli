@@ -4,7 +4,7 @@
 // software, via any medium, is strictly prohibited without prior
 // written permission from LeafLock.
 
-package cmdconfig
+package configfield
 
 import (
 	"errors"
@@ -32,14 +32,14 @@ var (
 // rejected too.
 func Decode(section map[string]any, dest any) error {
 	if dest == nil {
-		return errs.Unexpected(fmt.Errorf("cmdconfig[decode]: %w", errNilValue))
+		return errs.Unexpected(fmt.Errorf("configfield[decode]: %w", errNilValue))
 	}
 	rv := reflect.ValueOf(dest)
 	if rv.Kind() != reflect.Pointer || rv.IsNil() {
-		return errs.Unexpected(fmt.Errorf("cmdconfig[decode]: %w", errNotPointer))
+		return errs.Unexpected(fmt.Errorf("configfield[decode]: %w", errNotPointer))
 	}
 	if rv.Elem().Kind() != reflect.Struct {
-		return errs.Unexpected(fmt.Errorf("cmdconfig[decode]: %w", errNotStruct))
+		return errs.Unexpected(fmt.Errorf("configfield[decode]: %w", errNotStruct))
 	}
 	return decodeStruct(section, rv.Elem())
 }
@@ -79,7 +79,7 @@ func decodeStruct(section map[string]any, rv reflect.Value) error {
 func decodeField(section map[string]any, sf *reflect.StructField, fv reflect.Value) (string, error) {
 	f, ok := fv.Interface().(field)
 	if !ok {
-		return "", errs.Unexpected(fmt.Errorf("cmdconfig[decode]: field %q: %w", sf.Name, errFieldNotWrapped))
+		return "", errs.Unexpected(fmt.Errorf("configfield[decode]: field %q: %w", sf.Name, errFieldNotWrapped))
 	}
 	key := fieldKey(sf, f)
 	raw, present := section[key]
@@ -91,7 +91,7 @@ func decodeField(section map[string]any, sf *reflect.StructField, fv reflect.Val
 	}
 	setter, ok := fv.Addr().Interface().(fieldSetter)
 	if !ok {
-		return key, errs.Unexpected(fmt.Errorf("cmdconfig[decode]: field %q: %w", sf.Name, errFieldNotWrapped))
+		return key, errs.Unexpected(fmt.Errorf("configfield[decode]: field %q: %w", sf.Name, errFieldNotWrapped))
 	}
 	if err := setter.setOverride(raw); err != nil {
 		return key, fmt.Errorf("%q: %w", key, err)

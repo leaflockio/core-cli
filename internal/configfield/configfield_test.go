@@ -4,7 +4,7 @@
 // software, via any medium, is strictly prohibited without prior
 // written permission from LeafLock.
 
-package cmdconfig
+package configfield
 
 import (
 	"errors"
