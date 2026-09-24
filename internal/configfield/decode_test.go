@@ -8,6 +8,7 @@ package configfield_test
 
 import (
 	"errors"
+	"strings"
 	"testing"
 
 	"github.com/leaflockio/core-cli/internal/configfield"
@@ -196,5 +197,121 @@ func TestDecode_collectsEveryFieldError(t *testing.T) {
 	}
 	if got := len(joiner.Unwrap()); got != 2 {
 		t.Errorf("collected %d field errors, want 2", got)
+	}
+}
+
+type decodeElementFixture struct {
+	Pattern configfield.Field[string]
+	Style   configfield.Field[string]
+}
+
+type decodeSliceOfFieldStructConfig struct {
+	Overrides configfield.Field[[]decodeElementFixture]
+}
+
+// TestDecode_sliceOfFieldStruct_decodesEachElement verifies each element
+// of a slice whose type is Field-shaped is decoded independently.
+func TestDecode_sliceOfFieldStruct_decodesEachElement(t *testing.T) {
+	var c decodeSliceOfFieldStructConfig
+	section := map[string]any{
+		"overrides": []any{
+			map[string]any{"pattern": "go", "style": "c_style"},
+			map[string]any{"pattern": "py", "style": "shell_style"},
+		},
+	}
+	if err := configfield.Decode(section, &c); err != nil {
+		t.Fatalf("Decode: %v", err)
+	}
+	got := c.Overrides.Value()
+	if len(got) != 2 {
+		t.Fatalf("len = %d, want 2", len(got))
+	}
+	if got[0].Pattern.Value() != "go" || got[0].Style.Value() != "c_style" {
+		t.Errorf("got[0] = %+v", got[0])
+	}
+	if got[1].Pattern.Value() != "py" || got[1].Style.Value() != "shell_style" {
+		t.Errorf("got[1] = %+v", got[1])
+	}
+}
+
+// TestDecode_sliceOfFieldStruct_notASequence verifies a non-list raw
+// value for a Field-shaped slice is rejected.
+func TestDecode_sliceOfFieldStruct_notASequence(t *testing.T) {
+	var c decodeSliceOfFieldStructConfig
+	err := configfield.Decode(map[string]any{"overrides": "not-a-list"}, &c)
+	if err == nil {
+		t.Fatal("expected error, got nil")
+	}
+}
+
+// TestDecode_sliceOfFieldStruct_nonMappingElementRejected verifies an
+// element that isn't itself a mapping is reported, not silently skipped.
+func TestDecode_sliceOfFieldStruct_nonMappingElementRejected(t *testing.T) {
+	var c decodeSliceOfFieldStructConfig
+	section := map[string]any{"overrides": []any{"oops"}}
+	if err := configfield.Decode(section, &c); err == nil {
+		t.Fatal("expected error, got nil")
+	}
+}
+
+// TestDecode_sliceOfFieldStruct_collectsEveryElementError verifies every
+// bad element is reported, not just the first.
+func TestDecode_sliceOfFieldStruct_collectsEveryElementError(t *testing.T) {
+	var c decodeSliceOfFieldStructConfig
+	section := map[string]any{
+		"overrides": []any{
+			map[string]any{"pattern": "go", "bogus1": "x"},
+			map[string]any{"pattern": "py", "bogus2": "y"},
+		},
+	}
+	err := configfield.Decode(section, &c)
+	if err == nil {
+		t.Fatal("expected error, got nil")
+	}
+	msg := err.Error()
+	if !strings.Contains(msg, "bogus1") || !strings.Contains(msg, "bogus2") {
+		t.Errorf("error = %q, want both bogus1 and bogus2 reported", msg)
+	}
+}
+
+type decodeMapOfFieldStructConfig struct {
+	Styles configfield.Field[map[string]decodeElementFixture]
+}
+
+// TestDecode_mapOfFieldStruct_decodesEachElement verifies each value of a
+// string-keyed map whose type is Field-shaped is decoded independently.
+func TestDecode_mapOfFieldStruct_decodesEachElement(t *testing.T) {
+	var c decodeMapOfFieldStructConfig
+	section := map[string]any{
+		"styles": map[string]any{
+			"my_style": map[string]any{"pattern": "go", "style": "c_style"},
+		},
+	}
+	if err := configfield.Decode(section, &c); err != nil {
+		t.Fatalf("Decode: %v", err)
+	}
+	got := c.Styles.Value()["my_style"]
+	if got.Pattern.Value() != "go" || got.Style.Value() != "c_style" {
+		t.Errorf("got = %+v", got)
+	}
+}
+
+// TestDecode_mapOfFieldStruct_collectsEveryElementError verifies every
+// bad value is reported, not just the first.
+func TestDecode_mapOfFieldStruct_collectsEveryElementError(t *testing.T) {
+	var c decodeMapOfFieldStructConfig
+	section := map[string]any{
+		"styles": map[string]any{
+			"a": map[string]any{"bogus1": "x"},
+			"b": map[string]any{"bogus2": "y"},
+		},
+	}
+	err := configfield.Decode(section, &c)
+	if err == nil {
+		t.Fatal("expected error, got nil")
+	}
+	msg := err.Error()
+	if !strings.Contains(msg, "bogus1") || !strings.Contains(msg, "bogus2") {
+		t.Errorf("error = %q, want both bogus1 and bogus2 reported", msg)
 	}
 }

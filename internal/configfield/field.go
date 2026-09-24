@@ -100,22 +100,8 @@ type fieldSetter interface {
 var _ fieldSetter = &Field[struct{}]{}
 
 // setOverride decodes raw into the field's override and marks it as set.
-// When T is itself a struct, raw must be a map[string]any: the override is
-// seeded from a copy of Default (so nested fields the user didn't configure
-// keep their real defaults, not zero values) and then decoded field by
-// field, recursively. The decoded value is then checked against Options and
-// Validate, when set — a rejection leaves the field's override unset.
 func (f *Field[T]) setOverride(raw any) error {
-	if reflect.TypeFor[T]().Kind() == reflect.Struct {
-		rawMap, ok := raw.(map[string]any)
-		if !ok {
-			return errNotAMapping
-		}
-		f.overrideValue = f.Default
-		if err := decodeStruct(rawMap, reflect.ValueOf(&f.overrideValue).Elem()); err != nil {
-			return err
-		}
-	} else if err := codec.DecodeValue(raw, &f.overrideValue); err != nil {
+	if err := f.decodeOverride(raw); err != nil {
 		return err
 	}
 	if err := f.checkValue(f.overrideValue); err != nil {
@@ -125,10 +111,40 @@ func (f *Field[T]) setOverride(raw any) error {
 	return nil
 }
 
-// checkDefault requires Default to be valid — present among Options when
-// Options is set, and accepted by Validate when Validate is set — for the
-// field interface. Catches an author's own typo or a Default that fell out
-// of sync with Options or Validate.
+// decodeOverride decodes raw into f.overrideValue, dispatching by T's
+// shape.
+func (f *Field[T]) decodeOverride(raw any) error {
+	t := reflect.TypeFor[T]()
+	dest := reflect.ValueOf(&f.overrideValue).Elem()
+	if t.Kind() == reflect.Struct {
+		f.overrideValue = f.Default
+		return decodeStructValue(raw, dest)
+	}
+	if fieldTypedElem(t) {
+		return decodeElements(raw, dest)
+	}
+	return codec.DecodeValue(raw, &f.overrideValue)
+}
+
+// isFieldShaped reports whether t is a struct with at least one exported
+// field implementing the field interface.
+func isFieldShaped(t reflect.Type) bool {
+	return t.Kind() == reflect.Struct && hasFieldMember(t)
+}
+
+// fieldTypedElem reports whether t is a string-keyed map or slice whose
+// element type is Field-shaped.
+func fieldTypedElem(t reflect.Type) bool {
+	isSlice := t.Kind() == reflect.Slice
+	isStringKeyedMap := t.Kind() == reflect.Map && t.Key().Kind() == reflect.String
+	if !isSlice && !isStringKeyedMap {
+		return false
+	}
+	return isFieldShaped(t.Elem())
+}
+
+// checkDefault reports whether Default is valid according to Options and
+// Validate.
 func (f Field[T]) checkDefault() error {
 	return f.checkValue(f.Default)
 }
@@ -145,13 +161,8 @@ func (f Field[T]) checkValue(v T) error {
 	return nil
 }
 
-// checkValueInOptions requires v to equal one of f.Options when Options is
-// non-empty. T isn't constrained to comparable (it may be a slice or map),
-// so equality is checked with reflect.DeepEqual — which is why Options on a
-// struct-typed field is rejected outright rather than attempted: any such
-// struct is Field-shaped all the way down, and DeepEqual never considers
-// two non-nil func values equal, so a nested Validate func would make every
-// comparison spuriously fail.
+// checkValueInOptions reports whether v is one of f.Options, when Options
+// is non-empty.
 func (f Field[T]) checkValueInOptions(v T) error {
 	if len(f.Options) == 0 {
 		return nil
@@ -172,17 +183,16 @@ var (
 	matchAllCap   = regexp.MustCompile("([a-z0-9])([A-Z])")
 )
 
-// toSnakeCase converts a Go identifier such as UpdateLicenseFile to
-// update_license_file, keeping acronym runs like TTL or SPDX intact
-// (TTL stays ttl, OSIOnly becomes osi_only).
+// toSnakeCase converts a Go identifier to snake_case.
+//
+//	APIKey -> api_key
 func toSnakeCase(s string) string {
 	s = matchFirstCap.ReplaceAllString(s, "${1}_${2}")
 	s = matchAllCap.ReplaceAllString(s, "${1}_${2}")
 	return strings.ToLower(s)
 }
 
-// fieldKey returns f's decode/encode key: its own Key if set, otherwise
-// sf's name converted to snake_case.
+// fieldKey returns f's decode/encode key.
 func fieldKey(sf *reflect.StructField, f field) string {
 	if k := f.key(); k != "" {
 		return k

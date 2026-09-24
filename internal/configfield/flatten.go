@@ -15,10 +15,7 @@ import (
 )
 
 // Flatten produces a map[string]any from src, a struct or a pointer to
-// one. For every Field[T] (except ones marked Internal, which are
-// skipped), it emits one key mapped to its resolved Value. When a resolved
-// value is itself a struct, it's flattened into a nested map rather than
-// assigned directly.
+// one.
 func Flatten(src any) (map[string]any, error) {
 	if src == nil {
 		return nil, errs.Unexpected(fmt.Errorf("configfield[flatten]: %w", errNilValue))
@@ -52,12 +49,8 @@ func flattenStruct(rv reflect.Value) (map[string]any, error) {
 	return m, nil
 }
 
-// flattenField writes fv's resolved value into m under its key, unless the
-// field is Internal. A resolved value that's itself a struct is flattened
-// into a nested map rather than assigned directly. Anything else — a
-// scalar, or a slice/map that may itself contain a plain struct — goes
-// through codec.EncodeValue, so a struct nested inside a slice or map is
-// keyed by its mapstructure tags rather than its raw Go field names.
+// flattenField writes fv's resolved value into m under its key, unless
+// the field is Internal.
 func flattenField(m map[string]any, sf *reflect.StructField, fv reflect.Value) error {
 	f, ok := fv.Interface().(field)
 	if !ok {
@@ -66,22 +59,61 @@ func flattenField(m map[string]any, sf *reflect.StructField, fv reflect.Value) e
 	if f.internal() {
 		return nil
 	}
-	key := fieldKey(sf, f)
-
-	val := f.value()
-	valRv := reflect.ValueOf(val)
-	if valRv.Kind() == reflect.Struct {
-		nested, err := flattenStruct(valRv)
-		if err != nil {
-			return err
-		}
-		m[key] = nested
-		return nil
-	}
-	encoded, err := codec.EncodeValue(val)
+	encoded, err := flattenValue(f.value())
 	if err != nil {
 		return err
 	}
-	m[key] = encoded
+	m[fieldKey(sf, f)] = encoded
 	return nil
+}
+
+// flattenValue encodes val, a Field[T]'s resolved value, into a form safe
+// for a config map.
+func flattenValue(val any) (any, error) {
+	valRv := reflect.ValueOf(val)
+	if valRv.Kind() == reflect.Struct {
+		return flattenStruct(valRv)
+	}
+	if fieldTypedElem(valRv.Type()) {
+		return flattenElements(valRv)
+	}
+	return codec.EncodeValue(val)
+}
+
+// flattenElements flattens rv, a string-keyed map or slice whose element
+// type is Field-shaped, one element at a time via flattenStruct.
+func flattenElements(rv reflect.Value) (any, error) {
+	if rv.Kind() == reflect.Slice {
+		return flattenElementSlice(rv)
+	}
+	return flattenElementMap(rv)
+}
+
+// flattenElementSlice flattens rv, a slice whose element type is
+// Field-shaped, into a plain slice of nested maps.
+func flattenElementSlice(rv reflect.Value) (any, error) {
+	out := make([]any, rv.Len())
+	for i := range rv.Len() {
+		nested, err := flattenStruct(rv.Index(i))
+		if err != nil {
+			return nil, fmt.Errorf("[%d]: %w", i, err)
+		}
+		out[i] = nested
+	}
+	return out, nil
+}
+
+// flattenElementMap flattens rv, a string-keyed map whose value type is
+// Field-shaped, into a plain map of nested maps.
+func flattenElementMap(rv reflect.Value) (any, error) {
+	out := make(map[string]any, rv.Len())
+	iter := rv.MapRange()
+	for iter.Next() {
+		nested, err := flattenStruct(iter.Value())
+		if err != nil {
+			return nil, fmt.Errorf("%q: %w", iter.Key(), err)
+		}
+		out[fmt.Sprint(iter.Key().Interface())] = nested
+	}
+	return out, nil
 }

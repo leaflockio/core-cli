@@ -10,6 +10,7 @@ import (
 	"errors"
 	"os"
 	"path/filepath"
+	"reflect"
 	"strings"
 	"testing"
 )
@@ -121,6 +122,33 @@ func TestCommandConfig_Save_flattenErrorIsPropagated(t *testing.T) {
 
 	err := cc.Save(filepath.Join(t.TempDir(), "config"), 0o755, 0o644)
 	if err == nil {
+		t.Fatal("expected error, got nil")
+	}
+}
+
+type decodeStructValueFixture struct {
+	A Field[bool]
+}
+
+func TestDecodeStructValue_success(t *testing.T) {
+	dest := reflect.ValueOf(&decodeStructValueFixture{A: Field[bool]{Default: true}}).Elem()
+
+	if err := decodeStructValue(map[string]any{"a": false}, dest); err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	got, ok := dest.Interface().(decodeStructValueFixture)
+	if !ok {
+		t.Fatalf("dest.Interface() = %T, want decodeStructValueFixture", dest.Interface())
+	}
+	if got.A.Value() != false {
+		t.Errorf("A.Value() = %v, want false", got.A.Value())
+	}
+}
+
+func TestDecodeStructValue_rawNotAMapping(t *testing.T) {
+	dest := reflect.ValueOf(&decodeStructValueFixture{}).Elem()
+
+	if err := decodeStructValue("not-a-map", dest); err == nil {
 		t.Fatal("expected error, got nil")
 	}
 }

@@ -166,3 +166,70 @@ func TestFlatten_structTypedField_nestedErrorIsPropagated(t *testing.T) {
 		t.Fatal("expected error, got nil")
 	}
 }
+
+type flattenElementFixture struct {
+	Pattern configfield.Field[string]
+	Style   configfield.Field[string]
+}
+
+type flattenSliceOfFieldStructConfig struct {
+	Overrides configfield.Field[[]flattenElementFixture]
+}
+
+// TestFlatten_sliceOfFieldStruct_flattensEachElement verifies each
+// element of a Field-shaped slice is flattened into a nested map.
+func TestFlatten_sliceOfFieldStruct_flattensEachElement(t *testing.T) {
+	c := flattenSliceOfFieldStructConfig{
+		Overrides: configfield.Field[[]flattenElementFixture]{
+			Default: []flattenElementFixture{
+				{
+					Pattern: configfield.Field[string]{Default: "go"},
+					Style:   configfield.Field[string]{Default: "c_style"},
+				},
+			},
+		},
+	}
+	m, err := configfield.Flatten(&c)
+	if err != nil {
+		t.Fatalf("Flatten: %v", err)
+	}
+	overrides, ok := m["overrides"].([]any)
+	if !ok || len(overrides) != 1 {
+		t.Fatalf(`m["overrides"] = %#v, want a one-element slice`, m["overrides"])
+	}
+	row, ok := overrides[0].(map[string]any)
+	if !ok || row["pattern"] != "go" || row["style"] != "c_style" {
+		t.Errorf("overrides[0] = %#v", overrides[0])
+	}
+}
+
+type flattenMapOfFieldStructConfig struct {
+	Styles configfield.Field[map[string]flattenElementFixture]
+}
+
+// TestFlatten_mapOfFieldStruct_flattensEachElement verifies each value of
+// a Field-shaped string-keyed map is flattened into a nested map.
+func TestFlatten_mapOfFieldStruct_flattensEachElement(t *testing.T) {
+	c := flattenMapOfFieldStructConfig{
+		Styles: configfield.Field[map[string]flattenElementFixture]{
+			Default: map[string]flattenElementFixture{
+				"my_style": {
+					Pattern: configfield.Field[string]{Default: "go"},
+					Style:   configfield.Field[string]{Default: "c_style"},
+				},
+			},
+		},
+	}
+	m, err := configfield.Flatten(&c)
+	if err != nil {
+		t.Fatalf("Flatten: %v", err)
+	}
+	styles, ok := m["styles"].(map[string]any)
+	if !ok {
+		t.Fatalf(`m["styles"] = %#v, want a map`, m["styles"])
+	}
+	row, ok := styles["my_style"].(map[string]any)
+	if !ok || row["pattern"] != "go" || row["style"] != "c_style" {
+		t.Errorf(`styles["my_style"] = %#v`, styles["my_style"])
+	}
+}

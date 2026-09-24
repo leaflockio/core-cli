@@ -308,9 +308,11 @@ type plainElementFixture struct {
 	Detect string
 }
 
-// fieldElementFixture has a Field member — unsafe as a map/slice/array
-// element, since mapstructure would decode into it directly with no idea
-// Field[T] exists.
+// fieldElementFixture has a Field member. Safe as a string-keyed map
+// value or slice element — Decode and Flatten handle that shape
+// themselves — but still unsafe as a fixed-size array element, since
+// that falls through to ordinary mapstructure with no idea Field[T]
+// exists.
 type fieldElementFixture struct {
 	Detect configfield.Field[string]
 }
@@ -333,12 +335,13 @@ type validateMapOfFieldStructConfig struct {
 	PerFile configfield.Field[map[string]fieldElementFixture]
 }
 
-// TestValidate_mapOfFieldStruct_rejected verifies a map whose value type
-// has a Field buried inside it is rejected — mapstructure would corrupt it.
-func TestValidate_mapOfFieldStruct_rejected(t *testing.T) {
+// TestValidate_mapOfFieldStruct_passes verifies a string-keyed map whose
+// value type has a Field buried inside it is accepted — Decode and
+// Flatten handle this shape themselves, element by element.
+func TestValidate_mapOfFieldStruct_passes(t *testing.T) {
 	c := validateMapOfFieldStructConfig{}
-	if err := configfield.Validate(&c); err == nil {
-		t.Fatal("expected error, got nil")
+	if err := configfield.Validate(&c); err != nil {
+		t.Fatalf("unexpected error: %v", err)
 	}
 }
 
@@ -360,12 +363,13 @@ type validateSliceOfFieldStructConfig struct {
 	Legacy configfield.Field[[]fieldElementFixture]
 }
 
-// TestValidate_sliceOfFieldStruct_rejected verifies a slice whose element
-// type has a Field buried inside it is rejected.
-func TestValidate_sliceOfFieldStruct_rejected(t *testing.T) {
+// TestValidate_sliceOfFieldStruct_passes verifies a slice whose element
+// type has a Field buried inside it is accepted — Decode and Flatten
+// handle this shape themselves, element by element.
+func TestValidate_sliceOfFieldStruct_passes(t *testing.T) {
 	c := validateSliceOfFieldStructConfig{}
-	if err := configfield.Validate(&c); err == nil {
-		t.Fatal("expected error, got nil")
+	if err := configfield.Validate(&c); err != nil {
+		t.Fatalf("unexpected error: %v", err)
 	}
 }
 
@@ -374,9 +378,23 @@ type validateArrayOfFieldStructConfig struct {
 }
 
 // TestValidate_arrayOfFieldStruct_rejected verifies a fixed-size array
-// whose element type has a Field buried inside it is rejected too.
+// whose element type has a Field buried inside it is rejected.
 func TestValidate_arrayOfFieldStruct_rejected(t *testing.T) {
 	c := validateArrayOfFieldStructConfig{}
+	if err := configfield.Validate(&c); err == nil {
+		t.Fatal("expected error, got nil")
+	}
+}
+
+type validatePlainArrayConfig struct {
+	Fixed configfield.Field[[2]string]
+}
+
+// TestValidate_plainArray_rejected verifies a fixed-size array is
+// rejected regardless of its element type — its length is fixed by the
+// Go type, not by what a config file declares.
+func TestValidate_plainArray_rejected(t *testing.T) {
+	c := validatePlainArrayConfig{}
 	if err := configfield.Validate(&c); err == nil {
 		t.Fatal("expected error, got nil")
 	}

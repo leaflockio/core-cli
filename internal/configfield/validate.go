@@ -39,12 +39,11 @@ var (
 	errNotAMapping       = errors.New("expected a mapping")
 	errUnsupportedType   = errors.New("field type cannot be decoded")
 	errDuplicateFieldKey = errors.New("duplicate key")
-	errFieldTypedElement = errors.New("map, slice, and array elements cannot contain a Field")
+	errFieldTypedElement = errors.New("map and slice elements cannot contain a Field")
 )
 
-// unsupportedKinds are T kinds that codec/mapstructure can never decode
-// into or encode meaningfully, so Field[T] rejects them outright rather
-// than letting them fail later with a confusing low-level error.
+// unsupportedKinds are T kinds Field[T] rejects outright — codec/
+// mapstructure can never decode into or encode most of them meaningfully.
 var unsupportedKinds = map[reflect.Kind]bool{
 	reflect.Chan:          true,
 	reflect.Func:          true,
@@ -52,17 +51,14 @@ var unsupportedKinds = map[reflect.Kind]bool{
 	reflect.Complex64:     true,
 	reflect.Complex128:    true,
 	reflect.Interface:     true,
+	reflect.Array:         true,
 }
 
 // containerKinds are T kinds whose element type needs checking for a
-// buried Field — codec/mapstructure decodes into a map, slice, or array
-// element via its own struct logic, with no idea Field[T] exists, so an
-// element struct containing one would get silently corrupted rather than
-// decoded correctly.
+// buried Field.
 var containerKinds = map[reflect.Kind]bool{
 	reflect.Map:   true,
 	reflect.Slice: true,
-	reflect.Array: true,
 }
 
 // hasFieldMember reports whether t — expected to be a struct — has any
@@ -77,11 +73,8 @@ func hasFieldMember(t reflect.Type) bool {
 	return false
 }
 
-// Validate reports an error if any exported field, at any depth, of the
-// given value's struct type is not a Field, has a type that can't be
-// decoded, has a Default that isn't valid per its own Options or Validate,
-// or shares its key with a sibling field. The value may be a struct or a
-// pointer to one.
+// Validate reports whether v, a struct or pointer to one, is correctly
+// shaped for Decode.
 func Validate(v any) error {
 	if v == nil {
 		return errs.Unexpected(fmt.Errorf("configfield[validate]: %w", errNilValue))
@@ -104,11 +97,8 @@ func Validate(v any) error {
 	return nil
 }
 
-// validateStruct checks every exported field of rv, collecting every
-// violation found (each with a dotted path back to its field) rather than
-// stopping at the first — including any two sibling fields that resolve to
-// the same key, which would otherwise silently share one decoded value or
-// have one overwrite the other when flattened.
+// validateStruct checks every exported field of rv and collects every
+// violation found.
 func validateStruct(rv reflect.Value) error {
 	var violations []error
 	keyOwners := make(map[string]string)
@@ -132,12 +122,7 @@ func validateStruct(rv reflect.Value) error {
 	return errors.Join(violations...)
 }
 
-// validateField requires fv to be a Field[T] for some T that's decodable
-// and, if a map, slice, or array, has an element type with no Field buried
-// inside it. Requires Default to be among its own Options (when Options is
-// set), recursing into T's own Default when T is itself a struct. Returns
-// the field interface value on success so validateStruct can check it for
-// a duplicate key without asserting it a second time.
+// validateField requires fv to be a decodable Field[T].
 func validateField(fv reflect.Value) (field, error) {
 	if !fv.Type().Implements(fieldType) {
 		return nil, errFieldNotWrapped
@@ -155,8 +140,13 @@ func validateField(fv reflect.Value) (field, error) {
 	}
 	if containerKinds[vt.Kind()] {
 		elem := vt.Elem()
-		if elem.Kind() == reflect.Struct && hasFieldMember(elem) {
-			return nil, fmt.Errorf("%s: %w", vt, errFieldTypedElement)
+		if isFieldShaped(elem) {
+			if !fieldTypedElem(vt) {
+				return nil, fmt.Errorf("%s: %w", vt, errFieldTypedElement)
+			}
+			if err := validateStruct(reflect.New(elem).Elem()); err != nil {
+				return nil, err
+			}
 		}
 	}
 	if vt.Kind() == reflect.Struct {
